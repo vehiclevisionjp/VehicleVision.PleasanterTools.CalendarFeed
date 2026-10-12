@@ -29,10 +29,13 @@ dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web
 ```
 
 ```bash
-# フィードを作る（応答の url が購読 URL。トークンは 1 度しか表示されない）
+# 秘密の鍵を作って設定する（フィードごとの Pleasanter API キーを DB へ暗号化して置く鍵。失うと API キーは復号できない）
+export CALENDARFEED_SECRET_KEY=$(dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web -- --generate-secret-key)
+
+# フィードを作る（応答の url が購読 URL。トークンは 1 度しか表示されない。API キーは登録後は返さない）
 curl -X POST http://localhost:5000/admin/api/feeds \
   -H "Authorization: Bearer $CALENDARFEED_ADMIN_APIKEY" -H "Content-Type: application/json" \
-  -d '{"name":"共有予定","siteId":123,"mapping":{"startColumn":"StartTime","endColumn":"CompletionTime"}}'
+  -d '{"name":"共有予定","siteId":123,"apiKey":"<Pleasanter の API キー>","apiKeyUserTimeZoneId":"Asia/Tokyo","language":"ja"}'
 ```
 
 | API | 内容 |
@@ -41,6 +44,7 @@ curl -X POST http://localhost:5000/admin/api/feeds \
 | `GET /admin/api/feeds/` | フィードの一覧（トークンは含まない） |
 | `POST /admin/api/feeds` | フィードの作成 |
 | `POST /admin/api/feeds/{id}/rotate` | トークンの作り直し（旧トークンは即失効） |
+| `PUT /admin/api/feeds/{id}/apikey` | API キー（と利用者のタイムゾーン）の差し替え |
 | `DELETE /admin/api/feeds/{id}` | フィードの失効 |
 
 ## 対応する RDBMS
