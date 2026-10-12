@@ -1,0 +1,9 @@
+{
+  "//": "本アプリ全体の設定。実値は Service.local.json（git 管理外）か環境変数で上書きする",
+
+  "//TimeZoneDefault": "既定のタイムゾーン。Pleasanter.json の ApiKeyUserTimeZoneId が未設定のとき、API キーを持つ Pleasanter 利用者のタイムゾーンとして使う。IANA 形式（Asia/Tokyo）と Windows 形式（Tokyo Standard Time）のどちらでもよい。**運用開始後に変えないこと**（予定の時刻がずれる）",
+  "TimeZoneDefault": "Asia/Tokyo",
+
+  "//PublicBaseUrl": "本アプリの公開 URL。購読 URL を作るときの基点。リバースプロキシの内側では Host が内部の値になるため、公開 URL をここで固定する。末尾のスラッシュは付けない。未設定なら要求の Host から作る",
+  "PublicBaseUrl": null
+}

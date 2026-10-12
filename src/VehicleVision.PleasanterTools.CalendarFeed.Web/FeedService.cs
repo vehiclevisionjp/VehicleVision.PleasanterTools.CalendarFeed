@@ -50,7 +50,7 @@ public sealed class FeedService(
 
             foreach (var record in page.Records)
             {
-                if (EventMapper.Map(record, feed, _apiUserZone, pleasanter.PublicBaseUrl) is { } mapped)
+                if (EventMapper.Map(record, feed, _apiUserZone, pleasanter.LinkBaseUrl) is { } mapped)
                 {
                     events.Add(mapped);
                 }

@@ -20,7 +20,7 @@ public sealed class PleasanterOptions
     public required string ApiKeyUserTimeZoneId { get; init; }
 
     /// <summary>予定に付けるレコードへのリンクの基点。利用者のブラウザから届く URL を指定する。</summary>
-    public string? PublicBaseUrl { get; init; }
+    public string? LinkBaseUrl { get; init; }
 
     /// <summary>API のバージョン。リクエストボディの <c>ApiVersion</c> に載せる。</summary>
     public decimal ApiVersion { get; init; } = 1.1m;

@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <!-- 実値を置く *.local.json は配布物へ入れない -->
+    <Content Remove="App_Data/Parameters/*.local.json" />
+    <None Remove="App_Data/Parameters/*.local.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Core\VehicleVision.PleasanterTools.CalendarFeed.Core.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Data\VehicleVision.PleasanterTools.CalendarFeed.Data.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Pleasanter\VehicleVision.PleasanterTools.CalendarFeed.Pleasanter.csproj" />
