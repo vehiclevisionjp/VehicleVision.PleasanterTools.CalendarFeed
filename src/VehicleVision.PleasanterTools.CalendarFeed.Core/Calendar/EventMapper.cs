@@ -25,11 +25,16 @@ public static class EventMapper
     /// <param name="feed">フィード定義。</param>
     /// <param name="apiUserTimeZone">API キーを持つ利用者のタイムゾーン。</param>
     /// <param name="linkBaseUrl">Pleasanter の公開 URL。指定すると各予定へレコードへのリンクを付ける。</param>
+    /// <param name="resolved">
+    /// Pleasanter に表示名へ解決させた文字（列名 → 表示名。選択肢・リンク・ユーザー・状況）。
+    /// 無い列は生の値を使う（Issue #5）。
+    /// </param>
     public static CalendarEvent? Map(
         JsonNode record,
         FeedDefinition feed,
         TimeZoneInfo apiUserTimeZone,
-        string? linkBaseUrl = null)
+        string? linkBaseUrl = null,
+        IReadOnlyDictionary<string, string>? resolved = null)
     {
         var mapping = feed.Mapping;
 
@@ -45,9 +50,24 @@ public static class EventMapper
             return null;
         }
 
-        // 組み上げ済みの ItemTitle が無い応答（想定外の形）では Title へ落とす
-        var summary = GetString(record, mapping.SummaryColumn)
-            ?? (mapping.SummaryColumn == FeedColumns.ItemTitle ? GetString(record, "Title") : null);
+        string? summary;
+        if (mapping.SummaryTemplate is { } template)
+        {
+            // 列の値を書式・表示名を通して組み合わせる（Issue #5）
+            summary = TextTemplate.Render(
+                TextTemplate.Parse(template),
+                (column, format) => ColumnText(record, column, format, mapping, resolved) ?? string.Empty);
+        }
+        else if (mapping.SummaryColumn == FeedColumns.ItemTitle)
+        {
+            // 組み上げ済みの ItemTitle が無い応答（想定外の形）では Title へ落とす
+            summary = GetString(record, FeedColumns.ItemTitle) ?? GetString(record, "Title");
+        }
+        else
+        {
+            summary = ColumnText(record, mapping.SummaryColumn, null, mapping, resolved);
+        }
+
         var end = mapping.EndColumn is null ? null : GetDateTime(record, mapping.EndColumn);
 
         DateTimeOffset startValue;
@@ -82,13 +102,62 @@ public static class EventMapper
             Start = startValue,
             End = endValue,
             AllDay = allDay,
-            Description = mapping.DescriptionColumn is null ? null : GetString(record, mapping.DescriptionColumn),
-            Location = mapping.LocationColumn is null ? null : GetString(record, mapping.LocationColumn),
+            Description = mapping.DescriptionColumn is null
+                ? null
+                : ColumnText(record, mapping.DescriptionColumn, null, mapping, resolved),
+            Location = mapping.LocationColumn is null
+                ? null
+                : ColumnText(record, mapping.LocationColumn, null, mapping, resolved),
             Url = linkBaseUrl is null ? null : $"{linkBaseUrl.TrimEnd('/')}/items/{recordId}",
             LastModified = updated is { } u ? At(u, apiUserTimeZone) : null,
             Sequence = Math.Max(0, (GetInt(record, "Ver") ?? 1) - 1),
         };
     }
+
+    /// <summary>
+    /// 列の値を**表示用の文字**にする。
+    /// <list type="bullet">
+    /// <item>日付・数値の列は、生の値を **.NET の書式**（<paramref name="inlineFormat"/> ＞ <see cref="FeedMapping.Formats"/>）で整形する。
+    /// 未設定（<c>1899-12-30</c>）の日付は空文字。インバリアントカルチャ</item>
+    /// <item>選択肢・リンク・ユーザー・状況の列は、Pleasanter が解決した表示名（<paramref name="resolved"/>）。無ければ生の値</item>
+    /// <item>それ以外は生の値</item>
+    /// </list>
+    /// </summary>
+    internal static string? ColumnText(
+        JsonNode record,
+        string column,
+        string? inlineFormat,
+        FeedMapping mapping,
+        IReadOnlyDictionary<string, string>? resolved)
+    {
+        if (FeedColumns.NeedsFormat(column))
+        {
+            var format = inlineFormat ?? mapping.Formats?.GetValueOrDefault(column);
+            if (FeedColumns.IsDate(column))
+            {
+                return GetDateTime(record, column) is { } dt
+                    ? dt.ToString(format ?? "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+                    : string.Empty;
+            }
+
+            return GetDecimal(record, column) is { } number
+                ? number.ToString(format, CultureInfo.InvariantCulture)
+                : string.Empty;
+        }
+
+        if (resolved is not null && resolved.TryGetValue(column, out var text))
+        {
+            return text;
+        }
+
+        return GetString(record, column);
+    }
+
+    /// <summary>列の値を数値で読む。無い・読めなければ <c>null</c>。</summary>
+    public static decimal? GetDecimal(JsonNode record, string column) =>
+        decimal.TryParse(GetString(record, column), NumberStyles.Number | NumberStyles.AllowExponent, CultureInfo.InvariantCulture, out var v)
+            ? v
+            : null;
 
     /// <summary>列の値を文字列で読む。無ければ <c>null</c>。</summary>
     public static string? GetString(JsonNode record, string column)
