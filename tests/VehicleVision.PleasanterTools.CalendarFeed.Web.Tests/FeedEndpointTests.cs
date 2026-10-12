@@ -412,6 +412,59 @@ public sealed class FeedTemplateEndpointTests : IDisposable
     }
 }
 
+/// <summary>日付が文字の列に入っているときの開始・終了（Issue #14）。</summary>
+public sealed class FeedTextDateEndpointTests : IDisposable
+{
+    private readonly TestApp _app = new();
+
+    public FeedTextDateEndpointTests() =>
+        _app.Pleasanter.Record = """
+            { "IssueId": 5, "Ver": 1, "Title": "出張",
+              "DescriptionHash": { "DescriptionA": "2026/03/05", "DescriptionB": "2026/03/06" } }
+            """;
+
+    public void Dispose() => _app.Dispose();
+
+    [Fact]
+    public async Task 文字の列の日付を書式で読んで終日の予定にする()
+    {
+        var (path, _) = await _app.CreateFeedAsync(new
+        {
+            name = "a",
+            siteId = 1,
+            mapping = new
+            {
+                startColumn = "DescriptionA",
+                startFormat = "yyyy/MM/dd",
+                endColumn = "DescriptionB",
+                endFormat = "yyyy/MM/dd",
+            },
+        });
+
+        var body = await _app.Client().GetStringAsync(path);
+
+        Assert.Contains("DTSTART;VALUE=DATE:20260305", body);
+        Assert.Contains("DTEND;VALUE=DATE:20260307", body);
+    }
+
+    [Theory]
+    [InlineData("{\"startColumn\":\"DescriptionA\"}")]
+    [InlineData("{\"startColumn\":\"DateA\",\"startFormat\":\"yyyy/MM/dd\"}")]
+    [InlineData("{\"startColumn\":\"DescriptionA\",\"startFormat\":\"%\"}")]
+    [InlineData("{\"startColumn\":\"NumA\",\"startFormat\":\"yyyy\"}")]
+    public async Task 書式と列の組み合わせが不正なら400(string mapping)
+    {
+        var response = await _app.AdminClient().PostAsync(
+            "/admin/api/feeds",
+            new StringContent(
+                $"{{\"name\":\"a\",\"siteId\":1,\"mapping\":{mapping}}}",
+                System.Text.Encoding.UTF8,
+                "application/json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+}
+
 /// <summary>秘密の鍵も共通の既定の API キーも無い構成。</summary>
 public sealed class NoSecretKeyEndpointTests : IDisposable
 {
