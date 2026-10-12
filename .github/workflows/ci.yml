@@ -1,0 +1,63 @@
+# ビルドと単体テスト。
+#
+# **ここで定義したジョブ名は必須ステータスチェックへ登録する。以後変えないこと**
+# （_documents/ブランチ運用方針.md「ブランチ保護」）。名前を変えると、必須チェックが
+# 「待ち続けるが永遠に来ない」状態になり、マージできなくなる。
+#
+# 書き方は Questionnaire の ci.yml に倣った（actions/checkout v7 / actions/setup-dotnet v6）。
+name: CI
+
+on:
+  # **全ブランチへの push で回す。** 根幹ブランチへの PR でも回す。タグの push では回さない
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - develop
+      - master
+
+# 同じブランチの実行が重なったら、古い方は打ち切る
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# **既定を読み取りだけにする。** 書き込みが要るジョブは無い
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  build-test:
+    name: ビルドと単体テスト
+    runs-on: ubuntu-latest
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          # **_reference（Pleasanter 本体・AGPL v3）は取得しない。**
+          # 参照専用であり、ビルドにもテストにも要らない
+          submodules: false
+
+      - name: .NET SDK を用意する
+        uses: actions/setup-dotnet@v6
+        with:
+          # 版は global.json を単一の情報源にする
+          global-json-file: global.json
+
+      - name: 依存を復元する
+        run: dotnet restore VehicleVision.PleasanterTools.CalendarFeed.slnx
+
+      - name: ビルドする
+        run: >-
+          dotnet build VehicleVision.PleasanterTools.CalendarFeed.slnx
+          --no-restore -c Release
+
+      - name: 単体テストを実行する
+        run: >-
+          dotnet test VehicleVision.PleasanterTools.CalendarFeed.slnx
+          --no-build -c Release

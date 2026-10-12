@@ -1,0 +1,60 @@
+# PR タイトルの WIP 検査
+#
+# ■ なぜワークフローなのか
+#   規約では **`WIP:` の除去が「マージしてよい」の合図**である
+#   （`.github/copilot-instructions.md` の「必ず守る規約」5）。
+#   ところがこの合図を機械が見ておらず、`WIP:` が付いたままでもマージできる。
+#   自動マージを仕込めばそのまま入る。
+#
+#   **ブランチ保護（ruleset）に PR タイトルを見るルールは無い。**
+#   コミットのメタデータ制限はあるが、対象はコミットメッセージ・作者メール・
+#   ブランチ名で、**PR タイトルは含まれない**
+#   （<https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets>、
+#   2026-08-19 参照）。残る手は必須ステータスチェックにすることだけである。
+#
+# ■ `edited` を拾うのが肝
+#   タイトルから `WIP:` を外しても、`edited` を契機に入れていないと**赤いまま残る。**
+#   `ci.yml` は push が無いと動かないため、そちらへ相乗りできない。
+#
+# ■ PR のコードは実行しない
+#   見るのはタイトルだけ。チェックアウトもしない。
+
+name: PR タイトルの検査
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review, converted_to_draft]
+    branches:
+      - develop
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-title-wip-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  wip-title:
+    name: WIP が外れているか
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: タイトルを確かめる
+        env:
+          # タイトルは利用者が書く文字列である。**コマンドへ直接埋め込まないこと。**
+          # env 経由で渡し、シェルからは変数として読む
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          echo "タイトル: $TITLE"
+
+          # 規約は `WIP:` と書く（`[WIP]` ではない）が、どちらで書かれても止める
+          if printf '%s' "$TITLE" | grep -Eqi '^[[:space:]]*(wip:|\[wip\])'; then
+            echo '::error title=WIP のままです::タイトルの WIP: を外すまでマージできません。作業や修正が残っているなら Draft のままにしてください。'
+            exit 1
+          fi
+
+          echo 'WIP: は付いていません。'
