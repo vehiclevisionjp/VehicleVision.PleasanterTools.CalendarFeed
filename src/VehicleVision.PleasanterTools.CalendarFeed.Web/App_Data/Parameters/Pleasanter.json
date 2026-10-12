@@ -1,0 +1,21 @@
+{
+  "//": "接続先 Pleasanter の設定。実値は Pleasanter.local.json（git 管理外）か環境変数で上書きする",
+
+  "//BaseUrl": "Pleasanter のベース URL。末尾のスラッシュは付けない。例 https://pleasanter.example.jp",
+  "BaseUrl": "http://localhost:8080",
+
+  "//ApiKey": "Pleasanter の API キー。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_PLEASANTER_APIKEY か Pleasanter.local.json から読む。Pleasanter はリクエストボディの JSON に ApiKey を載せる方式のため、購読側へは渡さない（_documents/アーキテクチャ方針.md 3 章）",
+  "ApiKey": null,
+
+  "//ApiVersion": "Pleasanter の API バージョン。リクエストボディの ApiVersion に載せる。読めない値は 1.1 に落とす",
+  "ApiVersion": 1.1,
+
+  "//TimeoutSeconds": "Pleasanter API 呼び出しのタイムアウト（秒）",
+  "TimeoutSeconds": 30,
+
+  "//ApiKeyUserTimeZoneId": "API キーに紐づく Pleasanter 利用者のタイムゾーン。Pleasanter は日時をこのタイムゾーンで返す。null なら Service.json の TimeZoneDefault を使う。**運用開始後に変えないこと**",
+  "ApiKeyUserTimeZoneId": null,
+
+  "//LinkBaseUrl": "予定に付けるレコードへのリンク（URL プロパティ）の基点。利用者のブラウザから届く Pleasanter の URL を書く。null ならリンクを付けない",
+  "LinkBaseUrl": null
+}

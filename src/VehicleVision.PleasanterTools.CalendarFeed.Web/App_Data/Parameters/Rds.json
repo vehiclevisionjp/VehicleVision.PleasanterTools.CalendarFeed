@@ -1,0 +1,6 @@
+{
+  "//": "本アプリ専用の DB。Pleasanter の DB とは別に作る",
+
+  "//ConnectionString": "接続文字列。現状は SQLite のみ（_documents/アーキテクチャ方針.md 6 章。4 種の RDBMS 対応は未実装）。資格情報を含む場合は Rds.local.json か環境変数で与える",
+  "ConnectionString": "Data Source=App_Data/calendarfeed.db"
+}

@@ -18,12 +18,12 @@ Outlook / Google カレンダー / Apple カレンダーの「URL から購読�
 ## 使い方
 
 ```bash
-# 設定（API キーは環境変数で渡す。ファイルへ直書きしない）
-export Pleasanter__BaseUrl=http://localhost:8080
-export Pleasanter__ApiKey=<API キー>
-export Pleasanter__ApiKeyUserTimeZoneId=Asia/Tokyo
-export Admin__ApiKey=<管理キー>
-export PublicBaseUrl=https://calendar.example.com
+# 設定は App_Data/Parameters/*.json（README あり）か環境変数で与える。API キーはファイルへ直書きしない
+export CALENDARFEED_PLEASANTER_BASEURL=http://localhost:8080
+export CALENDARFEED_PLEASANTER_APIKEY=<API キー>
+export CALENDARFEED_PLEASANTER_TIMEZONE=Asia/Tokyo
+export CALENDARFEED_ADMIN_APIKEY=<管理キー>
+export CALENDARFEED_PUBLIC_BASEURL=https://calendar.example.com
 
 dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web
 ```
@@ -31,7 +31,7 @@ dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web
 ```bash
 # フィードを作る（応答の url が購読 URL。トークンは 1 度しか表示されない）
 curl -X POST http://localhost:5000/admin/api/feeds \
-  -H "Authorization: Bearer $Admin__ApiKey" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CALENDARFEED_ADMIN_APIKEY" -H "Content-Type: application/json" \
   -d '{"name":"共有予定","siteId":123,"mapping":{"startColumn":"StartTime","endColumn":"CompletionTime"}}'
 ```
 

@@ -1,0 +1,6 @@
+{
+  "//": "セキュリティの設定。実値は Security.local.json（git 管理外）か環境変数で与える",
+
+  "//AdminApiKey": "管理 API（/admin/api/feeds）の Bearer キー。**このファイルへ実値を書かないこと。** null なら管理 API の口を開かない。管理画面の認証ができたら置き換える（_documents/アーキテクチャ方針.md 3 章）",
+  "AdminApiKey": null
+}

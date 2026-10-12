@@ -4,7 +4,9 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Tests;
 
@@ -19,12 +21,16 @@ public sealed class FeedEndpointTests : IDisposable
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("ConnectionStrings:CalendarFeed", $"Data Source={_db};Pooling=False");
-            builder.UseSetting("Pleasanter:BaseUrl", "https://pleasanter.test");
-            builder.UseSetting("Pleasanter:ApiKey", "secret-api-key");
-            builder.UseSetting("Pleasanter:ApiKeyUserTimeZoneId", "UTC");
-            builder.UseSetting("Admin:ApiKey", AdminKey);
-            builder.UseSetting("PublicBaseUrl", "https://feed.test");
+            // **ConfigureAppConfiguration で上書きする。** UseSetting は App_Data/Parameters の既定より弱い
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [AppSettings.DbConnectionString] = $"Data Source={_db};Pooling=False",
+                [AppSettings.PleasanterBaseUrl] = "https://pleasanter.test",
+                [AppSettings.PleasanterApiKey] = "secret-api-key",
+                [AppSettings.PleasanterTimeZone] = "UTC",
+                [AppSettings.AdminApiKey] = AdminKey,
+                [AppSettings.PublicBaseUrl] = "https://feed.test",
+            }));
             builder.ConfigureTestServices(services =>
                 services.AddHttpClient<Pleasanter.PleasanterClient>()
                     .ConfigurePrimaryHttpMessageHandler(() => _pleasanter));

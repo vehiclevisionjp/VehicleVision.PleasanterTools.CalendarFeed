@@ -25,3 +25,9 @@ TestResults/
 temp/
 
 .claude/settings.local.json
+
+## Parameters のローカル上書き（実値。コミットしない）
+**/App_Data/Parameters/*.local.json
+
+## 本アプリの DB
+**/App_Data/*.db

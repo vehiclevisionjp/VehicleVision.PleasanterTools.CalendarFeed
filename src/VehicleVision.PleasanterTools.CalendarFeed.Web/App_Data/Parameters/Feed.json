@@ -1,0 +1,12 @@
+{
+  "//": "購読フィードの表示に関する設定",
+
+  "//CacheSeconds": "生成した .ics を使い回す秒数。Pleasanter の API 回数制限を守るため 0 にしない。REFRESH-INTERVAL にも同じ値を返す",
+  "CacheSeconds": 300,
+
+  "//MaxEvents": "1 フィードで出す予定の上限。超えた分は出さない",
+  "MaxEvents": 5000,
+
+  "//PageSize": "Pleasanter へ求める 1 ページの件数。Pleasanter 側の上限で切られる",
+  "PageSize": 1000
+}

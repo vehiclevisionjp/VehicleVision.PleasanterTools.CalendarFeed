@@ -8,25 +8,24 @@ using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Web;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ---- App_Data/Parameters の設定ファイル ----------------------------------------
+// **一番先に積む。** 以降の読み取りがすべてこれを見る。
+// 優先順位は {名前}.local.json ＞ 環境変数 ＞ {名前}.json（App_Data/Parameters/README.md）
+builder.Configuration.AddParameterFiles();
+
 // ---- 設定は DI の生成時に読む（テストからの上書きを効かせるため） ---------------
-builder.Services.AddSingleton(sp =>
-    sp.GetRequiredService<IConfiguration>().GetSection("Pleasanter").Get<PleasanterOptions>()
-        ?? throw new InvalidOperationException("Pleasanter の接続設定（Pleasanter:BaseUrl / ApiKey / ApiKeyUserTimeZoneId）がありません。"));
-builder.Services.AddSingleton(sp =>
-    sp.GetRequiredService<IConfiguration>().GetSection("Feed").Get<FeedOptions>() ?? new FeedOptions());
+builder.Services.AddSingleton(sp => AppSettings.ReadPleasanter(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton(sp => AppSettings.ReadFeed(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<PleasanterClient>();
 builder.Services.AddSingleton<FeedService>();
 builder.Services.AddSingleton(sp =>
-{
-    var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("CalendarFeed")
-        ?? "Data Source=App_Data/calendarfeed.db";
-    return new SqliteFeedStore(connectionString);
-});
+    new SqliteFeedStore(AppSettings.ReadConnectionString(sp.GetRequiredService<IConfiguration>())));
 builder.Services.AddSingleton<IFeedStore>(sp => sp.GetRequiredService<SqliteFeedStore>());
 
 // **購読 URL の総当たりを遅くする。** トークンは 256 bit なので当たらないが、無駄な負荷も止める
@@ -39,6 +38,16 @@ builder.Services.AddRateLimiter(o =>
 });
 
 var app = builder.Build();
+
+// ⚠️ **何を読んだかを残す。** 設定ファイルは optional なので、置き場を間違えても黙って既定で動いてしまう
+app.Logger.LogInformation(
+    "設定ファイルの置き場: {Directory} / 見つかったファイル: {Files}",
+    app.Configuration[ParameterFiles.DirectoryKey],
+    app.Configuration[ParameterFiles.FoundFilesKey]);
+if (string.IsNullOrEmpty(app.Configuration[ParameterFiles.FoundFilesKey]))
+{
+    app.Logger.LogWarning("設定ファイルが 1 つも見つかりません。置き場を確かめてください。");
+}
 
 // DB の親ディレクトリを用意して表を作る
 var store = app.Services.GetRequiredService<SqliteFeedStore>();
@@ -100,7 +109,7 @@ app.MapGet("/feeds/{token}.ics", async (
 // ---- 管理 API ----------------------------------------------------------------------
 // **足場。** 管理画面（UI）と管理者ログインは未実装。当面は管理キー（Admin:ApiKey）を
 // Authorization: Bearer で渡す。キーが未設定なら、この口は開かない
-var adminKey = app.Configuration["Admin:ApiKey"];
+var adminKey = AppSettings.Text(app.Configuration, AppSettings.AdminApiKey);
 if (!string.IsNullOrEmpty(adminKey))
 {
     var admin = app.MapGroup("/admin/api/feeds");
@@ -164,7 +173,7 @@ app.Run();
 static string FeedUrl(HttpContext http, IConfiguration configuration, string token)
 {
     // **リバースプロキシの内側では Host が内部の値になる。公開 URL は設定で固定する**
-    var baseUrl = configuration["PublicBaseUrl"]?.TrimEnd('/')
+    var baseUrl = AppSettings.Text(configuration, AppSettings.PublicBaseUrl)?.TrimEnd('/')
         ?? $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}";
     return $"{baseUrl}/feeds/{token}.ics";
 }
