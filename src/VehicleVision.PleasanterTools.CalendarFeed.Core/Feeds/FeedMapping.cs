@@ -22,8 +22,8 @@ public sealed class FeedMapping
     /// <summary>場所にする列。</summary>
     public string? LocationColumn { get; init; }
 
-    /// <summary>終日の予定として出すか。</summary>
-    public bool AllDay { get; init; }
+    /// <summary>終日にするかの決め方。既定は <see cref="AllDayMode.Auto"/>。</summary>
+    public AllDayMode AllDay { get; init; } = AllDayMode.Auto;
 
     /// <summary>終了が無い（または開始以前の）時間指定の予定に補う長さ（分）。</summary>
     public int DefaultDurationMinutes { get; init; } = 60;

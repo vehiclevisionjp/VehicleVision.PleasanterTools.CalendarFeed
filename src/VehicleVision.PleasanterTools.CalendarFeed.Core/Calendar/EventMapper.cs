@@ -52,7 +52,13 @@ public static class EventMapper
 
         DateTimeOffset startValue;
         DateTimeOffset? endValue;
-        if (mapping.AllDay)
+        var allDay = mapping.AllDay switch
+        {
+            AllDayMode.Always => true,
+            AllDayMode.Never => false,
+            _ => start.Value.TimeOfDay == TimeSpan.Zero && (end is null || end.Value.TimeOfDay == TimeSpan.Zero),
+        };
+        if (allDay)
         {
             var startDate = start.Value.Date;
             // 終了の日を含めるため、DTEND は翌日にする。終了が無い・開始より前なら 1 日だけ
@@ -75,7 +81,7 @@ public static class EventMapper
             Summary = string.IsNullOrWhiteSpace(summary) ? "(無題)" : summary,
             Start = startValue,
             End = endValue,
-            AllDay = mapping.AllDay,
+            AllDay = allDay,
             Description = mapping.DescriptionColumn is null ? null : GetString(record, mapping.DescriptionColumn),
             Location = mapping.LocationColumn is null ? null : GetString(record, mapping.LocationColumn),
             Url = linkBaseUrl is null ? null : $"{linkBaseUrl.TrimEnd('/')}/items/{recordId}",

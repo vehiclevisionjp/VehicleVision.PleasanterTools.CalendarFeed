@@ -96,7 +96,7 @@ public sealed class EventMapperTests
                 { "IssueId": 1, "Title": "t", "StartTime": "2026-03-01T00:00:00",
                   "CompletionTime": "2026-03-02T00:00:00" }
                 """),
-            Feed(new FeedMapping { AllDay = true }),
+            Feed(new FeedMapping { AllDay = AllDayMode.Always }),
             Tokyo);
 
         Assert.True(e!.AllDay);
@@ -118,5 +118,72 @@ public sealed class EventMapperTests
     {
         Assert.Null(EventMapper.Map(
             Record("""{ "Title": "t", "StartTime": "2026-03-01T09:00:00" }"""), Feed(), Tokyo));
+    }
+}
+
+public sealed class AllDayModeTests
+{
+    private static readonly TimeZoneInfo Utc = TimeZoneInfo.Utc;
+
+    private static CalendarEvent? Map(string json, AllDayMode mode) =>
+        EventMapper.Map(
+            JsonNode.Parse(json)!,
+            new FeedDefinition(
+                Guid.NewGuid(), "t", 1, new FeedMapping { AllDay = mode },
+                new Dictionary<string, string>(), DateTimeOffset.UnixEpoch, false),
+            Utc);
+
+    private const string DateOnly =
+        """{ "IssueId": 1, "Title": "t", "StartTime": "2026-03-01T00:00:00", "CompletionTime": "2026-03-02T00:00:00" }""";
+
+    private const string Timed =
+        """{ "IssueId": 2, "Title": "t", "StartTime": "2026-03-01T09:00:00", "CompletionTime": "2026-03-01T10:00:00" }""";
+
+    private const string DateOnlyNoEnd =
+        """{ "IssueId": 3, "Title": "t", "StartTime": "2026-03-01T00:00:00" }""";
+
+    private const string StartsAtMidnightEndsLater =
+        """{ "IssueId": 4, "Title": "t", "StartTime": "2026-03-01T00:00:00", "CompletionTime": "2026-03-01T08:00:00" }""";
+
+    [Fact]
+    public void 自動では日付だけを終日にし時間つきは時間指定のまま()
+    {
+        Assert.True(Map(DateOnly, AllDayMode.Auto)!.AllDay);
+        Assert.True(Map(DateOnlyNoEnd, AllDayMode.Auto)!.AllDay);
+        Assert.False(Map(Timed, AllDayMode.Auto)!.AllDay);
+    }
+
+    [Fact]
+    public void 自動でも0時開始で終了に時刻があれば時間指定()
+    {
+        Assert.False(Map(StartsAtMidnightEndsLater, AllDayMode.Auto)!.AllDay);
+    }
+
+    [Fact]
+    public void 常に時間指定なら日付だけでも時間指定()
+    {
+        var e = Map(DateOnly, AllDayMode.Never)!;
+        Assert.False(e.AllDay);
+        Assert.Equal(TimeSpan.FromDays(1), e.End - e.Start);
+    }
+
+    [Fact]
+    public void 常に終日なら時刻を捨てる()
+    {
+        var e = Map(Timed, AllDayMode.Always)!;
+        Assert.True(e.AllDay);
+        Assert.Equal(new DateTime(2026, 3, 1), e.Start.Date);
+        Assert.Equal(new DateTime(2026, 3, 2), e.End!.Value.Date);
+    }
+
+    [Fact]
+    public void 既定は自動で文字列でも指定できる()
+    {
+        Assert.Equal(AllDayMode.Auto, new FeedMapping().AllDay);
+        Assert.Equal(
+            AllDayMode.Always,
+            System.Text.Json.JsonSerializer.Deserialize<FeedMapping>(
+                """{ "allDay": "Always" }""",
+                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!.AllDay);
     }
 }
