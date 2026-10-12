@@ -45,7 +45,9 @@ public static class EventMapper
             return null;
         }
 
-        var summary = GetString(record, mapping.SummaryColumn);
+        // 組み上げ済みの ItemTitle が無い応答（想定外の形）では Title へ落とす
+        var summary = GetString(record, mapping.SummaryColumn)
+            ?? (mapping.SummaryColumn == FeedColumns.ItemTitle ? GetString(record, "Title") : null);
         var end = mapping.EndColumn is null ? null : GetDateTime(record, mapping.EndColumn);
 
         DateTimeOffset startValue;
