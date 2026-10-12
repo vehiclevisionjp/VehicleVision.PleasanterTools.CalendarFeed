@@ -24,13 +24,13 @@ public sealed class SqliteFeedStoreTests : IDisposable
     public async Task 作ったフィードをトークンで引ける()
     {
         var (feed, token) = await _store.CreateAsync(
-            "共有予定", 10, new FeedMapping { AllDay = true }, new Dictionary<string, string> { ["ClassA"] = "x" });
+            "共有予定", 10, new FeedMapping { AllDay = AllDayMode.Always }, new Dictionary<string, string> { ["ClassA"] = "x" });
 
         var found = await _store.FindByTokenAsync(token);
 
         Assert.NotNull(found);
         Assert.Equal(feed.Id, found.Id);
-        Assert.True(found.Mapping.AllDay);
+        Assert.Equal(AllDayMode.Always, found.Mapping.AllDay);
         Assert.Equal("x", found.Filters["ClassA"]);
     }
 
