@@ -43,6 +43,12 @@ curl -X POST http://localhost:5000/admin/api/feeds \
 | `POST /admin/api/feeds/{id}/rotate` | トークンの作り直し（旧トークンは即失効） |
 | `DELETE /admin/api/feeds/{id}` | フィードの失効 |
 
+## 対応する RDBMS
+
+本アプリ専用の DB（フィード定義）は **SQLite / SQL Server / PostgreSQL / MySQL**。**Pleasanter の DB とは別に作る。**
+`CALENDARFEED_DB_PROVIDER`（既定 `Sqlite`。簡易セットアップとデバッグ用で、本番運用には使わない）と
+`CALENDARFEED_DB_CONNECTIONSTRING` で指定する。マイグレーションは起動時に自動で当たる。
+
 ## 開発
 
 ```bash
@@ -50,6 +56,10 @@ git submodule update --init --recursive   # _reference（Pleasanter 本体・参
 dotnet build
 dotnet test
 ```
+
+**4 種の RDBMS の結合テスト**は、検証環境（`tools/pleasanter-testenv`）の PostgreSQL・MySQL・SQL Server に当てる。
+**接続文字列の環境変数を設定しないと、SQLite 以外は何も流れずに緑になる**ので、`CALENDARFEED_REQUIRE_ALL_RDBMS=1` で
+未設定を失敗にできる（CI は必ずこれを立てる）。手順は [`tools/pleasanter-testenv/README.md`](tools/pleasanter-testenv/README.md)。
 
 | パス | 内容 |
 | --- | --- |
