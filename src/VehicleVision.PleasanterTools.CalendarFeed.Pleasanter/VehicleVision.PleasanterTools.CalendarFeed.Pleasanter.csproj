@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Core\VehicleVision.PleasanterTools.CalendarFeed.Core.csproj" />
+  </ItemGroup>
+
+</Project>

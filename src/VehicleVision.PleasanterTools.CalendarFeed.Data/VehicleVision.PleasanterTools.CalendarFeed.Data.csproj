@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- MIT。SQLitePCLRaw（Apache-2.0）と SQLite（パブリックドメイン）を推移的に伴う -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Core\VehicleVision.PleasanterTools.CalendarFeed.Core.csproj" />
+  </ItemGroup>
+
+</Project>
