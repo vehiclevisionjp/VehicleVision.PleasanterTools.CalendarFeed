@@ -51,8 +51,10 @@ services:
       # **Dbms は環境変数で設定できない。** Rds.json をマウントして SQLServer に差し替える
       # CodeDefiner イメージの Parameters は /app/Implem.Pleasanter/App_Data/Parameters 配下
       - ./Parameters/Rds.json:/app/Implem.Pleasanter/App_Data/Parameters/Rds.json:ro
+      # 項目拡張（Class 100 ＋ Date 100）。trial は既定で Class しか拡張しないため、/e でファイルを使う
+      - ./Parameters/ExtendedColumns:/app/Implem.Pleasanter/App_Data/Parameters/ExtendedColumns:ro
     # CodeDefiner のオプションは "/" 接頭辞（"-" ではない）。/y=無人実行
-    command: ["trial", "/y"]
+    command: ["trial", "/y", "/e"]
     restart: "no"
 
   pleasanter:
@@ -72,6 +74,7 @@ services:
     volumes:
       # 本体イメージの Parameters は /app/App_Data/Parameters 配下（CodeDefiner とは階層が異なる）
       - ./Parameters/Rds.json:/app/App_Data/Parameters/Rds.json:ro
+      - ./Parameters/ExtendedColumns:/app/App_Data/Parameters/ExtendedColumns:ro
     healthcheck:
       # 本体イメージ（dotnet runtime ベース）には curl / wget が無いため bash の /dev/tcp で待受を確認する
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080"]

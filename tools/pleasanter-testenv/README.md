@@ -43,6 +43,12 @@ docker compose down -v                                  # 後片付け（DB ご�
   （`_documents/実機検証結果.md` 1 章）
 - `Full-Text Search is not installed` は SQL Server コンテナに全文検索が無いため。**検証には影響しない**
 
+## 項目拡張
+
+`trial` の CodeDefiner は既定で `Class001`〜`Class100` だけを有効にする。**`Parameters/ExtendedColumns/*.json` を渡し、`trial /y /e` で
+実行している**（`Class` 100 ＋ `Date` 100。Issues と Results）。本数を変えたら **`docker compose down -v` で DB ごと作り直す**
+（CodeDefiner はスキーマ作成時にだけ読む）。
+
 ## アプリを検証環境へ向けて動かす
 
 ```bash
