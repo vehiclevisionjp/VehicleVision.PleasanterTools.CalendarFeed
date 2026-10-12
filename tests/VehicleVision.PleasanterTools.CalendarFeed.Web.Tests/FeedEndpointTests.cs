@@ -92,6 +92,12 @@ internal sealed class FakePleasanter : HttpMessageHandler
 
     public string? LastRequestBody { get; private set; }
 
+    /// <summary>受けたリクエスト本文（順に）。</summary>
+    public List<string> Bodies { get; } = [];
+
+    /// <summary>表示名への解決（KeyValues ＋ Text）の要求に返す行（JSON）。</summary>
+    public string ResolvedRow { get; set; } = """{ "IssueId": "5", "ClassA": "会議", "ClassB": "第一会議室" }""";
+
     /// <summary>返すレコード 1 件（JSON）。</summary>
     public string Record { get; set; } = """
         { "IssueId": 5, "Ver": 1, "Title": "打合せ", "Body": "議題",
@@ -104,11 +110,15 @@ internal sealed class FakePleasanter : HttpMessageHandler
         CallCount++;
         LastRequestUri = request.RequestUri!.ToString();
         LastRequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+        Bodies.Add(LastRequestBody);
+
+        // 表示名への解決の要求（View.ApiDataType = KeyValues）には、解決済みの行を返す
+        var row = LastRequestBody.Contains("\"ApiDataType\"", StringComparison.Ordinal) ? ResolvedRow : Record;
 
         return new HttpResponseMessage(StatusCode)
         {
             Content = new StringContent(
-                $$"""{ "StatusCode": 200, "Response": { "Offset": 0, "PageSize": 200, "TotalCount": 1, "Data": [ {{Record}} ] } }""",
+                $$"""{ "StatusCode": 200, "Response": { "Offset": 0, "PageSize": 200, "TotalCount": 1, "Data": [ {{row}} ] } }""",
                 System.Text.Encoding.UTF8,
                 "application/json"),
         };
@@ -293,6 +303,110 @@ public sealed class FeedApiKeyEndpointTests : IDisposable
     {
         var response = await _app.AdminClient().PostAsync(
             "/admin/api/feeds", new StringContent(json, System.Text.Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+}
+
+/// <summary>件名のテンプレート・書式・表示名への解決（Issue #5）。</summary>
+public sealed class FeedTemplateEndpointTests : IDisposable
+{
+    private readonly TestApp _app = new();
+
+    public FeedTemplateEndpointTests() =>
+        _app.Pleasanter.Record = """
+            { "IssueId": 5, "Ver": 1, "Title": "見積", "Body": "議題",
+              "StartTime": "2026-03-01T09:00:00", "CompletionTime": "2026-03-01T10:00:00",
+              "ClassHash": { "ClassA": "1", "ClassB": "2" },
+              "DateHash": { "DateA": "2026-03-05T14:30:00" }, "NumHash": { "NumA": 1234.5 } }
+            """;
+
+    public void Dispose() => _app.Dispose();
+
+    [Fact]
+    public async Task 選択肢の列を使うときだけ表示名への解決を別に取り件名と場所へ入る()
+    {
+        var (path, _) = await _app.CreateFeedAsync(new
+        {
+            name = "a",
+            siteId = 1,
+            mapping = new
+            {
+                summaryTemplate = "{ClassA}：{Title}（{DateA:yyyy/MM/dd HH:mm} {NumA:#,##0.00}）",
+                locationColumn = "ClassB",
+            },
+        });
+
+        var body = await _app.Client().GetStringAsync(path);
+
+        Assert.Contains("SUMMARY:会議：見積（2026/03/05 14:30 1\\,234.50）", body);
+        Assert.Contains("LOCATION:第一会議室", body);
+        Assert.Equal(2, _app.Pleasanter.CallCount);
+
+        // 2 回目は KeyValues ＋ Text で、必要な列と ID だけを求める。日付・数値は求めない
+        var second = _app.Pleasanter.Bodies[1];
+        Assert.Contains("\"ApiDataType\":1", second);
+        Assert.Contains("\"ApiColumnValueDisplayType\":2", second);
+        Assert.Contains("\"GridColumns\":[\"IssueId\",\"ClassA\",\"ClassB\"]", second);
+        Assert.DoesNotContain("DateA", second);
+    }
+
+    [Fact]
+    public async Task 解決が要る列が無ければ2回目の取得はしない()
+    {
+        var (path, _) = await _app.CreateFeedAsync(new
+        {
+            name = "a",
+            siteId = 1,
+            mapping = new { summaryTemplate = "{Title} {DateA:yyyy/MM/dd}" },
+        });
+
+        var body = await _app.Client().GetStringAsync(path);
+
+        Assert.Contains("SUMMARY:見積 2026/03/05", body);
+        Assert.Equal(1, _app.Pleasanter.CallCount);
+    }
+
+    [Fact]
+    public async Task 既定の件名では2回目の取得はしない()
+    {
+        var (path, _) = await _app.CreateFeedAsync();
+
+        await _app.Client().GetStringAsync(path);
+
+        Assert.Equal(1, _app.Pleasanter.CallCount);
+    }
+
+    [Fact]
+    public async Task 突き合わせられないレコードは生の値のまま出す()
+    {
+        _app.Pleasanter.ResolvedRow = """{ "IssueId": "999", "ClassA": "別のレコード" }""";
+        var (path, _) = await _app.CreateFeedAsync(new
+        {
+            name = "a",
+            siteId = 1,
+            mapping = new { summaryTemplate = "{ClassA}：{Title}" },
+        });
+
+        var body = await _app.Client().GetStringAsync(path);
+
+        Assert.Contains("SUMMARY:1：見積", body);
+    }
+
+    [Theory]
+    [InlineData("{\"summaryTemplate\":\"{DateA}\"}")]
+    [InlineData("{\"summaryTemplate\":\"{Title\"}")]
+    [InlineData("{\"summaryTemplate\":\"固定\"}")]
+    [InlineData("{\"locationColumn\":\"NumA\"}")]
+    [InlineData("{\"formats\":{\"ClassA\":\"yyyy\"}}")]
+    public async Task 書式やテンプレートが不正なら400(string mapping)
+    {
+        var response = await _app.AdminClient().PostAsync(
+            "/admin/api/feeds",
+            new StringContent(
+                $"{{\"name\":\"a\",\"siteId\":1,\"mapping\":{mapping}}}",
+                System.Text.Encoding.UTF8,
+                "application/json"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
