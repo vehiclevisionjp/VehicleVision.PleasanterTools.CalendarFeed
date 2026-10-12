@@ -21,13 +21,12 @@ public sealed class FeedOptions
 /// <summary>Pleasanter から取って .ics を組み立てる。</summary>
 public sealed class FeedService(
     PleasanterClient client,
+    IFeedStore feeds,
     PleasanterOptions pleasanter,
     FeedOptions options,
     IMemoryCache cache,
     TimeProvider time)
 {
-    private readonly TimeZoneInfo _apiUserZone = TimeZoneInfo.FindSystemTimeZoneById(pleasanter.ApiKeyUserTimeZoneId);
-
     /// <summary>フィードの .ics を返す。キャッシュがあればそれを返す。</summary>
     public Task<string> GetCalendarAsync(FeedDefinition feed, CancellationToken cancellationToken) =>
         cache.GetOrCreateAsync(
@@ -38,19 +37,30 @@ public sealed class FeedService(
                 return await BuildAsync(feed, cancellationToken).ConfigureAwait(false);
             })!;
 
+    /// <summary>生成済みの .ics を捨てる。**API キーを差し替えたら呼ぶ**（古いキーで取った結果を返さない）。</summary>
+    public void Invalidate(Guid feedId) => cache.Remove(feedId);
+
     private async Task<string> BuildAsync(FeedDefinition feed, CancellationToken cancellationToken)
     {
+        // フィードごとの API キー。未登録なら全フィード共通の既定（任意）。どちらも無ければ止める
+        var apiKey = await feeds.GetApiKeyAsync(feed.Id, cancellationToken).ConfigureAwait(false)
+            ?? pleasanter.ApiKey
+            ?? throw new PleasanterException(
+                PleasanterErrorKind.Unauthorized, "フィードに API キーが登録されていません。");
+        var apiUserZone = TimeZoneInfo.FindSystemTimeZoneById(
+            feed.ApiKeyUserTimeZoneId ?? pleasanter.ApiKeyUserTimeZoneId);
+
         var events = new List<CalendarEvent>();
         var offset = 0;
         while (events.Count < options.MaxEvents)
         {
             var page = await client
-                .GetRecordsAsync(feed.SiteId, offset, options.PageSize, feed.Filters, cancellationToken)
+                .GetRecordsAsync(apiKey, feed.SiteId, offset, options.PageSize, feed.Filters, cancellationToken)
                 .ConfigureAwait(false);
 
             foreach (var record in page.Records)
             {
-                if (EventMapper.Map(record, feed, _apiUserZone, pleasanter.LinkBaseUrl) is { } mapped)
+                if (EventMapper.Map(record, feed, apiUserZone, pleasanter.LinkBaseUrl) is { } mapped)
                 {
                     events.Add(mapped);
                 }

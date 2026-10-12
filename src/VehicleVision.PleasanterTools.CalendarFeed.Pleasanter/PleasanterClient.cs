@@ -12,10 +12,16 @@ public sealed class PleasanterOptions
     /// <summary>API の呼び出し先。末尾のスラッシュは付けない。</summary>
     public required string BaseUrl { get; init; }
 
-    /// <summary>API キー。**サーバ側だけが持つ。購読側へ渡さない。** リクエストボディに載せる方式。</summary>
-    public required string ApiKey { get; init; }
+    /// <summary>
+    /// 全フィード共通の既定の API キー（任意）。**フィードごとの API キーが未登録のときだけ使う。**
+    /// サーバ側だけが持つ。購読側へ渡さない。リクエストボディに載せる方式。
+    /// </summary>
+    public string? ApiKey { get; init; }
 
-    /// <summary>API キーに紐づく Pleasanter 利用者のタイムゾーン ID。日時はこのタイムゾーンで返る。</summary>
+    /// <summary>
+    /// 既定のタイムゾーン ID。フィードごとの <c>ApiKeyUserTimeZoneId</c> が未設定のときに、
+    /// API キーに紐づく Pleasanter 利用者のタイムゾーンとして使う。日時はこのタイムゾーンで返る。
+    /// </summary>
     /// <remarks>**運用開始後に変更してはならない。** 変えると既存の予定の時刻がずれる。</remarks>
     public required string ApiKeyUserTimeZoneId { get; init; }
 
@@ -68,12 +74,14 @@ public sealed class PleasanterClient(HttpClient httpClient, PleasanterOptions op
     };
 
     /// <summary>サイトのレコードを 1 ページ取り出す。</summary>
+    /// <param name="apiKey">この呼び出しに使う API キー。**ログ・例外へ出さない。**</param>
     /// <param name="siteId">サイト ID。</param>
     /// <param name="offset">取り出し始める位置。</param>
     /// <param name="pageSize">1 ページの件数。サーバ側の上限を超えると上限へ切られる。</param>
     /// <param name="filters">列名と絞り込み値（<c>View.ColumnFilterHash</c>）。</param>
     /// <param name="cancellationToken">キャンセル。</param>
     public async Task<PleasanterPage> GetRecordsAsync(
+        string apiKey,
         long siteId,
         int offset,
         int pageSize,
@@ -82,7 +90,7 @@ public sealed class PleasanterClient(HttpClient httpClient, PleasanterOptions op
     {
         var body = new Dictionary<string, object?>
         {
-            ["ApiKey"] = options.ApiKey,
+            ["ApiKey"] = apiKey,
             ["ApiVersion"] = options.ApiVersion,
             ["Offset"] = offset,
             ["PageSize"] = pageSize,

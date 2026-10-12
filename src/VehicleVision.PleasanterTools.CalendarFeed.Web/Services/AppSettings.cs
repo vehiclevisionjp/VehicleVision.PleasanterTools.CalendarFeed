@@ -1,5 +1,6 @@
 using System.Globalization;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
+using VehicleVision.PleasanterTools.CalendarFeed.Security;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
@@ -28,12 +29,14 @@ public static class AppSettings
     public const string DbConnectionString = "CALENDARFEED_DB_CONNECTIONSTRING";
     public const string DbAutoMigrate = "CALENDARFEED_DB_AUTOMIGRATE";
     public const string AdminApiKey = "CALENDARFEED_ADMIN_APIKEY";
+    public const string SecretKey = "CALENDARFEED_SECRET_KEY";
 
     /// <summary>Pleasanter の接続設定を読む。必須の値が無ければ、設定名を挙げて止める。</summary>
     public static PleasanterOptions ReadPleasanter(IConfiguration configuration) => new()
     {
         BaseUrl = Required(configuration, PleasanterBaseUrl),
-        ApiKey = Required(configuration, PleasanterApiKey),
+        // 全フィード共通の既定（任意）。フィードごとの API キーが未登録のときだけ使う
+        ApiKey = Text(configuration, PleasanterApiKey),
 
         // **未設定なら本アプリの既定タイムゾーン**（Questionnaire と同じ）
         ApiKeyUserTimeZoneId = Text(configuration, PleasanterTimeZone)
@@ -55,6 +58,10 @@ public static class AppSettings
         MaxEvents = PositiveInt(configuration, FeedMaxEvents, 5000),
         PageSize = PositiveInt(configuration, FeedPageSize, 1000),
     };
+
+    /// <summary>秘密の鍵から <see cref="ISecretProtector"/> を作る。未設定なら、使おうとしたときに止まる実装を返す。</summary>
+    public static ISecretProtector ReadSecretProtector(IConfiguration configuration) =>
+        Text(configuration, SecretKey) is { } key ? new SecretProtector(key) : new UnconfiguredSecretProtector();
 
     /// <summary>起動時にマイグレーションを当てるか。既定は当てる。<c>false</c> で無効（手で当てる）。</summary>
     public static bool ReadAutoMigrate(IConfiguration configuration) =>

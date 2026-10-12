@@ -7,8 +7,17 @@ using Microsoft.Extensions.Caching.Memory;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
+using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using VehicleVision.PleasanterTools.CalendarFeed.Web;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
+
+// **設定に書く鍵を作るための道。** 手で乱数を用意させると、短い値や使い回しが混ざる。
+// コンソールへ出す文字列なので英語（.github/copilot-instructions.md）
+if (args.Contains("--generate-secret-key"))
+{
+    Console.WriteLine(SecretProtector.GenerateKey());
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,6 +44,7 @@ builder.Services.AddSingleton<IDbConnectionFactory>(sp =>
             AppSettings.Text(configuration, AppSettings.DbConnectionString),
             sp.GetRequiredService<IHostEnvironment>().ContentRootPath));
 });
+builder.Services.AddSingleton(sp => AppSettings.ReadSecretProtector(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<IFeedStore, FeedStore>();
 
 // **購読 URL の総当たりを遅くする。** トークンは 256 bit なので当たらないが、無駄な負荷も止める
@@ -95,6 +105,12 @@ app.MapGet("/feeds/{token}.ics", async (
     {
         body = await service.GetCalendarAsync(feed, cancellationToken);
     }
+    catch (Exception ex) when (ex is CryptographicException or InvalidOperationException)
+    {
+        // 秘密の鍵が未設定、または保管時と違う鍵（失った・変えた）。**API キーを登録し直す必要がある**
+        logger.LogError("フィード {FeedId} の API キーを復号できません: {Message}", feed.Id, ex.Message);
+        return Results.StatusCode(StatusCodes.Status502BadGateway);
+    }
     catch (PleasanterException ex)
     {
         // **トークンをログへ出さない。** フィード ID だけで追える
@@ -152,6 +168,7 @@ if (!string.IsNullOrEmpty(adminKey))
         HttpContext http,
         IFeedStore feeds,
         PleasanterOptions pleasanter,
+        ISecretProtector protector,
         IConfiguration configuration,
         CancellationToken ct) =>
     {
@@ -160,11 +177,23 @@ if (!string.IsNullOrEmpty(adminKey))
             return Results.BadRequest(new { error });
         }
 
+        if (!string.IsNullOrEmpty(request.ApiKey) && !protector.IsConfigured)
+        {
+            return Results.BadRequest(new { error = $"API キーを保管するには {UnconfiguredSecretProtector.SettingName} の設定が要ります。" });
+        }
+
+        // API キーが無いフィードは、全フィード共通の既定があるときだけ動く
+        if (string.IsNullOrEmpty(request.ApiKey) && string.IsNullOrEmpty(pleasanter.ApiKey))
+        {
+            return Results.BadRequest(new { error = "ApiKey を指定してください（全フィード共通の既定の API キーも未設定です）。" });
+        }
+
         var (feed, token) = await feeds.CreateAsync(
             request.Name.Trim(),
             request.SiteId,
             request.Mapping ?? new FeedMapping(),
             request.Filters ?? new Dictionary<string, string>(),
+            new FeedAccess(request.ApiKey, request.ApiKeyUserTimeZoneId, FeedLanguages.Normalize(request.Language)),
             ct);
         return Results.Created(
             $"/admin/api/feeds/{feed.Id}",
@@ -181,8 +210,44 @@ if (!string.IsNullOrEmpty(adminKey))
             ? Results.Ok(new { url = FeedUrl(http, configuration, token) })
             : Results.NotFound());
 
-    admin.MapDelete("/{id:guid}", async (Guid id, IFeedStore feeds, CancellationToken ct) =>
-        await feeds.RevokeAsync(id, ct) ? Results.NoContent() : Results.NotFound());
+    // **API キーの差し替え。** 登録後の値は返さない。差し替えたら、古いキーで取った生成済みの .ics を捨てる
+    admin.MapPut("/{id:guid}/apikey", async (
+        Guid id,
+        SetApiKeyRequest request,
+        IFeedStore feeds,
+        FeedService service,
+        ISecretProtector protector,
+        CancellationToken ct) =>
+    {
+        if (request.Validate() is { } error)
+        {
+            return Results.BadRequest(new { error });
+        }
+
+        if (!protector.IsConfigured)
+        {
+            return Results.BadRequest(new { error = $"API キーを保管するには {UnconfiguredSecretProtector.SettingName} の設定が要ります。" });
+        }
+
+        if (!await feeds.SetApiKeyAsync(id, request.ApiKey, request.ApiKeyUserTimeZoneId, ct))
+        {
+            return Results.NotFound();
+        }
+
+        service.Invalidate(id);
+        return Results.NoContent();
+    });
+
+    admin.MapDelete("/{id:guid}", async (Guid id, IFeedStore feeds, FeedService service, CancellationToken ct) =>
+    {
+        if (!await feeds.RevokeAsync(id, ct))
+        {
+            return Results.NotFound();
+        }
+
+        service.Invalidate(id);
+        return Results.NoContent();
+    });
 }
 
 app.Run();
@@ -205,7 +270,10 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Web
         string Name,
         long SiteId,
         FeedMapping? Mapping,
-        Dictionary<string, string>? Filters)
+        Dictionary<string, string>? Filters,
+        string? ApiKey = null,
+        string? ApiKeyUserTimeZoneId = null,
+        string? Language = null)
     {
         private static readonly Regex ColumnName = new("^[A-Za-z][A-Za-z0-9_]{0,63}$", RegexOptions.Compiled);
 
@@ -233,20 +301,58 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Web
                 return "Filters は 20 件まで、列名は英数字と _ 、値は 500 文字までです。";
             }
 
-            return null;
+            if (ApiKey is not null && (ApiKey.Length is 0 or > 512 || ApiKey.Any(char.IsControl)))
+            {
+                return "ApiKey は 1〜512 文字（制御文字なし）で指定してください。";
+            }
+
+            if (SetApiKeyRequest.InvalidTimeZone(ApiKeyUserTimeZoneId))
+            {
+                return "ApiKeyUserTimeZoneId に、このサーバが解決できないタイムゾーン ID が指定されています。";
+            }
+
+            return Language is not null && !FeedLanguages.IsSupported(Language)
+                ? $"Language は {string.Join(" / ", FeedLanguages.Supported)} のいずれかで指定してください。"
+                : null;
         }
     }
 
-    /// <summary>管理 API が返すフィードの姿。**トークンを含めない。**</summary>
+    /// <summary>API キーの差し替えの要求。</summary>
+    public sealed record SetApiKeyRequest(string ApiKey, string? ApiKeyUserTimeZoneId = null)
+    {
+        /// <summary>入力を検証する。問題があれば理由を返す。</summary>
+        public string? Validate()
+        {
+            if (string.IsNullOrEmpty(ApiKey) || ApiKey.Length > 512 || ApiKey.Any(char.IsControl))
+            {
+                return "ApiKey は 1〜512 文字（制御文字なし）で指定してください。";
+            }
+
+            return InvalidTimeZone(ApiKeyUserTimeZoneId)
+                ? "ApiKeyUserTimeZoneId に、このサーバが解決できないタイムゾーン ID が指定されています。"
+                : null;
+        }
+
+        /// <summary>指定されているのに、解決できないタイムゾーン ID か。</summary>
+        public static bool InvalidTimeZone(string? id) =>
+            id is not null && !TimeZoneInfo.TryFindSystemTimeZoneById(id, out _);
+    }
+
+    /// <summary>管理 API が返すフィードの姿。**トークンも API キーも含めない**（API キーは登録済みかと末尾だけ）。</summary>
     public sealed record FeedView(
         Guid Id,
         string Name,
         long SiteId,
         FeedMapping Mapping,
         IReadOnlyDictionary<string, string> Filters,
-        DateTimeOffset CreatedAt)
+        DateTimeOffset CreatedAt,
+        string Language,
+        string? ApiKeyUserTimeZoneId,
+        bool HasApiKey,
+        string? ApiKeyHint)
     {
-        public static FeedView From(FeedDefinition f) =>
-            new(f.Id, f.Name, f.SiteId, f.Mapping, f.Filters, f.CreatedAt);
+        public static FeedView From(FeedDefinition f) => new(
+            f.Id, f.Name, f.SiteId, f.Mapping, f.Filters, f.CreatedAt,
+            f.Language, f.ApiKeyUserTimeZoneId, f.HasApiKey, f.ApiKeyHint);
     }
 }

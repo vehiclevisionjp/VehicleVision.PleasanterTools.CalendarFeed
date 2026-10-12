@@ -9,12 +9,13 @@ public interface IFeedStore
         long siteId,
         FeedMapping mapping,
         IReadOnlyDictionary<string, string> filters,
+        FeedAccess? access = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>トークンからフィードを引く。無い・失効済みなら <c>null</c>。</summary>
+    /// <summary>トークンからフィードを引く。無い・失効済みなら <c>null</c>。**API キーは含まない。**</summary>
     Task<FeedDefinition?> FindByTokenAsync(string token, CancellationToken cancellationToken = default);
 
-    /// <summary>失効していないフィードを新しい順に返す。</summary>
+    /// <summary>失効していないフィードを新しい順に返す。**API キーは含まない。**</summary>
     Task<IReadOnlyList<FeedDefinition>> ListAsync(CancellationToken cancellationToken = default);
 
     /// <summary>トークンを作り直す。旧トークンはその場で使えなくなる。フィードが無ければ <c>null</c>。</summary>
@@ -22,4 +23,14 @@ public interface IFeedStore
 
     /// <summary>フィードを失効させる。失効させたら <c>true</c>。</summary>
     Task<bool> RevokeAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>フィードの API キーを復号して返す。未登録・失効済みなら <c>null</c>。**呼び出しのたびにサーバ内だけで使い、ログへ出さない。**</summary>
+    Task<string?> GetApiKeyAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>API キー（と利用者のタイムゾーン）を差し替える。フィードが無い・失効済みなら <c>false</c>。</summary>
+    Task<bool> SetApiKeyAsync(
+        Guid id,
+        string apiKey,
+        string? apiKeyUserTimeZoneId,
+        CancellationToken cancellationToken = default);
 }
