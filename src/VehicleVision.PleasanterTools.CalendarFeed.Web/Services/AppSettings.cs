@@ -24,7 +24,9 @@ public static class AppSettings
     public const string FeedMaxEvents = "CALENDARFEED_FEED_MAXEVENTS";
     public const string FeedPageSize = "CALENDARFEED_FEED_PAGESIZE";
 
+    public const string DbProvider = "CALENDARFEED_DB_PROVIDER";
     public const string DbConnectionString = "CALENDARFEED_DB_CONNECTIONSTRING";
+    public const string DbAutoMigrate = "CALENDARFEED_DB_AUTOMIGRATE";
     public const string AdminApiKey = "CALENDARFEED_ADMIN_APIKEY";
 
     /// <summary>Pleasanter の接続設定を読む。必須の値が無ければ、設定名を挙げて止める。</summary>
@@ -54,9 +56,9 @@ public static class AppSettings
         PageSize = PositiveInt(configuration, FeedPageSize, 1000),
     };
 
-    /// <summary>本アプリの DB の接続文字列。</summary>
-    public static string ReadConnectionString(IConfiguration configuration) =>
-        Text(configuration, DbConnectionString) ?? "Data Source=App_Data/calendarfeed.db";
+    /// <summary>起動時にマイグレーションを当てるか。既定は当てる。<c>false</c> で無効（手で当てる）。</summary>
+    public static bool ReadAutoMigrate(IConfiguration configuration) =>
+        !string.Equals(Text(configuration, DbAutoMigrate), "false", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>空でない値を返す。無ければ <c>null</c>。</summary>
     public static string? Text(IConfiguration configuration, string key) =>

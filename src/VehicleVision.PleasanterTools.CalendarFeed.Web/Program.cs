@@ -24,9 +24,18 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<PleasanterClient>();
 builder.Services.AddSingleton<FeedService>();
-builder.Services.AddSingleton(sp =>
-    new SqliteFeedStore(AppSettings.ReadConnectionString(sp.GetRequiredService<IConfiguration>())));
-builder.Services.AddSingleton<IFeedStore>(sp => sp.GetRequiredService<SqliteFeedStore>());
+builder.Services.AddSingleton<IDbConnectionFactory>(sp =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var provider = DbConnectionFactory.ParseProvider(AppSettings.Text(configuration, AppSettings.DbProvider));
+    return new DbConnectionFactory(
+        provider,
+        DbConnectionFactory.ResolveConnectionString(
+            provider,
+            AppSettings.Text(configuration, AppSettings.DbConnectionString),
+            sp.GetRequiredService<IHostEnvironment>().ContentRootPath));
+});
+builder.Services.AddSingleton<IFeedStore, FeedStore>();
 
 // **購読 URL の総当たりを遅くする。** トークンは 256 bit なので当たらないが、無駄な負荷も止める
 builder.Services.AddRateLimiter(o =>
@@ -49,10 +58,18 @@ if (string.IsNullOrEmpty(app.Configuration[ParameterFiles.FoundFilesKey]))
     app.Logger.LogWarning("設定ファイルが 1 つも見つかりません。置き場を確かめてください。");
 }
 
-// DB の親ディレクトリを用意して表を作る
-var store = app.Services.GetRequiredService<SqliteFeedStore>();
-Directory.CreateDirectory("App_Data");
-await store.EnsureSchemaAsync();
+// ---- DB のマイグレーション ---------------------------------------------------------
+// 起動時に自動で当てる（CALENDARFEED_DB_AUTOMIGRATE=false で無効。その場合は手で当てる）
+var db = app.Services.GetRequiredService<IDbConnectionFactory>();
+app.Logger.LogInformation("DB: {Provider}", db.Provider);
+if (AppSettings.ReadAutoMigrate(app.Configuration))
+{
+    DatabaseMigrator.Migrate(db.Provider, db.ConnectionString);
+}
+else
+{
+    app.Logger.LogWarning("起動時のマイグレーションは無効です。DB に表が無いと動きません。");
+}
 
 app.UseRateLimiter();
 
