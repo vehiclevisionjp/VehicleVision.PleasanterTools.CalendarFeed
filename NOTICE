@@ -14,6 +14,19 @@ Copyright (C) PMC Co.,Ltd.
     （Apache-2.0 の SQLitePCLRaw と、パブリックドメインの SQLite を推移的に伴う。
       Questionnaire の NOTICE と同じ依存。参照日 2026-10-12）
 
+  Dapper 2.1.89 / Apache-2.0 / https://www.nuget.org/packages/Dapper
+  FluentMigrator 8.0.1 / Apache-2.0 / https://www.nuget.org/packages/FluentMigrator
+  FluentMigrator.Runner 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.SqlServer 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.Postgres 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.MySql 8.0.1 / Apache-2.0
+  FluentMigrator.Runner.SQLite 8.0.1 / Apache-2.0
+  Microsoft.Data.SqlClient 7.1.1 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
+  Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
+  MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
+  Microsoft.Extensions.DependencyInjection 10.0.12 / MIT
+    （Dapper 以下は Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-12）
+
 テストのみ（配布物に含まれない）
 
   Microsoft.AspNetCore.Mvc.Testing 10.0.12 / MIT

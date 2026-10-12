@@ -1,6 +1,12 @@
 {
   "//": "本アプリ専用の DB。Pleasanter の DB とは別に作る",
 
-  "//ConnectionString": "接続文字列。現状は SQLite のみ（_documents/アーキテクチャ方針.md 6 章。4 種の RDBMS 対応は未実装）。資格情報を含む場合は Rds.local.json か環境変数で与える",
-  "ConnectionString": "Data Source=App_Data/calendarfeed.db"
+  "//Provider": "RDBMS。Sqlite / SqlServer / PostgreSql / MySql。Sqlite は簡易セットアップとデバッグ用で、本番運用には使わない。Pleasanter が使う RDBMS に合わせる",
+  "Provider": "Sqlite",
+
+  "//ConnectionString": "接続文字列。Sqlite だけは省略でき、App_Data/calendarfeed.db を使う。SqlServer は暗号化を強制する（Encrypt=False と書いても暗号化する。証明書の確認を緩めるなら TrustServerCertificate）。資格情報を含むため、実値は Rds.local.json か環境変数で与える",
+  "ConnectionString": null,
+
+  "//AutoMigrate": "起動時にマイグレーションを当てるか。false で無効にして手で当てる。複数インスタンスの同時起動の排他は無いので、複数台にするときは先に 1 台だけで当てる",
+  "AutoMigrate": true
 }

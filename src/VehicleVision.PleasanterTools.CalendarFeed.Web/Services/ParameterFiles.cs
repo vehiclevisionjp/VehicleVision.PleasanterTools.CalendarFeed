@@ -68,7 +68,9 @@ public static class ParameterFiles
             ["PageSize"] = AppSettings.FeedPageSize,
 
             // Rds.json
+            ["Provider"] = AppSettings.DbProvider,
             ["ConnectionString"] = AppSettings.DbConnectionString,
+            ["AutoMigrate"] = AppSettings.DbAutoMigrate,
 
             // Security.json
             ["AdminApiKey"] = AppSettings.AdminApiKey,

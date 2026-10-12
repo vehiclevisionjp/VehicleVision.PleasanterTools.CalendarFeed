@@ -102,5 +102,43 @@ services:
     command: ["python", "run.py"]
     profiles: ["verify"]
 
+  # ---- アプリの DB の結合テスト用（profile: rdbms）。Pleasanter とは無関係 ----
+  # `docker compose --profile rdbms up -d --wait postgres mysql`。SQL Server は上の db を使う
+  postgres:
+    image: postgres:18-alpine
+    profiles: ["rdbms"]
+    environment:
+      POSTGRES_PASSWORD: ${TESTENV_SA_PASSWORD:-Calendarfeed#Test1}
+      POSTGRES_DB: calendarfeed
+      # UTC にしない。サーバの時間帯が UTC だと、ドライバの日時変換の事故を見つける検証が素通りする
+      TZ: Asia/Tokyo
+    ports:
+      - "${TESTENV_POSTGRES_PORT:-15433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  mysql:
+    image: mysql:26
+    profiles: ["rdbms"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TESTENV_SA_PASSWORD:-Calendarfeed#Test1}
+      MYSQL_DATABASE: calendarfeed
+      TZ: Asia/Tokyo
+    # utf8mb4 を明示する。既定が 3 バイトの utf8 だと絵文字が入らない
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_as_cs
+    ports:
+      - "${TESTENV_MYSQL_PORT:-13307}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
 volumes:
   db-data:
