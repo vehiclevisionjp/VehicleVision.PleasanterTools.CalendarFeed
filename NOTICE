@@ -1,0 +1,22 @@
+VehicleVision.PleasanterTools.CalendarFeed
+Copyright (C) PMC Co.,Ltd.
+
+--------------------------------------------------------------------------------
+サードパーティソフトウェア
+--------------------------------------------------------------------------------
+
+本ソフトウェアが利用する OSS は、寛容ライセンス（MIT / BSD 系 / Apache-2.0）に限定します。
+依存を追加したら、このファイルへ「名称 / バージョン / ライセンス / 入手元」を追記すること。
+
+名称 / バージョン / ライセンス / 入手元
+
+  Microsoft.Data.Sqlite 10.0.12 / MIT / https://www.nuget.org/packages/Microsoft.Data.Sqlite/10.0.12
+    （Apache-2.0 の SQLitePCLRaw と、パブリックドメインの SQLite を推移的に伴う。
+      Questionnaire の NOTICE と同じ依存。参照日 2026-10-12）
+
+テストのみ（配布物に含まれない）
+
+  Microsoft.AspNetCore.Mvc.Testing 10.0.12 / MIT
+  xunit 2.9.3 / Apache-2.0
+  Microsoft.NET.Test.Sdk 18.10.1 / MIT
+  coverlet.collector 10.1.0 / MIT
