@@ -38,7 +38,7 @@ public static class EventMapper
     {
         var mapping = feed.Mapping;
 
-        var start = GetDateTime(record, mapping.StartColumn);
+        var start = ReadDate(record, mapping.StartColumn, mapping.StartFormat);
         if (start is null)
         {
             return null;
@@ -68,7 +68,14 @@ public static class EventMapper
             summary = ColumnText(record, mapping.SummaryColumn, null, mapping, resolved);
         }
 
-        var end = mapping.EndColumn is null ? null : GetDateTime(record, mapping.EndColumn);
+        // 終了の文字が**空でないのに読めない**ときは予定を出さない（黙って終了を補うと、別の日付に見える）
+        var end = mapping.EndColumn is null ? null : ReadDate(record, mapping.EndColumn, mapping.EndFormat);
+        if (end is null && mapping.EndColumn is not null && mapping.EndFormat is not null
+            && !string.IsNullOrWhiteSpace(GetString(record, mapping.EndColumn)))
+        {
+            return null;
+        }
+
 
         DateTimeOffset startValue;
         DateTimeOffset? endValue;
@@ -169,6 +176,24 @@ public static class EventMapper
             JsonValue value when value.TryGetValue<string>(out var s) => s,
             _ => node.ToJsonString().Trim('"'),
         };
+    }
+
+    /// <summary>
+    /// 開始・終了を読む。日付の列は ISO 形式の値、**文字の列は書式で読む**（<c>ParseExact</c>。インバリアントカルチャ・
+    /// 前後の空白は無視）。無い・読めないなら <c>null</c>。
+    /// </summary>
+    internal static DateTime? ReadDate(JsonNode record, string column, string? format)
+    {
+        if (format is null || FeedColumns.IsDate(column))
+        {
+            return GetDateTime(record, column);
+        }
+
+        var text = GetString(record, column)?.Trim();
+        return !string.IsNullOrEmpty(text)
+            && DateTime.TryParseExact(text, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? DateTime.SpecifyKind(parsed, DateTimeKind.Unspecified)
+            : null;
     }
 
     /// <summary>列の値を日時で読む。無い・読めない・未設定（1900 年より前）なら <c>null</c>。</summary>

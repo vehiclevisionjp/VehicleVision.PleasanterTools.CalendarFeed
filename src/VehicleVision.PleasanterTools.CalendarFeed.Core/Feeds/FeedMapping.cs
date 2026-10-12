@@ -25,11 +25,23 @@ public sealed class FeedMapping
     /// </summary>
     public string? SummaryTemplate { get; init; }
 
-    /// <summary>開始日時にする列。</summary>
+    /// <summary>
+    /// 開始日時にする列。日付の列（<c>StartTime</c> / <c>CompletionTime</c> / <c>DateA</c>…）は書式が要らない。
+    /// **日付が文字として入っている列（<c>Class*</c> / <c>Description*</c> / <c>Title</c> / <c>Body</c>）は <see cref="StartFormat"/> が必須。**
+    /// </summary>
     public string StartColumn { get; init; } = "StartTime";
 
-    /// <summary>終了日時にする列。<c>null</c> なら終了を持たない予定にする。</summary>
+    /// <summary>
+    /// 開始が文字の列のときの、日付の書式（.NET のカスタム書式文字列。<c>DateTime.ParseExact</c>。例 <c>yyyy/MM/dd HH:mm</c>）。
+    /// 日付の列には指定しない。
+    /// </summary>
+    public string? StartFormat { get; init; }
+
+    /// <summary>終了日時にする列。<c>null</c> なら終了を持たない予定にする。文字の列なら <see cref="EndFormat"/> が必須。</summary>
     public string? EndColumn { get; init; } = "CompletionTime";
+
+    /// <summary>終了が文字の列のときの、日付の書式（<see cref="StartFormat"/> と同じ）。</summary>
+    public string? EndFormat { get; init; }
 
     /// <summary>説明にする列。</summary>
     public string? DescriptionColumn { get; init; } = "Body";
@@ -114,14 +126,21 @@ public sealed class FeedMapping
             return $"SummaryColumn に指定できない列です: {SummaryColumn}";
         }
 
-        if (!FeedColumns.IsDate(StartColumn))
+        if (ValidateDateColumn(nameof(StartColumn), StartColumn, StartFormat) is { } startError)
         {
-            return $"StartColumn は日付の列（StartTime / CompletionTime / DateA〜DateZ / Date001〜Date100 など）を指定してください: {StartColumn}";
+            return startError;
         }
 
-        if (EndColumn is not null && !FeedColumns.IsDate(EndColumn))
+        if (EndColumn is null)
         {
-            return $"EndColumn は日付の列を指定してください: {EndColumn}";
+            if (EndFormat is not null)
+            {
+                return "EndColumn が無いときは EndFormat を指定できません。";
+            }
+        }
+        else if (ValidateDateColumn(nameof(EndColumn), EndColumn, EndFormat) is { } endError)
+        {
+            return endError;
         }
 
         foreach (var (name, column) in new[]
@@ -142,6 +161,52 @@ public sealed class FeedMapping
         }
 
         return ValidateFormats();
+    }
+
+    /// <summary>開始・終了の列と書式の組み合わせを検証する。</summary>
+    private static string? ValidateDateColumn(string name, string column, string? format)
+    {
+        if (FeedColumns.IsDate(column))
+        {
+            return format is null
+                ? null
+                : $"{name} は日付の列なので書式は要りません（文字の列に日付が入っているときだけ指定します）: {column}";
+        }
+
+        if (!FeedColumns.IsParsableText(column))
+        {
+            return $"{name} は日付の列（StartTime / CompletionTime / DateA〜DateZ / Date001〜Date100 など）か、"
+                + $"日付が文字で入っている列（Class* / Description* / Title / Body）を指定してください: {column}";
+        }
+
+        if (format is null)
+        {
+            return $"{name} に文字の列を指定するときは、日付の書式（{name.Replace("Column", "Format", StringComparison.Ordinal)}）が要ります: {column}";
+        }
+
+        return TryParseFormat(format) is { } error ? $"{name.Replace("Column", "Format", StringComparison.Ordinal)}: {error}" : null;
+    }
+
+    /// <summary>日付を読む書式として使えるか。**整形してから同じ書式で読み戻せること**を確かめる。</summary>
+    public static string? TryParseFormat(string format)
+    {
+        if (string.IsNullOrWhiteSpace(format) || format.Length > 100 || format.Any(char.IsControl))
+        {
+            return "書式は 1〜100 文字（制御文字なし）で指定してください。";
+        }
+
+        try
+        {
+            var sample = new DateTime(2026, 3, 5, 14, 30, 45, DateTimeKind.Unspecified);
+            var text = sample.ToString(format, CultureInfo.InvariantCulture);
+            return DateTime.TryParseExact(text, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
+                ? null
+                : $"書式「{format}」は、日付を読む書式として使えません（整形した値を同じ書式で読み戻せません）。";
+        }
+        catch (FormatException)
+        {
+            return $"書式「{format}」は、日付の書式として使えません。";
+        }
     }
 
     /// <summary>書式の指定を検証する（必須の有無・書式として使えるか）。</summary>

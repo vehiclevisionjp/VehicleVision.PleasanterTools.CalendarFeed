@@ -31,6 +31,9 @@ public static partial class FeedColumns
     [GeneratedRegex($"^Class{Suffix}\\z")]
     private static partial Regex TypedClass();
 
+    [GeneratedRegex($"^Description{Suffix}\\z")]
+    private static partial Regex TypedDescription();
+
     private static readonly HashSet<string> FixedDates =
         new(["StartTime", "CompletionTime", "CreatedTime", "UpdatedTime"], StringComparer.Ordinal);
 
@@ -50,6 +53,13 @@ public static partial class FeedColumns
     /// <summary>日付として読める列か（開始・終了に指定できる列）。</summary>
     public static bool IsDate(string column) =>
         FixedDates.Contains(column) || TypedDate().IsMatch(column);
+
+    /// <summary>
+    /// 日付が**文字として入っている**列か（開始・終了に、書式つきで指定できる文字の列）。
+    /// <c>Title</c> / <c>Body</c> / <c>Class*</c> / <c>Description*</c>。値は生の値（選択肢のキーなど）を読む。
+    /// </summary>
+    public static bool IsParsableText(string column) =>
+        column is "Title" or "Body" || TypedClass().IsMatch(column) || TypedDescription().IsMatch(column);
 
     /// <summary>文字として読める列か（件名・説明・場所に指定できる列）。日付の列も文字として読める。</summary>
     public static bool IsText(string column) =>
