@@ -78,7 +78,7 @@ public static class EventMapper
         return new CalendarEvent
         {
             Uid = $"{feed.SiteId}-{recordId}@{feed.Id:N}.calendarfeed",
-            Summary = string.IsNullOrWhiteSpace(summary) ? "(無題)" : summary,
+            Summary = string.IsNullOrWhiteSpace(summary) ? FeedLanguages.Untitled(feed.Language) : summary,
             Start = startValue,
             End = endValue,
             AllDay = allDay,

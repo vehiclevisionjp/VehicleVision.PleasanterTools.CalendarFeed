@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Dapper;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
+using VehicleVision.PleasanterTools.CalendarFeed.Security;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Data;
 
@@ -9,44 +10,65 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Data;
 /// <remarks>
 /// <para>
 /// トークンは SHA-256 だけを保管する（<see cref="FeedTokens"/>）。
+/// **API キーは <see cref="ISecretProtector"/> で暗号化して保管し、フィード ID に束縛する。** 平文は DB に置かない。
+/// 一覧・取得が返す <see cref="FeedDefinition"/> に API キーは含まれない（末尾の <c>ApiKeyHint</c> だけ）。
 /// </para>
 /// <para>
 /// SQL は <see cref="SqlDialect.Format"/> を通して書く（識別子は角括弧で囲む）。**方言差を持ち込まない。**
 /// </para>
 /// </remarks>
-public sealed class FeedStore(IDbConnectionFactory connections) : IFeedStore
+public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector protector) : IFeedStore
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private const string SelectColumns =
-        "SELECT [Id], [Name], [SiteId], [MappingJson], [FiltersJson], [CreatedAt], [IsRevoked] FROM [Feeds]";
+        "SELECT [Id], [Name], [SiteId], [MappingJson], [FiltersJson], [CreatedAt], [IsRevoked], "
+        + "[Language], [ApiKeyUserTimeZoneId], [ApiKeyHint] FROM [Feeds]";
 
     private string Sql(string sql) => SqlDialect.Format(connections.Provider, sql);
+
+    /// <summary>暗号文を持ち主（フィード ID）に束縛する文脈。</summary>
+    private static string ContextOf(Guid id) => $"calendarfeed:apikey:{id:D}";
+
+    /// <summary>見分けるための末尾。短い API キーは末尾を出さない（空文字＝登録済み・末尾なし）。</summary>
+    internal static string HintOf(string apiKey) => apiKey.Length >= 16 ? apiKey[^4..] : string.Empty;
 
     public async Task<(FeedDefinition Feed, string Token)> CreateAsync(
         string name,
         long siteId,
         FeedMapping mapping,
         IReadOnlyDictionary<string, string> filters,
+        FeedAccess? access = null,
         CancellationToken cancellationToken = default)
     {
+        access ??= new FeedAccess();
+        var language = FeedLanguages.Normalize(access.Language);
+        var id = Guid.NewGuid();
+        var hasKey = !string.IsNullOrEmpty(access.ApiKey);
         var feed = new FeedDefinition(
-            Guid.NewGuid(), name, siteId, mapping, filters, DateTimeOffset.UtcNow, IsRevoked: false);
+            id, name, siteId, mapping, filters, DateTimeOffset.UtcNow, IsRevoked: false,
+            language, access.ApiKeyUserTimeZoneId, hasKey ? HintOf(access.ApiKey!) : null);
         var token = FeedTokens.Generate();
 
         await using var connection = connections.Create();
         await connection.ExecuteAsync(new CommandDefinition(
-            Sql("INSERT INTO [Feeds] ([Id], [Name], [SiteId], [MappingJson], [FiltersJson], [TokenHash], [CreatedAt], [IsRevoked]) "
-                + "VALUES (@Id, @Name, @SiteId, @MappingJson, @FiltersJson, @TokenHash, @CreatedAt, 0)"),
+            Sql("INSERT INTO [Feeds] ([Id], [Name], [SiteId], [MappingJson], [FiltersJson], [TokenHash], [CreatedAt], "
+                + "[IsRevoked], [Language], [ApiKeyCipher], [ApiKeyHint], [ApiKeyUserTimeZoneId]) "
+                + "VALUES (@Id, @Name, @SiteId, @MappingJson, @FiltersJson, @TokenHash, @CreatedAt, "
+                + "0, @Language, @ApiKeyCipher, @ApiKeyHint, @ApiKeyUserTimeZoneId)"),
             new
             {
-                Id = feed.Id.ToString("D"),
+                Id = id.ToString("D"),
                 Name = name,
                 SiteId = siteId,
                 MappingJson = JsonSerializer.Serialize(mapping, Json),
                 FiltersJson = JsonSerializer.Serialize(filters, Json),
                 TokenHash = FeedTokens.Hash(token),
                 CreatedAt = feed.CreatedAt.ToString("O", CultureInfo.InvariantCulture),
+                Language = language,
+                ApiKeyCipher = hasKey ? protector.Protect(access.ApiKey!, ContextOf(id)) : null,
+                ApiKeyHint = feed.ApiKeyHint,
+                access.ApiKeyUserTimeZoneId,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return (feed, token);
@@ -92,7 +114,39 @@ public sealed class FeedStore(IDbConnectionFactory connections) : IFeedStore
             cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
     }
 
-    /// <summary>表の 1 行。**型は 4 種の RDBMS で通じるものだけ**（M0001_Feeds）。</summary>
+    public async Task<string?> GetApiKeyAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var cipher = await connection.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+            Sql("SELECT [ApiKeyCipher] FROM [Feeds] WHERE [Id] = @Id AND [IsRevoked] = 0"),
+            new { Id = id.ToString("D") },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return string.IsNullOrEmpty(cipher) ? null : protector.Unprotect(cipher, ContextOf(id));
+    }
+
+    public async Task<bool> SetApiKeyAsync(
+        Guid id,
+        string apiKey,
+        string? apiKeyUserTimeZoneId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(apiKey);
+
+        await using var connection = connections.Create();
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [Feeds] SET [ApiKeyCipher] = @ApiKeyCipher, [ApiKeyHint] = @ApiKeyHint, "
+                + "[ApiKeyUserTimeZoneId] = @ApiKeyUserTimeZoneId WHERE [Id] = @Id AND [IsRevoked] = 0"),
+            new
+            {
+                Id = id.ToString("D"),
+                ApiKeyCipher = protector.Protect(apiKey, ContextOf(id)),
+                ApiKeyHint = HintOf(apiKey),
+                ApiKeyUserTimeZoneId = apiKeyUserTimeZoneId,
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+    }
+
+    /// <summary>表の 1 行（API キーの暗号文は読まない）。**型は 4 種の RDBMS で通じるものだけ。**</summary>
     private sealed class FeedRow
     {
         public string Id { get; set; } = "";
@@ -109,6 +163,12 @@ public sealed class FeedStore(IDbConnectionFactory connections) : IFeedStore
 
         public int IsRevoked { get; set; }
 
+        public string Language { get; set; } = FeedLanguages.Default;
+
+        public string? ApiKeyUserTimeZoneId { get; set; }
+
+        public string? ApiKeyHint { get; set; }
+
         public FeedDefinition ToDefinition() => new(
             Guid.Parse(Id),
             Name,
@@ -117,6 +177,9 @@ public sealed class FeedStore(IDbConnectionFactory connections) : IFeedStore
             JsonSerializer.Deserialize<Dictionary<string, string>>(FiltersJson, Json)
                 ?? new Dictionary<string, string>(),
             DateTimeOffset.Parse(CreatedAt, CultureInfo.InvariantCulture),
-            IsRevoked != 0);
+            IsRevoked != 0,
+            Language,
+            ApiKeyUserTimeZoneId,
+            ApiKeyHint);
     }
 }

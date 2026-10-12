@@ -8,6 +8,9 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 /// <param name="Filters">Pleasanter の <c>View.ColumnFilterHash</c> へ渡す絞り込み。</param>
 /// <param name="CreatedAt">作成日時（UTC）。</param>
 /// <param name="IsRevoked">失効済みか。失効したフィードは 404 を返す。</param>
+/// <param name="Language">フィードの言語（件名が空のときの仮の件名に使う）。</param>
+/// <param name="ApiKeyUserTimeZoneId">API キーの利用者のタイムゾーン。<c>null</c> なら既定のタイムゾーン。</param>
+/// <param name="ApiKeyHint">登録した API キーの末尾（見分けるため）。<c>null</c> なら API キーは未登録。**値そのものは持たない。**</param>
 public sealed record FeedDefinition(
     Guid Id,
     string Name,
@@ -15,4 +18,11 @@ public sealed record FeedDefinition(
     FeedMapping Mapping,
     IReadOnlyDictionary<string, string> Filters,
     DateTimeOffset CreatedAt,
-    bool IsRevoked);
+    bool IsRevoked,
+    string Language = FeedLanguages.Default,
+    string? ApiKeyUserTimeZoneId = null,
+    string? ApiKeyHint = null)
+{
+    /// <summary>フィードごとの API キーが登録されているか。</summary>
+    public bool HasApiKey => ApiKeyHint is not null;
+}

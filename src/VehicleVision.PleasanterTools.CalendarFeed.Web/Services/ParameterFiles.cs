@@ -74,6 +74,7 @@ public static class ParameterFiles
 
             // Security.json
             ["AdminApiKey"] = AppSettings.AdminApiKey,
+            ["SecretKey"] = AppSettings.SecretKey,
         }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

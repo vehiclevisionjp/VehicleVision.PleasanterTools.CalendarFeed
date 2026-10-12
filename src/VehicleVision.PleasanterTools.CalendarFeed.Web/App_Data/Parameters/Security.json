@@ -2,5 +2,8 @@
   "//": "セキュリティの設定。実値は Security.local.json（git 管理外）か環境変数で与える",
 
   "//AdminApiKey": "管理 API（/admin/api/feeds）の Bearer キー。**このファイルへ実値を書かないこと。** null なら管理 API の口を開かない。管理画面の認証ができたら置き換える（_documents/アーキテクチャ方針.md 3 章）",
-  "AdminApiKey": null
+  "AdminApiKey": null,
+
+  "//SecretKey": "フィードごとの Pleasanter API キーを DB へ暗号化して置くための鍵（AES-256-GCM。Base64・32 バイト）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_SECRET_KEY か Security.local.json で与える。`dotnet run -- --generate-secret-key` で作れる。**失うと保管した API キーは復号できない**（登録し直す）。**運用開始後に変えると、同じく復号できなくなる**",
+  "SecretKey": null
 }

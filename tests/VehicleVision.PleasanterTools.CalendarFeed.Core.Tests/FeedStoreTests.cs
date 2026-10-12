@@ -1,6 +1,9 @@
 using System.Reflection;
+using System.Security.Cryptography;
+using Dapper;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
+using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using Xunit.Sdk;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Core.Tests;
@@ -40,6 +43,9 @@ public sealed class EnabledDatabasesAttribute : DataAttribute
 
 public sealed class FeedStoreTests : IDisposable
 {
+    private static readonly string TestKey = SecretProtector.GenerateKey();
+    private const string ApiKey = "6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664a";
+
     private readonly string _sqlitePath = Path.Combine(Path.GetTempPath(), $"calendarfeed-{Guid.NewGuid():N}.db");
 
     public void Dispose()
@@ -59,7 +65,7 @@ public sealed class FeedStoreTests : IDisposable
     {
         var factory = FactoryFor(provider);
         DatabaseMigrator.Migrate(provider, factory.ConnectionString);
-        return new FeedStore(factory);
+        return new FeedStore(factory, new SecretProtector(TestKey));
     }
 
     [Fact]
@@ -177,6 +183,128 @@ public sealed class FeedStoreTests : IDisposable
 
         Assert.Equal(FeedTokens.Hash(token), stored);
         Assert.NotEqual(token, stored);
+    }
+
+    [Theory]
+    [EnabledDatabases]
+    public async Task APIキーは暗号化して保管し復号して取り出せる(DatabaseProvider provider)
+    {
+        var store = StoreFor(provider);
+        var (feed, _) = await store.CreateAsync(
+            "a", 1, new FeedMapping(), new Dictionary<string, string>(),
+            new FeedAccess(ApiKey, "Asia/Tokyo", "en"));
+
+        Assert.Equal(ApiKey, await store.GetApiKeyAsync(feed.Id));
+        var (cipher, hint, tz, language) = await RawAsync(provider, feed.Id);
+        Assert.StartsWith("v1:", cipher, StringComparison.Ordinal);
+        Assert.DoesNotContain(ApiKey, cipher, StringComparison.Ordinal);
+        Assert.Equal(ApiKey[^4..], hint);
+        Assert.Equal("Asia/Tokyo", tz);
+        Assert.Equal("en", language);
+    }
+
+    [Theory]
+    [EnabledDatabases]
+    public async Task 取得と一覧が返す定義にAPIキーは含まれず登録済みと末尾だけが分かる(DatabaseProvider provider)
+    {
+        var store = StoreFor(provider);
+        var (feed, token) = await store.CreateAsync(
+            "a", 1, new FeedMapping(), new Dictionary<string, string>(), new FeedAccess(ApiKey));
+
+        var found = await store.FindByTokenAsync(token);
+        var listed = (await store.ListAsync()).Single(f => f.Id == feed.Id);
+
+        Assert.True(found!.HasApiKey);
+        Assert.Equal(ApiKey[^4..], found.ApiKeyHint);
+        Assert.True(listed.HasApiKey);
+        Assert.DoesNotContain(ApiKey, found.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [EnabledDatabases]
+    public async Task APIキーが無いフィードは未登録として扱う(DatabaseProvider provider)
+    {
+        var store = StoreFor(provider);
+        var (feed, token) = await store.CreateAsync("a", 1, new FeedMapping(), new Dictionary<string, string>());
+
+        Assert.Null(await store.GetApiKeyAsync(feed.Id));
+        Assert.False((await store.FindByTokenAsync(token))!.HasApiKey);
+    }
+
+    [Theory]
+    [EnabledDatabases]
+    public async Task APIキーを差し替えられ失効したフィードは差し替えも取り出しもできない(DatabaseProvider provider)
+    {
+        var store = StoreFor(provider);
+        var (feed, _) = await store.CreateAsync(
+            "a", 1, new FeedMapping(), new Dictionary<string, string>(), new FeedAccess(ApiKey));
+
+        Assert.True(await store.SetApiKeyAsync(feed.Id, "another-key-0123456789", "UTC"));
+        Assert.Equal("another-key-0123456789", await store.GetApiKeyAsync(feed.Id));
+        Assert.Equal("UTC", (await store.ListAsync()).Single(f => f.Id == feed.Id).ApiKeyUserTimeZoneId);
+
+        await store.RevokeAsync(feed.Id);
+        Assert.False(await store.SetApiKeyAsync(feed.Id, "x", null));
+        Assert.Null(await store.GetApiKeyAsync(feed.Id));
+        Assert.False(await store.SetApiKeyAsync(Guid.NewGuid(), "x", null));
+    }
+
+    [Theory]
+    [EnabledDatabases]
+    public async Task 暗号文を別のフィードの行へ差し替えても復号できない(DatabaseProvider provider)
+    {
+        var store = StoreFor(provider);
+        var (victim, _) = await store.CreateAsync(
+            "victim", 1, new FeedMapping(), new Dictionary<string, string>(), new FeedAccess(ApiKey));
+        var (mine, _) = await store.CreateAsync("mine", 1, new FeedMapping(), new Dictionary<string, string>());
+        var (cipher, _, _, _) = await RawAsync(provider, victim.Id);
+
+        await using var connection = FactoryFor(provider).Create();
+        await connection.ExecuteAsync(
+            SqlDialect.Format(provider, "UPDATE [Feeds] SET [ApiKeyCipher] = @Cipher WHERE [Id] = @Id"),
+            new { Cipher = cipher, Id = mine.Id.ToString("D") });
+
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => store.GetApiKeyAsync(mine.Id));
+    }
+
+    [Theory]
+    [EnabledDatabases]
+    public async Task 保管時と違う鍵では復号できない(DatabaseProvider provider)
+    {
+        var store = StoreFor(provider);
+        var (feed, _) = await store.CreateAsync(
+            "a", 1, new FeedMapping(), new Dictionary<string, string>(), new FeedAccess(ApiKey));
+        var otherKey = new FeedStore(FactoryFor(provider), new SecretProtector(SecretProtector.GenerateKey()));
+
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => otherKey.GetApiKeyAsync(feed.Id));
+    }
+
+    [Theory]
+    [EnabledDatabases]
+    public async Task 言語は正規化して保管し対応外は既定へ落とす(DatabaseProvider provider)
+    {
+        var store = StoreFor(provider);
+        var (a, _) = await store.CreateAsync(
+            "a", 1, new FeedMapping(), new Dictionary<string, string>(), new FeedAccess(Language: "EN-us"));
+        var (b, _) = await store.CreateAsync(
+            "b", 1, new FeedMapping(), new Dictionary<string, string>(), new FeedAccess(Language: "fr"));
+
+        var feeds = await store.ListAsync();
+        Assert.Equal("en", feeds.Single(f => f.Id == a.Id).Language);
+        Assert.Equal("ja", feeds.Single(f => f.Id == b.Id).Language);
+    }
+
+    private async Task<(string? Cipher, string? Hint, string? TimeZone, string Language)> RawAsync(
+        DatabaseProvider provider, Guid id)
+    {
+        await using var connection = FactoryFor(provider).Create();
+        var row = await connection.QuerySingleAsync<(string? Cipher, string? Hint, string? Tz, string Language)>(
+            SqlDialect.Format(
+                provider,
+                "SELECT [ApiKeyCipher] AS Cipher, [ApiKeyHint] AS Hint, [ApiKeyUserTimeZoneId] AS Tz, [Language] AS Language "
+                + "FROM [Feeds] WHERE [Id] = @Id"),
+            new { Id = id.ToString("D") });
+        return (row.Cipher, row.Hint, row.Tz, row.Language);
     }
 
     [Fact]
