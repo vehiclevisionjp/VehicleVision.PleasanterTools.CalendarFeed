@@ -36,6 +36,10 @@
 | `Security.json` | `SecretKey` | `CALENDARFEED_SECRET_KEY` | フィードごとの API キーを DB へ暗号化して置く鍵（Base64・32 バイト）。**実値は書かない。** `dotnet run -- --generate-secret-key` で作る。**失うと保管した API キーは復号できない** |
 | `Security.json` | `AdminApiKey` | `CALENDARFEED_ADMIN_APIKEY` | 管理 API の Bearer キー。**実値は書かない**。未設定なら管理 API を開かない |
 
+> **`CALENDARFEED_SECRET_KEY` は環境変数で保持する**（Azure App Service のアプリケーション設定・Key Vault の参照など、
+> デプロイ先の秘密の保管先へ）。`Security.local.json` はローカル開発用。失うと保管した API キーを復号できないため、
+> コンテナやディスクが作り直されても残る場所に置く。
+
 > ⚠️ **値が `null` や空のキーは無視する。** `ApiKey` は既定で `null`（ここへ書かせない）なので、
 > 写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
 
