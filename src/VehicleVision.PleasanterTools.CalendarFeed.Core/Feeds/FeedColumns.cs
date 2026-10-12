@@ -25,8 +25,18 @@ public static partial class FeedColumns
     [GeneratedRegex($"^(Class|Num|Description|Check){Suffix}\\z")]
     private static partial Regex TypedOther();
 
+    [GeneratedRegex($"^Num{Suffix}\\z")]
+    private static partial Regex TypedNumber();
+
+    [GeneratedRegex($"^Class{Suffix}\\z")]
+    private static partial Regex TypedClass();
+
     private static readonly HashSet<string> FixedDates =
         new(["StartTime", "CompletionTime", "CreatedTime", "UpdatedTime"], StringComparer.Ordinal);
+
+    /// <summary>ID や数値で返り、Pleasanter に表示名へ解決させる固定の列。</summary>
+    private static readonly HashSet<string> FixedResolved =
+        new(["Status", "Manager", "Owner", "Creator", "Updator"], StringComparer.Ordinal);
 
     private static readonly HashSet<string> FixedTexts =
         new(["Title", "Body", ItemTitle], StringComparer.Ordinal);
@@ -43,6 +53,19 @@ public static partial class FeedColumns
 
     /// <summary>文字として読める列か（件名・説明・場所に指定できる列）。日付の列も文字として読める。</summary>
     public static bool IsText(string column) =>
-        FixedTexts.Contains(column) || FixedDates.Contains(column)
+        FixedTexts.Contains(column) || FixedDates.Contains(column) || FixedResolved.Contains(column)
         || TypedDate().IsMatch(column) || TypedOther().IsMatch(column);
+
+    /// <summary>数値の列か（<c>NumA</c>〜<c>NumZ</c> / <c>Num001</c>〜）。</summary>
+    public static bool IsNumber(string column) => TypedNumber().IsMatch(column);
+
+    /// <summary>文字にするとき、**書式を与える必要がある列か**（日付と数値）。</summary>
+    public static bool NeedsFormat(string column) => IsDate(column) || IsNumber(column);
+
+    /// <summary>
+    /// 既定の応答では生の値（選択肢のキー・ユーザー ID・状況の数値）で返るため、
+    /// **Pleasanter に表示名へ解決させる必要がある列か**（Issue #5。選択肢・リンク・ユーザー）。
+    /// </summary>
+    public static bool NeedsResolution(string column) =>
+        FixedResolved.Contains(column) || TypedClass().IsMatch(column);
 }

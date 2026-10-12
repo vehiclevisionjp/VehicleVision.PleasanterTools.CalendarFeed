@@ -88,6 +88,85 @@ public sealed class PleasanterClient(HttpClient httpClient, PleasanterOptions op
         IReadOnlyDictionary<string, string>? filters,
         CancellationToken cancellationToken = default)
     {
+        var view = new Dictionary<string, object?>();
+        if (filters is { Count: > 0 })
+        {
+            view["ColumnFilterHash"] = filters;
+        }
+
+        return await PostGetAsync(apiKey, siteId, offset, pageSize, view, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// **選択肢・リンク・ユーザー・状況の列を、Pleasanter に表示名へ解決させて取り出す**（Issue #5）。
+    /// 返すのは（レコード ID → 列名 → 表示名）。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>View.ApiDataType = KeyValues</c> ＋ <c>ApiColumnValueDisplayType = Text</c> は、<c>GridColumns</c> に指定した列だけを
+    /// 表示用の文字で返す（実機検証結果 5 章）。**日時には使えない**（日付だけ・ロケール依存）ので、日時は
+    /// <see cref="GetRecordsAsync"/> の生の値を使う。
+    /// </para>
+    /// <para>
+    /// **<paramref name="offset"/> / <paramref name="pageSize"/> / <paramref name="filters"/> は
+    /// <see cref="GetRecordsAsync"/> と同じ値を渡す。** 同じ条件なら並びと件数が揃うことを実機で確認した。
+    /// 呼び出し側はレコード ID で突き合わせる。
+    /// </para>
+    /// <para>解決できる範囲は API キーの利用者の権限で決まる（読めない列は返らない）。</para>
+    /// </remarks>
+    /// <param name="idColumn">レコード ID の列（<c>IssueId</c> / <c>ResultId</c>）。</param>
+    /// <param name="columns">解決させる列。</param>
+    public async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>> GetResolvedTextAsync(
+        string apiKey,
+        long siteId,
+        int offset,
+        int pageSize,
+        IReadOnlyDictionary<string, string>? filters,
+        string idColumn,
+        IReadOnlyCollection<string> columns,
+        CancellationToken cancellationToken = default)
+    {
+        var view = new Dictionary<string, object?>
+        {
+            ["ApiDataType"] = 1, // KeyValues
+            ["ApiColumnKeyDisplayType"] = 1, // 列の内部名をキーにする
+            ["ApiColumnValueDisplayType"] = 2, // Text（表示名）
+            ["GridColumns"] = new[] { idColumn }.Concat(columns).Distinct().ToArray(),
+        };
+        if (filters is { Count: > 0 })
+        {
+            view["ColumnFilterHash"] = filters;
+        }
+
+        var page = await PostGetAsync(apiKey, siteId, offset, pageSize, view, cancellationToken).ConfigureAwait(false);
+
+        var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var row in page.Records.OfType<JsonObject>())
+        {
+            if (row[idColumn] is not { } id)
+            {
+                continue;
+            }
+
+            // ID は Text でも文字列で返る。数値で返っても同じ文字にする
+            var key = id is JsonValue v && v.TryGetValue<string>(out var text) ? text : id.ToJsonString();
+            result[key] = columns.ToDictionary(
+                c => c,
+                c => row[c] is { } node ? (node is JsonValue cv && cv.TryGetValue<string>(out var t) ? t : node.ToJsonString()) : string.Empty,
+                StringComparer.Ordinal);
+        }
+
+        return result;
+    }
+
+    private async Task<PleasanterPage> PostGetAsync(
+        string apiKey,
+        long siteId,
+        int offset,
+        int pageSize,
+        Dictionary<string, object?> view,
+        CancellationToken cancellationToken)
+    {
         var body = new Dictionary<string, object?>
         {
             ["ApiKey"] = apiKey,
@@ -95,9 +174,9 @@ public sealed class PleasanterClient(HttpClient httpClient, PleasanterOptions op
             ["Offset"] = offset,
             ["PageSize"] = pageSize,
         };
-        if (filters is { Count: > 0 })
+        if (view.Count > 0)
         {
-            body["View"] = new Dictionary<string, object?> { ["ColumnFilterHash"] = filters };
+            body["View"] = view;
         }
 
         using var request = new HttpRequestMessage(
