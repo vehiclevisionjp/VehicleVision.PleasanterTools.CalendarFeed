@@ -7,8 +7,8 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 /// </remarks>
 public sealed class FeedMapping
 {
-    /// <summary>件名にする列。</summary>
-    public string SummaryColumn { get; init; } = "Title";
+    /// <summary>件名にする列。既定は Pleasanter がサイト設定のタイトルで組み上げた <c>ItemTitle</c>。</summary>
+    public string SummaryColumn { get; init; } = FeedColumns.ItemTitle;
 
     /// <summary>開始日時にする列。</summary>
     public string StartColumn { get; init; } = "StartTime";
@@ -27,4 +27,39 @@ public sealed class FeedMapping
 
     /// <summary>終了が無い（または開始以前の）時間指定の予定に補う長さ（分）。</summary>
     public int DefaultDurationMinutes { get; init; } = 60;
+
+    /// <summary>入力を検証する。問題があれば理由を、無ければ <c>null</c> を返す。</summary>
+    public string? Validate()
+    {
+        if (!FeedColumns.IsText(SummaryColumn))
+        {
+            return $"SummaryColumn に指定できない列です: {SummaryColumn}";
+        }
+
+        if (!FeedColumns.IsDate(StartColumn))
+        {
+            return $"StartColumn は日付の列（StartTime / CompletionTime / DateA〜DateZ / Date001〜Date100 など）を指定してください: {StartColumn}";
+        }
+
+        if (EndColumn is not null && !FeedColumns.IsDate(EndColumn))
+        {
+            return $"EndColumn は日付の列を指定してください: {EndColumn}";
+        }
+
+        foreach (var (name, column) in new[]
+        {
+            (nameof(DescriptionColumn), DescriptionColumn),
+            (nameof(LocationColumn), LocationColumn),
+        })
+        {
+            if (column is not null && !FeedColumns.IsText(column))
+            {
+                return $"{name} に指定できない列です: {column}";
+            }
+        }
+
+        return DefaultDurationMinutes is < 1 or > 1440
+            ? "DefaultDurationMinutes は 1〜1440 で指定してください。"
+            : null;
+    }
 }

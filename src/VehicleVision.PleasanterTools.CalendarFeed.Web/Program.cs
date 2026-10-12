@@ -196,18 +196,9 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Web
                 return "SiteId は 1 以上で指定してください。";
             }
 
-            if (Mapping is { } m)
+            if (Mapping?.Validate() is { } mappingError)
             {
-                string?[] columns = [m.SummaryColumn, m.StartColumn, m.EndColumn, m.DescriptionColumn, m.LocationColumn];
-                if (columns.Any(c => c is not null && !ColumnName.IsMatch(c)))
-                {
-                    return "Mapping の列名は英数字と _ だけで指定してください。";
-                }
-
-                if (m.DefaultDurationMinutes is < 1 or > 1440)
-                {
-                    return "DefaultDurationMinutes は 1〜1440 で指定してください。";
-                }
+                return mappingError;
             }
 
             if (Filters is { } f
