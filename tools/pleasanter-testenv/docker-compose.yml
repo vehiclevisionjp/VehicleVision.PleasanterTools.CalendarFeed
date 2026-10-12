@@ -1,0 +1,103 @@
+# Pleasanter 検証環境（実機でしか確認できない事項を潰すため）
+#
+# ・Pleasanter 本体は **公式イメージを起動するだけ**。ソースの参照・リンクはしない
+#   （AGPL 非汚染の前提。_reference/README.md）
+# ・DB は SQL Server 2025。本アプリは 4 RDBMS 対応予定だが、まずは SQL Server 1 つで確認する
+# ・**検証もコンテナで実行する。** ホストに python も curl も要求しない
+#
+#   起動:  docker compose up -d --wait
+#   検証:  docker compose run --rm verify
+#   停止:  docker compose down -v
+
+name: calendarfeed-testenv
+
+services:
+  db:
+    # タグはレジストリで確認して固定する（2026-08-18 時点の最新 CU）
+    #   curl -s https://mcr.microsoft.com/v2/mssql/server/tags/list
+    image: mcr.microsoft.com/mssql/server:2025-CU8-ubuntu-24.04
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${TESTENV_SA_PASSWORD:-Calendarfeed#Test1}
+      MSSQL_PID: Developer
+      TZ: Asia/Tokyo
+    ports:
+      - "${TESTENV_DB_PORT:-11434}:1433"
+    healthcheck:
+      # 2022 以降のイメージは mssql-tools18。自己署名証明書なので -C（信頼）が要る
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    volumes:
+      - db-data:/var/opt/mssql
+
+  # スキーマ作成 ＋ 90 日トライアル登録（項目拡張を有効化）。完了して終了する
+  codedefiner:
+    image: implem/pleasanter:codedefiner
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      Implem.Pleasanter_Rds_Dbms: SQLServer
+      Implem.Pleasanter_Rds_SaConnectionString: "Server=db;Database=master;UID=sa;PWD=${TESTENV_SA_PASSWORD:-Calendarfeed#Test1};TrustServerCertificate=True"
+      Implem.Pleasanter_Rds_OwnerConnectionString: "Server=db;Database=#ServiceName#;UID=#ServiceName#_Owner;PWD=${TESTENV_SA_PASSWORD:-Calendarfeed#Test1};TrustServerCertificate=True"
+      Implem.Pleasanter_Rds_UserConnectionString: "Server=db;Database=#ServiceName#;UID=#ServiceName#_User;PWD=${TESTENV_SA_PASSWORD:-Calendarfeed#Test1};TrustServerCertificate=True"
+      TZ: Asia/Tokyo
+    volumes:
+      # **Dbms は環境変数で設定できない。** Rds.json をマウントして SQLServer に差し替える
+      # CodeDefiner イメージの Parameters は /app/Implem.Pleasanter/App_Data/Parameters 配下
+      - ./Parameters/Rds.json:/app/Implem.Pleasanter/App_Data/Parameters/Rds.json:ro
+    # CodeDefiner のオプションは "/" 接頭辞（"-" ではない）。/y=無人実行
+    command: ["trial", "/y"]
+    restart: "no"
+
+  pleasanter:
+    # サブモジュール _reference/Implem.Pleasanter の固定位置（Pleasanter_1.5.8.1）に合わせる
+    image: implem/pleasanter:1.5.8.1
+    depends_on:
+      codedefiner:
+        condition: service_completed_successfully
+    environment:
+      Implem.Pleasanter_Rds_Dbms: SQLServer
+      Implem.Pleasanter_Rds_SaConnectionString: "Server=db;Database=master;UID=sa;PWD=${TESTENV_SA_PASSWORD:-Calendarfeed#Test1};TrustServerCertificate=True"
+      Implem.Pleasanter_Rds_OwnerConnectionString: "Server=db;Database=#ServiceName#;UID=#ServiceName#_Owner;PWD=${TESTENV_SA_PASSWORD:-Calendarfeed#Test1};TrustServerCertificate=True"
+      Implem.Pleasanter_Rds_UserConnectionString: "Server=db;Database=#ServiceName#;UID=#ServiceName#_User;PWD=${TESTENV_SA_PASSWORD:-Calendarfeed#Test1};TrustServerCertificate=True"
+      TZ: Asia/Tokyo
+    ports:
+      - "${TESTENV_PLEASANTER_PORT:-18090}:8080"
+    volumes:
+      # 本体イメージの Parameters は /app/App_Data/Parameters 配下（CodeDefiner とは階層が異なる）
+      - ./Parameters/Rds.json:/app/App_Data/Parameters/Rds.json:ro
+    healthcheck:
+      # 本体イメージ（dotnet runtime ベース）には curl / wget が無いため bash の /dev/tcp で待受を確認する
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+
+  # 検証の実行役。ホストに python を要求しないためコンテナで動かす
+  verify:
+    image: python:3.13-slim
+    depends_on:
+      pleasanter:
+        condition: service_healthy
+    environment:
+      PLEASANTER_BASE_URL: http://pleasanter:8080
+      # 変数名は必ずプロジェクト接頭辞を付ける（ホストの同名変数が compose の既定値を黙って上書きするため）
+      PLEASANTER_API_KEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
+      TZ: Asia/Tokyo
+    volumes:
+      - ./verify:/verify:ro
+      - ./results:/results
+    working_dir: /verify
+    command: ["python", "run.py"]
+    profiles: ["verify"]
+
+volumes:
+  db-data:
