@@ -1,0 +1,27 @@
+## build
+bin/
+obj/
+artifacts/
+*.user
+.vs/
+.idea/
+
+## secrets / local config（API キー・管理キーはコミットしない）
+appsettings.*.local.json
+*.env
+.env.local
+
+## local DB
+*.db
+*.db-shm
+*.db-wal
+
+## logs / test results
+logs/
+*.log
+TestResults/
+
+## 一時成果物: temp/{yyyyMMdd}_{内容}/
+temp/
+
+.claude/settings.local.json
