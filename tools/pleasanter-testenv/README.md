@@ -43,6 +43,22 @@ docker compose down -v                                  # 後片付け（DB ご�
   （`_documents/実機検証結果.md` 1 章）
 - `Full-Text Search is not installed` は SQL Server コンテナに全文検索が無いため。**検証には影響しない**
 
+## アプリの DB の結合テスト（4 RDBMS）
+
+`profile: rdbms` の PostgreSQL と MySQL を起動し、SQL Server は上の `db` に `calendarfeed` データベースを作って使う。
+
+```bash
+docker compose --profile rdbms up -d --wait postgres mysql
+docker compose exec -T db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Calendarfeed#Test1' -C -b \
+  -Q "IF DB_ID('calendarfeed') IS NULL CREATE DATABASE [calendarfeed];"
+
+export CALENDARFEED_REQUIRE_ALL_RDBMS=1   # 未設定の RDBMS があればテストが落ちる
+export CALENDARFEED_TEST_SQLSERVER='Server=localhost,11434;Database=calendarfeed;User Id=sa;Password=Calendarfeed#Test1;TrustServerCertificate=True'
+export CALENDARFEED_TEST_POSTGRESQL='Host=localhost;Port=15433;Database=calendarfeed;Username=postgres;Password=Calendarfeed#Test1'
+export CALENDARFEED_TEST_MYSQL='Server=localhost;Port=13307;Database=calendarfeed;User=root;Password=Calendarfeed#Test1'
+dotnet test ../../tests/VehicleVision.PleasanterTools.CalendarFeed.Core.Tests
+```
+
 ## 項目拡張
 
 `trial` の CodeDefiner は既定で `Class001`〜`Class100` だけを有効にする。**`Parameters/ExtendedColumns/*.json` を渡し、`trial /y /e` で
