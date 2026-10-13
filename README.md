@@ -13,7 +13,7 @@ Outlook / Google カレンダー / Apple カレンダーの「URL から購読�
 
 ## 状態
 
-**足場（v0.1.0）。** 購読エンドポイントと管理 API が動く。**管理画面は未実装。**
+**足場（v0.1.0）。** 購読エンドポイント・管理 API・**管理者認証（ログイン ID ＋ パスワード ＋ TOTP）** が動く。**管理画面（UI）は未実装。**
 
 ## 使い方
 
@@ -22,30 +22,48 @@ Outlook / Google カレンダー / Apple カレンダーの「URL から購読�
 export CALENDARFEED_PLEASANTER_BASEURL=http://localhost:8080
 export CALENDARFEED_PLEASANTER_APIKEY=<API キー>
 export CALENDARFEED_PLEASANTER_TIMEZONE=Asia/Tokyo
-export CALENDARFEED_ADMIN_APIKEY=<管理キー>
 export CALENDARFEED_PUBLIC_BASEURL=https://calendar.example.com
 
 dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web
 ```
 
 ```bash
-# 秘密の鍵を作って設定する（フィードごとの Pleasanter API キーを DB へ暗号化して置く鍵。失うと API キーは復号できない）
+# 秘密の鍵を作って設定する（フィードごとの Pleasanter API キーと管理者の TOTP を DB へ暗号化して置く鍵。失うと復号できない）
 export CALENDARFEED_SECRET_KEY=$(dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web -- --generate-secret-key)
+```
+
+**最初の管理者**は、管理者が 1 人も居ないときだけ作れる（**公開する前に作る**。空の状態を放置しない）。
+管理 API は、ログインして発行された cookie（`HttpOnly` / `SameSite=Strict`）で使う。
+
+```bash
+B=http://localhost:5000
+curl -c jar -X POST $B/admin/api/setup -H "Content-Type: application/json" \
+  -d '{"loginId":"admin","password":"<12 文字以上のパスワード>"}'
+curl -b jar -c jar -X POST $B/admin/api/login -H "Content-Type: application/json" \
+  -d '{"loginId":"admin","password":"<パスワード>"}'        # {"step":"done"} か "totp" / "enroll"
 
 # フィードを作る（応答の url が購読 URL。トークンは 1 度しか表示されない。API キーは登録後は返さない）
-curl -X POST http://localhost:5000/admin/api/feeds \
-  -H "Authorization: Bearer $CALENDARFEED_ADMIN_APIKEY" -H "Content-Type: application/json" \
+curl -b jar -X POST $B/admin/api/feeds -H "Content-Type: application/json" \
   -d '{"name":"共有予定","siteId":123,"apiKey":"<Pleasanter の API キー>","apiKeyUserTimeZoneId":"Asia/Tokyo","language":"ja"}'
 ```
 
-| API | 内容 |
-| --- | --- |
-| `GET /feeds/{token}.ics` | 購読フィード |
-| `GET /admin/api/feeds/` | フィードの一覧（トークンは含まない） |
-| `POST /admin/api/feeds` | フィードの作成 |
-| `POST /admin/api/feeds/{id}/rotate` | トークンの作り直し（旧トークンは即失効） |
-| `PUT /admin/api/feeds/{id}/apikey` | API キー（と利用者のタイムゾーン）の差し替え |
-| `DELETE /admin/api/feeds/{id}` | フィードの失効 |
+| API | 認証 | 内容 |
+| --- | --- | --- |
+| `GET /feeds/{token}.ics` | トークン URL | 購読フィード |
+| `GET /admin/api/status` | なし | 最初の管理者が要るか・2 要素の方針 |
+| `POST /admin/api/setup` | なし（管理者が居ないときだけ） | 最初の管理者を作る |
+| `POST /admin/api/login` | なし | パスワードでログイン。`step` は `done` / `totp`（数字が要る）/ `enroll`（2 要素が必須で未登録） |
+| `POST /admin/api/login/totp` / `/login/recovery` | 途中（Pending） | 数字 / 復旧コードでログインを完了 |
+| `POST /admin/api/logout` | — | ログアウト（サーバ側のセッションを失効） |
+| `GET /admin/api/me/` | ログイン済み | 自分の情報 |
+| `POST /admin/api/me/password` | ログイン済み | パスワードの変更（他の端末のセッションを失効） |
+| `POST /admin/api/me/totp/begin` → `/complete` | ログイン済み、または必須で未登録の途中 | 2 要素の登録（復旧コード 10 本を 1 度だけ返す） |
+| `POST /admin/api/me/totp/disable` | ログイン済み | 2 要素の解除（パスワードの再確認つき。必須では不可） |
+| `GET /admin/api/feeds/` | ログイン済み | フィードの一覧（トークンも API キーも含まない） |
+| `POST /admin/api/feeds` | ログイン済み | フィードの作成 |
+| `POST /admin/api/feeds/{id}/rotate` | ログイン済み | トークンの作り直し（旧トークンは即失効） |
+| `PUT /admin/api/feeds/{id}/apikey` | ログイン済み | API キー（と利用者のタイムゾーン）の差し替え |
+| `DELETE /admin/api/feeds/{id}` | ログイン済み | フィードの失効 |
 
 ## 対応する RDBMS
 

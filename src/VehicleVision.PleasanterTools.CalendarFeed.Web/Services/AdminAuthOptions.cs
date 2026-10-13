@@ -1,0 +1,45 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Admin;
+using VehicleVision.PleasanterTools.CalendarFeed.Security;
+
+namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
+
+/// <summary>2 要素の方針。</summary>
+/// <remarks>Questionnaire の <c>QUESTIONNAIRE_ADMIN_TWOFACTOR</c> と同じ（既定は <see cref="Optional"/>）。</remarks>
+public enum TwoFactorMode
+{
+    /// <summary>**登録するまでログインが完了しない。** 登録済みなら毎回求める。自分では解除できない。</summary>
+    Required,
+
+    /// <summary>未登録ならそのまま入れる。登録済みなら毎回求める。自分で解除できる（パスワードの再確認つき）。</summary>
+    Optional,
+
+    /// <summary>未登録ならそのまま入れ、**登録の口を閉じる**。⚠️ **登録済みの人からは外さない**（設定 1 つで既存の保護が消えるのは危ない）。</summary>
+    Disabled,
+}
+
+/// <summary>管理者認証の設定。</summary>
+public sealed record AdminAuthOptions(TwoFactorMode TwoFactor, AdminPasswordPolicy PasswordPolicy)
+{
+    /// <summary>連続して何回失敗したら締め出すか。</summary>
+    public int LockoutThreshold { get; init; } = 5;
+
+    /// <summary>締め出しの長さ。**恒久的には締め出さない**（正規の利用者を狙って締め出す嫌がらせが成立する）。</summary>
+    public TimeSpan Lockout { get; init; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>パスワードは通ったが 2 要素がまだ、の段階の有効期間。この間は何も操作させない。</summary>
+    public TimeSpan PendingLifetime { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>ログイン済みセッションの有効期間。</summary>
+    public TimeSpan SessionLifetime { get; init; } = TimeSpan.FromHours(8);
+
+    /// <summary>認証アプリに出す発行元の名前。</summary>
+    public string Issuer { get; init; } = "CalendarFeed";
+}
+
+/// <summary>認証済みの管理者（エンドポイントフィルタが <c>HttpContext.Items</c> へ置く）。</summary>
+public sealed record AdminContext(AdminUser User, string SessionId, AdminSessionKind Kind)
+{
+    public const string ItemKey = "calendarfeed.admin";
+
+    public static AdminContext Of(HttpContext http) => (AdminContext)http.Items[ItemKey]!;
+}

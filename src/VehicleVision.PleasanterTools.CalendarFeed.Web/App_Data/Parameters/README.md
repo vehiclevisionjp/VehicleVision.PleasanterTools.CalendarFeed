@@ -33,8 +33,10 @@
 | `Feed.json` | `MaxEvents` | `CALENDARFEED_FEED_MAXEVENTS` | 1 フィードの予定の上限（既定 5000） |
 | `Feed.json` | `PageSize` | `CALENDARFEED_FEED_PAGESIZE` | Pleasanter へ求める 1 ページの件数（既定 1000） |
 | `Rds.json` | `ConnectionString` | `CALENDARFEED_DB_CONNECTIONSTRING` | 本アプリの DB。現状は SQLite のみ |
-| `Security.json` | `SecretKey` | `CALENDARFEED_SECRET_KEY` | フィードごとの API キーを DB へ暗号化して置く鍵（Base64・32 バイト）。**実値は書かない。** `dotnet run -- --generate-secret-key` で作る。**失うと保管した API キーは復号できない** |
-| `Security.json` | `AdminApiKey` | `CALENDARFEED_ADMIN_APIKEY` | 管理 API の Bearer キー。**実値は書かない**。未設定なら管理 API を開かない |
+| `Security.json` | `SecretKey` | `CALENDARFEED_SECRET_KEY` | フィードごとの API キーと管理者の TOTP の共有鍵を DB へ暗号化して置く鍵（Base64・32 バイト）。**実値は書かない。** `dotnet run -- --generate-secret-key` で作る。**失うと保管した API キーは復号できない** |
+| `Security.json` | `AdminTwoFactor` | `CALENDARFEED_ADMIN_TWOFACTOR` | 管理者の 2 要素。`required`（登録するまでログインが完了しない）/ `optional`（既定）/ `disabled`（登録の口を閉じる。登録済みの人からは外さない）。**知らない値は起動時に落とす** |
+| `Security.json` | `PasswordMinimumLength` | `CALENDARFEED_PASSWORD_MINIMUMLENGTH` | 管理者のパスワードの最低の長さ（既定 12） |
+| `Security.json` | `PasswordAllowSameAsLoginId` | `CALENDARFEED_PASSWORD_ALLOWSAMEASLOGINID` | ログイン ID と同じパスワードを許すか（既定 false） |
 
 > **`CALENDARFEED_SECRET_KEY` は環境変数で保持する**（Azure App Service のアプリケーション設定・Key Vault の参照など、
 > デプロイ先の秘密の保管先へ）。`Security.local.json` はローカル開発用。失うと保管した API キーを復号できないため、

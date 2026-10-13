@@ -73,7 +73,9 @@ public static class ParameterFiles
             ["AutoMigrate"] = AppSettings.DbAutoMigrate,
 
             // Security.json
-            ["AdminApiKey"] = AppSettings.AdminApiKey,
+            ["AdminTwoFactor"] = AppSettings.AdminTwoFactor,
+            ["PasswordMinimumLength"] = AppSettings.PasswordMinimumLength,
+            ["PasswordAllowSameAsLoginId"] = AppSettings.PasswordAllowSameAsLoginId,
             ["SecretKey"] = AppSettings.SecretKey,
         }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
 
