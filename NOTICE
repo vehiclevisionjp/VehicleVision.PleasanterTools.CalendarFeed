@@ -24,6 +24,8 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Data.SqlClient 7.1.1 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
+  Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
+    （管理者の TOTP（RFC 6238）。Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-13）
   Microsoft.Extensions.DependencyInjection 10.0.12 / MIT
     （Dapper 以下は Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-12）
 
