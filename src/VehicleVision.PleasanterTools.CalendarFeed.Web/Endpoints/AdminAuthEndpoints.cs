@@ -164,6 +164,7 @@ public static class AdminAuthEndpoints
         IAdminSessionStore sessions,
         AdminAuthOptions options,
         TimeProvider time,
+        ILogger<CodeRequest> logger,
         CancellationToken ct)
     {
         var now = time.GetUtcNow();
@@ -173,7 +174,27 @@ public static class AdminAuthEndpoints
         }
 
         var (user, pendingId) = pending;
-        if (user.IsDisabled || user.IsLocked(now) || await users.GetTotpSecretAsync(user.Id, ct) is not { } secret)
+        if (user.IsDisabled || user.IsLocked(now))
+        {
+            return Unauthorized();
+        }
+
+        string? secret;
+        try
+        {
+            secret = await users.GetTotpSecretAsync(user.Id, ct);
+        }
+        catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or InvalidOperationException)
+        {
+            // **秘密の鍵を失った・変えた（または未設定）。** 500 にせず通常の失敗として扱う。
+            // 復旧コードは鍵に依存しないので、それで入って 2 要素を登録し直せる（運用手順書）
+            logger.LogError(
+                "管理者 {UserId} の TOTP の共有鍵を復号できません（{Reason}）。復旧コードで入り、2 要素を登録し直してください",
+                user.Id, ex.Message);
+            return Unauthorized();
+        }
+
+        if (secret is null)
         {
             return Unauthorized();
         }

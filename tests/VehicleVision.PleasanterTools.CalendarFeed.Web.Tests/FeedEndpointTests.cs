@@ -28,12 +28,29 @@ internal sealed class TestApp : IDisposable
     public const string AdminPassword = "correct horse battery staple";
     public const string GlobalApiKey = "global-api-key";
 
-    private readonly string _db = Path.Combine(Path.GetTempPath(), $"calendarfeed-{Guid.NewGuid():N}.db");
+    private readonly string _db;
+    private readonly bool _ownsDb;
     private readonly WebApplicationFactory<Program> _factory;
     private HttpClient? _admin;
 
-    public TestApp(bool secretKey = true, bool globalApiKey = true, string? twoFactor = null, bool setUpAdmin = true)
+    /// <param name="existingDb">
+    /// すでにある DB のパス。**同じ DB を別の鍵で開く**ために使う（秘密の鍵を失った・変えた状態の再現）。
+    /// その DB は呼び出し側が消す。
+    /// </param>
+    /// <param name="secretKeyValue">秘密の鍵そのもの。省略すると、毎回新しい鍵を作る。</param>
+    public TestApp(
+        bool secretKey = true,
+        bool globalApiKey = true,
+        string? twoFactor = null,
+        bool setUpAdmin = true,
+        string? existingDb = null,
+        string? secretKeyValue = null)
     {
+        _ownsDb = existingDb is null;
+        _db = existingDb ?? Path.Combine(Path.GetTempPath(), $"calendarfeed-{Guid.NewGuid():N}.db");
+        DbPath = _db;
+        SecretKeyValue = secretKeyValue ?? SecretProtector.GenerateKey();
+
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             // **ConfigureAppConfiguration で上書きする。** UseSetting は App_Data/Parameters の既定より弱い
@@ -54,7 +71,7 @@ internal sealed class TestApp : IDisposable
 
                 if (secretKey)
                 {
-                    settings[AppSettings.SecretKey] = SecretProtector.GenerateKey();
+                    settings[AppSettings.SecretKey] = SecretKeyValue;
                 }
 
                 if (twoFactor is not null)
@@ -78,6 +95,15 @@ internal sealed class TestApp : IDisposable
     public FakePleasanter Pleasanter { get; } = new();
 
     public ManualTime Time { get; } = new();
+
+    /// <summary>Dispose で DB を消さない（同じ DB を別のアプリで開き直すテスト用）。</summary>
+    public bool KeepDb { get; set; }
+
+    /// <summary>DB のファイルのパス。</summary>
+    public string DbPath { get; }
+
+    /// <summary>秘密の鍵。</summary>
+    public string SecretKeyValue { get; }
 
     private bool SetUpAdmin { get; }
 
@@ -118,7 +144,10 @@ internal sealed class TestApp : IDisposable
     {
         _factory.Dispose();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        File.Delete(_db);
+        if (_ownsDb && !KeepDb)
+        {
+            File.Delete(_db);
+        }
     }
 }
 
