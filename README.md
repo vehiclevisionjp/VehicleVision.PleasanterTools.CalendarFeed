@@ -85,7 +85,9 @@ dotnet test
 
 | パス | 内容 |
 | --- | --- |
-| [`_documents/`](_documents/アーキテクチャ方針.md) | 設計 |
+| [`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) | 設計 |
+| [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md) | 導入・日常運用・更新・困ったとき（鍵を失ったとき、プロキシのログ） |
+| [`_documents/実機検証結果.md`](_documents/実機検証結果.md) | 実機で確かめた Pleasanter の挙動 |
 | `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用**）。[README](_reference/README.md) |
 | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | 開発規約（単一の参照元）。Claude Code は [`CLAUDE.md`](CLAUDE.md) から辿る |
 
