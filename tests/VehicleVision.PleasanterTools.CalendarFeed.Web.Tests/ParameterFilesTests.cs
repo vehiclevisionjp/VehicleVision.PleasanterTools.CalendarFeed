@@ -89,7 +89,9 @@ public sealed class ParameterFilesTests : IDisposable
         Assert.Equal("Asia/Tokyo", config[AppSettings.TimeZoneDefault]);
         Assert.Equal("300", config[AppSettings.FeedCacheSeconds]);
         Assert.Null(config[AppSettings.PleasanterApiKey]);
-        Assert.Null(config[AppSettings.AdminApiKey]);
+        Assert.Null(config[AppSettings.SecretKey]);
+        Assert.Equal("optional", config[AppSettings.AdminTwoFactor]);
+        Assert.Equal("12", config[AppSettings.PasswordMinimumLength]);
     }
 
     [Fact]

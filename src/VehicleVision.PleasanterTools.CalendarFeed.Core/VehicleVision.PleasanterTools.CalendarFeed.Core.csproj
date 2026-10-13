@@ -1,2 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- TOTP（RFC 6238）。MIT。自前で書かない。Questionnaire と同じ版 -->
+    <PackageReference Include="Otp.NET" Version="1.4.1" />
+  </ItemGroup>
+
 </Project>

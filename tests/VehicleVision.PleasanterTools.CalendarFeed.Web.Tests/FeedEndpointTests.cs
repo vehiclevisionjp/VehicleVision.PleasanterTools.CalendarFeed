@@ -11,16 +11,28 @@ using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Tests;
 
+/// <summary>テストで進められる時計。</summary>
+internal sealed class ManualTime : TimeProvider
+{
+    public DateTimeOffset Now { get; set; } = new(2026, 10, 13, 9, 0, 0, TimeSpan.Zero);
+
+    public override DateTimeOffset GetUtcNow() => Now;
+
+    public void Advance(TimeSpan span) => Now += span;
+}
+
 /// <summary>テスト用にアプリを起動する。Pleasanter は <see cref="FakePleasanter"/> が真似る。</summary>
 internal sealed class TestApp : IDisposable
 {
-    public const string AdminKey = "test-admin-key";
+    public const string AdminLoginId = "admin";
+    public const string AdminPassword = "correct horse battery staple";
     public const string GlobalApiKey = "global-api-key";
 
     private readonly string _db = Path.Combine(Path.GetTempPath(), $"calendarfeed-{Guid.NewGuid():N}.db");
     private readonly WebApplicationFactory<Program> _factory;
+    private HttpClient? _admin;
 
-    public TestApp(bool secretKey = true, bool globalApiKey = true)
+    public TestApp(bool secretKey = true, bool globalApiKey = true, string? twoFactor = null, bool setUpAdmin = true)
     {
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -32,8 +44,8 @@ internal sealed class TestApp : IDisposable
                     [AppSettings.DbConnectionString] = $"Data Source={_db};Pooling=False",
                     [AppSettings.PleasanterBaseUrl] = "https://pleasanter.test",
                     [AppSettings.PleasanterTimeZone] = "UTC",
-                    [AppSettings.AdminApiKey] = AdminKey,
-                    [AppSettings.PublicBaseUrl] = "https://feed.test",
+                    // cookie の Secure を付けない（テストの HttpClient は http で話す）。HTTPS の判定は AdminAuthEndpointTests で見る
+                    [AppSettings.PublicBaseUrl] = "http://feed.test",
                 };
                 if (globalApiKey)
                 {
@@ -45,23 +57,52 @@ internal sealed class TestApp : IDisposable
                     settings[AppSettings.SecretKey] = SecretProtector.GenerateKey();
                 }
 
+                if (twoFactor is not null)
+                {
+                    settings[AppSettings.AdminTwoFactor] = twoFactor;
+                }
+
                 config.AddInMemoryCollection(settings);
             });
             builder.ConfigureTestServices(services =>
+            {
                 services.AddHttpClient<Pleasanter.PleasanterClient>()
-                    .ConfigurePrimaryHttpMessageHandler(() => Pleasanter));
+                    .ConfigurePrimaryHttpMessageHandler(() => Pleasanter);
+                services.AddSingleton<TimeProvider>(Time);
+            });
         });
+
+        SetUpAdmin = setUpAdmin;
     }
 
     public FakePleasanter Pleasanter { get; } = new();
 
+    public ManualTime Time { get; } = new();
+
+    private bool SetUpAdmin { get; }
+
+    /// <summary>ログインしていない利用者（ブラウザ）。呼ぶたびに別の cookie の入れ物になる。</summary>
     public HttpClient Client() => _factory.CreateClient();
 
+    /// <summary>
+    /// ログイン済みの管理者。**最初の管理者を作ってログインする**（2 要素が要らない構成）。同じ入れ物を使い回す。
+    /// </summary>
     public HttpClient AdminClient()
     {
+        if (_admin is not null)
+        {
+            return _admin;
+        }
+
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new("Bearer", AdminKey);
-        return client;
+        if (SetUpAdmin)
+        {
+            Assert.Equal(HttpStatusCode.Created, client.PostAsJsonAsync("/admin/api/setup", new { loginId = AdminLoginId, password = AdminPassword }).GetAwaiter().GetResult().StatusCode);
+        }
+
+        var login = client.PostAsJsonAsync("/admin/api/login", new { loginId = AdminLoginId, password = AdminPassword }).GetAwaiter().GetResult();
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        return _admin = client;
     }
 
     /// <summary>フィードを作り、購読 URL のパスを返す。</summary>

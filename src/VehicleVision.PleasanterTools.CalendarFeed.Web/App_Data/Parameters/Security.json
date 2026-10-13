@@ -1,9 +1,15 @@
 {
   "//": "セキュリティの設定。実値は Security.local.json（git 管理外）か環境変数で与える",
 
-  "//AdminApiKey": "管理 API（/admin/api/feeds）の Bearer キー。**このファイルへ実値を書かないこと。** null なら管理 API の口を開かない。管理画面の認証ができたら置き換える（_documents/アーキテクチャ方針.md 3 章）",
-  "AdminApiKey": null,
+  "//AdminTwoFactor": "管理者の 2 要素（TOTP）。required＝登録するまでログインが完了しない・自分では解除できない／optional（既定）＝未登録ならそのまま入れる・自分で解除できる／disabled＝未登録ならそのまま入れ、登録の口を閉じる。⚠️ disabled でも、登録済みの人からは外さない。知らない値は起動時に落とす",
+  "AdminTwoFactor": "optional",
 
-  "//SecretKey": "フィードごとの Pleasanter API キーを DB へ暗号化して置くための鍵（AES-256-GCM。Base64・32 バイト）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_SECRET_KEY か Security.local.json で与える。`dotnet run -- --generate-secret-key` で作れる。**失うと保管した API キーは復号できない**（登録し直す）。**運用開始後に変えると、同じく復号できなくなる**",
+  "//PasswordMinimumLength": "管理者のパスワードの最低の長さ",
+  "PasswordMinimumLength": 12,
+
+  "//PasswordAllowSameAsLoginId": "ログイン ID と同じパスワードを許すか（大文字小文字は区別しない）",
+  "PasswordAllowSameAsLoginId": false,
+
+  "//SecretKey": "フィードごとの Pleasanter API キーと管理者の TOTP の共有鍵を DB へ暗号化して置くための鍵（AES-256-GCM。Base64・32 バイト）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_SECRET_KEY（デプロイ先の秘密の保管先）か Security.local.json で与える。`dotnet run -- --generate-secret-key` で作れる。**失うと保管した API キーと 2 要素は復号できない**（登録し直す）。**運用開始後に変えると、同じく復号できなくなる**",
   "SecretKey": null
 }

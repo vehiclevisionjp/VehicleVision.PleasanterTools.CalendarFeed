@@ -1,5 +1,6 @@
 using System.Globalization;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
+using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
@@ -28,7 +29,9 @@ public static class AppSettings
     public const string DbProvider = "CALENDARFEED_DB_PROVIDER";
     public const string DbConnectionString = "CALENDARFEED_DB_CONNECTIONSTRING";
     public const string DbAutoMigrate = "CALENDARFEED_DB_AUTOMIGRATE";
-    public const string AdminApiKey = "CALENDARFEED_ADMIN_APIKEY";
+    public const string AdminTwoFactor = "CALENDARFEED_ADMIN_TWOFACTOR";
+    public const string PasswordMinimumLength = "CALENDARFEED_PASSWORD_MINIMUMLENGTH";
+    public const string PasswordAllowSameAsLoginId = "CALENDARFEED_PASSWORD_ALLOWSAMEASLOGINID";
     public const string SecretKey = "CALENDARFEED_SECRET_KEY";
 
     /// <summary>Pleasanter の接続設定を読む。必須の値が無ければ、設定名を挙げて止める。</summary>
@@ -62,6 +65,26 @@ public static class AppSettings
     /// <summary>秘密の鍵から <see cref="ISecretProtector"/> を作る。未設定なら、使おうとしたときに止まる実装を返す。</summary>
     public static ISecretProtector ReadSecretProtector(IConfiguration configuration) =>
         Text(configuration, SecretKey) is { } key ? new SecretProtector(key) : new UnconfiguredSecretProtector();
+
+    /// <summary>
+    /// 管理者認証の設定を読む。**知らない値は起動時に落とす**（黙って既定へ落ちると、必須にしたつもりで任意のまま動く）。
+    /// </summary>
+    public static AdminAuthOptions ReadAdminAuth(IConfiguration configuration)
+    {
+        var raw = Text(configuration, AdminTwoFactor);
+        var mode = raw is null
+            ? TwoFactorMode.Optional
+            : Enum.TryParse<TwoFactorMode>(raw.Trim(), ignoreCase: true, out var parsed) && Enum.IsDefined(parsed)
+                ? parsed
+                : throw new InvalidOperationException(
+                    $"{AdminTwoFactor} の値 '{raw}' は対応していません。required / optional / disabled のいずれかで指定してください。");
+
+        return new AdminAuthOptions(
+            mode,
+            new AdminPasswordPolicy(
+                PositiveInt(configuration, PasswordMinimumLength, 12),
+                string.Equals(Text(configuration, PasswordAllowSameAsLoginId), "true", StringComparison.OrdinalIgnoreCase)));
+    }
 
     /// <summary>起動時にマイグレーションを当てるか。既定は当てる。<c>false</c> で無効（手で当てる）。</summary>
     public static bool ReadAutoMigrate(IConfiguration configuration) =>

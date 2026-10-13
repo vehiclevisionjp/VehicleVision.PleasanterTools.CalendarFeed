@@ -29,6 +29,20 @@ public static class TestDatabases
         _ => throw new NotSupportedException(),
     };
 
+    private static readonly object MigrationLock = new();
+
+    /// <summary>
+    /// マイグレーションを当てる。**テストクラスは並列に走り、共有の DB へ同時に当てると「表が既にある」で落ちる**
+    /// （本体のマイグレーションに複数インスタンスの排他が無いことの現れ。方針書 8 章 #5）ので、直列にする。
+    /// </summary>
+    public static void Migrate(DatabaseProvider provider, string connectionString)
+    {
+        lock (MigrationLock)
+        {
+            DatabaseMigrator.Migrate(provider, connectionString);
+        }
+    }
+
     public static bool IsEnabled(DatabaseProvider provider) =>
         provider is DatabaseProvider.Sqlite || !string.IsNullOrWhiteSpace(ConnectionString(provider));
 }
@@ -64,7 +78,7 @@ public sealed class FeedStoreTests : IDisposable
     private FeedStore StoreFor(DatabaseProvider provider)
     {
         var factory = FactoryFor(provider);
-        DatabaseMigrator.Migrate(provider, factory.ConnectionString);
+        TestDatabases.Migrate(provider, factory.ConnectionString);
         return new FeedStore(factory, new SecretProtector(TestKey));
     }
 
