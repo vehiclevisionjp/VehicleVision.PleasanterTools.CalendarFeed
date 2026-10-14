@@ -21,6 +21,7 @@ public static class AdminFeedEndpoints
         admin.MapGet("/", async (IFeedStore feeds, CancellationToken ct) =>
             Results.Ok((await feeds.ListAsync(ct)).Select(FeedView.From)));
 
+        // **変更はすべて Administrator だけ。** 一覧は、閲覧のみの役割にも見せる
         admin.MapPost("/", async (
             CreateFeedRequest request,
             HttpContext http,
@@ -60,7 +61,7 @@ public static class AdminFeedEndpoints
             return Results.Created(
                 $"/admin/api/feeds/{feed.Id}",
                 new { feed = FeedView.From(feed), url = FeedUrl(http, configuration, token) });
-        });
+        }).AddEndpointFilter<AdministratorOnlyFilter>();
 
         admin.MapPost("/{id:guid}/rotate", async (
             Guid id,
@@ -77,7 +78,7 @@ public static class AdminFeedEndpoints
 
             await audit.WriteAsync(http, AuditActions.FeedTokenRotated, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));
             return Results.Ok(new { url = FeedUrl(http, configuration, token) });
-        });
+        }).AddEndpointFilter<AdministratorOnlyFilter>();
 
         // **API キーの差し替え。** 登録後の値は返さない。差し替えたら、古いキーで取った生成済みの .ics を捨てる
         admin.MapPut("/{id:guid}/apikey", async (
@@ -109,7 +110,7 @@ public static class AdminFeedEndpoints
             // **API キーそのものは残さない**（対象のフィードだけ）
             await audit.WriteAsync(http, AuditActions.FeedApiKeySet, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));
             return Results.NoContent();
-        });
+        }).AddEndpointFilter<AdministratorOnlyFilter>();
 
         admin.MapDelete("/{id:guid}", async (
             Guid id, HttpContext http, IFeedStore feeds, FeedService service, AuditLogService audit, CancellationToken ct) =>
@@ -122,7 +123,7 @@ public static class AdminFeedEndpoints
             service.Invalidate(id);
             await audit.WriteAsync(http, AuditActions.FeedRevoked, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));
             return Results.NoContent();
-        });
+        }).AddEndpointFilter<AdministratorOnlyFilter>();
     }
 
     private static string FeedUrl(HttpContext http, IConfiguration configuration, string token)

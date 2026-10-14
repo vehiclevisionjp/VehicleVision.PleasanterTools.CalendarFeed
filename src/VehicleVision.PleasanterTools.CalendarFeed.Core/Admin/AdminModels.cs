@@ -11,18 +11,55 @@ public sealed record AdminUser(
     DateTimeOffset? LastLoginAt,
     DateTimeOffset CreatedAt,
     bool TotpEnabled,
-    string Language)
+    string Language,
+    DateTimeOffset? InviteExpiresAt = null,
+    bool InvitePending = false)
 {
     /// <summary>締め出し中か。</summary>
     public bool IsLocked(DateTimeOffset now) => LockedUntil is { } until && until > now;
+
+    /// <summary>
+    /// 長い間使われていないか（棚卸し用）。**招待中・無効のアカウントは対象にしない**（使っていないのではなく、使えない）。
+    /// 一度もログインしていなければ、作られた日から数える。
+    /// </summary>
+    public bool IsStale(DateTimeOffset now, TimeSpan threshold) =>
+        !InvitePending && !IsDisabled && now - (LastLoginAt ?? CreatedAt) > threshold;
 }
 
 /// <summary>役割。認可はこれだけで判定する（Pleasanter のグループ・組織では判定しない）。</summary>
 public static class AdminRoles
 {
-    /// <summary>すべてを許す。</summary>
+    /// <summary>すべてを許す（管理者の管理・監査ログ・フィードの変更）。</summary>
     public const string Administrator = "Administrator";
+
+    /// <summary>フィードの一覧を見るだけ。**変更・監査ログ・管理者の管理は許さない。**</summary>
+    public const string Viewer = "Viewer";
+
+    /// <summary>知っている役割か。</summary>
+    public static bool IsValid(string? role) => role is Administrator or Viewer;
 }
+
+/// <summary>管理者の変更の結果。</summary>
+public enum AdminChangeResult
+{
+    /// <summary>変えた。</summary>
+    Updated,
+
+    /// <summary>その管理者が居ない。</summary>
+    NotFound,
+
+    /// <summary><b>有効な Administrator が 0 人になるので断った。</b>締め出しを防ぐ。</summary>
+    LastAdministrator,
+}
+
+/// <summary>ログイン中の端末 1 つ分（サーバ側セッション）。</summary>
+/// <param name="Handle">端末を指す識別子（セッション ID の SHA-256。cookie の現物ではない）。</param>
+public sealed record AdminSessionInfo(
+    string Handle,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset ExpiresAt,
+    string? IpAddress,
+    string? UserAgent);
 
 /// <summary>サーバ側セッションの段階。</summary>
 public enum AdminSessionKind
@@ -61,6 +98,43 @@ public interface IAdminUserStore
 
     /// <summary>ID から引く。</summary>
     Task<AdminUser?> FindByIdAsync(string id, CancellationToken cancellationToken = default);
+
+    /// <summary>管理者の一覧（作成の古い順）。</summary>
+    Task<IReadOnlyList<AdminUser>> ListAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// **招待して管理者を作る。** パスワードはまだ無い（<c>PasswordHash</c> は空で、ログインできない）。
+    /// ログイン ID がすでにあれば <c>null</c>。
+    /// </summary>
+    /// <param name="inviteHash">招待トークンの SHA-256（16 進）。現物は保管しない。</param>
+    Task<AdminUser?> CreateInvitedAsync(
+        string loginId,
+        string role,
+        string language,
+        string inviteHash,
+        DateTimeOffset inviteExpiresAt,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>**招待の出し直し。** 前の招待は使えなくなる。招待中（パスワード未設定）の管理者だけが対象。</summary>
+    Task<bool> ReissueInviteAsync(
+        string id, string inviteHash, DateTimeOffset inviteExpiresAt, CancellationToken cancellationToken = default);
+
+    /// <summary>招待トークンの SHA-256 から、有効な（期限内・無効化されていない）招待中の管理者を引く。</summary>
+    Task<AdminUser?> FindByInviteAsync(
+        string inviteHash, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// **招待を受け取る**（パスワードを決める）。使い切り: 招待の印を条件に含めた 1 文の UPDATE の件数で判断する。
+    /// </summary>
+    Task<bool> AcceptInviteAsync(
+        string inviteHash, string passwordHash, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>無効化・有効化。**最後の有効な Administrator は無効化できない。**</summary>
+    Task<AdminChangeResult> SetDisabledAsync(string id, bool disabled, CancellationToken cancellationToken = default);
+
+    /// <summary>役割を変える。**最後の有効な Administrator は降格できない。**</summary>
+    Task<AdminChangeResult> SetRoleAsync(string id, string role, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// ログイン失敗を記録する。<paramref name="threshold"/> 回目で <paramref name="lockout"/> の間だけ締め出す。
@@ -120,7 +194,19 @@ public interface IAdminSessionStore
         AdminSessionKind kind,
         TimeSpan lifetime,
         DateTimeOffset now,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? ipAddress = null,
+        string? userAgent = null);
+
+    /// <summary>セッション ID から端末を指す識別子を作る（一覧に出してよい値。cookie の現物は作れない）。</summary>
+    string HandleOf(string sessionId);
+
+    /// <summary>ログイン中（<c>Session</c>・期限内）の端末の一覧。新しい順。</summary>
+    Task<IReadOnlyList<AdminSessionInfo>> ListForUserAsync(
+        string userId, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>端末を 1 つ失効させる。<b>持ち主の組で消す</b>（他人の端末の識別子を渡されても消えない）。</summary>
+    Task<bool> DeleteByHandleAsync(string userId, string handle, CancellationToken cancellationToken = default);
 
     /// <summary>ID からセッションを引く。無い・期限切れなら <c>null</c>。</summary>
     Task<AdminSession?> FindAsync(string sessionId, DateTimeOffset now, CancellationToken cancellationToken = default);

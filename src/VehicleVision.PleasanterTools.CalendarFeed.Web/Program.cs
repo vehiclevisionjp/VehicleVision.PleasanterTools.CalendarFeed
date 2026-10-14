@@ -191,6 +191,7 @@ app.MapGet("/feeds/{token}.ics", async (
 app.MapAdminAuth();
 app.MapAdminFeeds();
 app.MapAdminAudit();
+app.MapAdminUsers();
 
 app.Run();
 

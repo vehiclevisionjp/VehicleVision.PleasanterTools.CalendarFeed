@@ -22,7 +22,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
 {
     private const string SelectColumns =
         "SELECT [Id], [LoginId], [Role], [IsDisabled], [FailedLoginCount], [LockedUntil], [LastLoginAt], [CreatedAt], "
-        + "[TotpSecretCipher], [Language], [PasswordHash] FROM [AdminUsers]";
+        + "[TotpSecretCipher], [Language], [PasswordHash], [InviteHash], [InviteExpiresAt] FROM [AdminUsers]";
 
     private string Sql(string sql) => SqlDialect.Format(connections.Provider, sql);
 
@@ -110,6 +110,136 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
             Sql($"{SelectColumns} WHERE [Id] = @Id"), new { Id = id },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return row?.ToUser();
+    }
+
+    public async Task<IReadOnlyList<AdminUser>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var rows = await connection.QueryAsync<UserRow>(new CommandDefinition(
+            Sql($"{SelectColumns} ORDER BY [CreatedAt], [Id]"), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return [.. rows.Select(r => r.ToUser())];
+    }
+
+    public async Task<AdminUser?> CreateInvitedAsync(
+        string loginId,
+        string role,
+        string language,
+        string inviteHash,
+        DateTimeOffset inviteExpiresAt,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        var id = Guid.NewGuid().ToString("D");
+        await using var connection = connections.Create();
+        try
+        {
+            // パスワードは空（ログインできない）。ログイン ID の一意性は LoginIdKey の一意索引が守る
+            await connection.ExecuteAsync(new CommandDefinition(
+                Sql("INSERT INTO [AdminUsers] ([Id], [LoginId], [LoginIdKey], [PasswordHash], [Role], [IsDisabled], "
+                    + "[FailedLoginCount], [CreatedAt], [Language], [InviteHash], [InviteExpiresAt]) "
+                    + "VALUES (@Id, @LoginId, @LoginIdKey, '', @Role, 0, 0, @CreatedAt, @Language, @InviteHash, @InviteExpiresAt)"),
+                new
+                {
+                    Id = id,
+                    LoginId = loginId.Trim(),
+                    LoginIdKey = KeyOf(loginId),
+                    Role = role,
+                    CreatedAt = DbTime.Format(now),
+                    Language = FeedLanguages.Normalize(language),
+                    InviteHash = inviteHash,
+                    InviteExpiresAt = DbTime.Format(inviteExpiresAt),
+                },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+        catch (System.Data.Common.DbException)
+        {
+            // 一意制約で落ちた（同じログイン ID がある）なら null。それ以外の失敗は握りつぶさない
+            if (await FindForLoginAsync(loginId, cancellationToken).ConfigureAwait(false) is not null)
+            {
+                return null;
+            }
+
+            throw;
+        }
+
+        return await FindByIdAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> ReissueInviteAsync(
+        string id, string inviteHash, DateTimeOffset inviteExpiresAt, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        // 招待中（パスワード未設定）だけ。受け取り済みの人の招待を作り直して、乗っ取りの入口にさせない
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [AdminUsers] SET [InviteHash] = @InviteHash, [InviteExpiresAt] = @InviteExpiresAt "
+                + "WHERE [Id] = @Id AND [InviteHash] IS NOT NULL AND [PasswordHash] = ''"),
+            new { Id = id, InviteHash = inviteHash, InviteExpiresAt = DbTime.Format(inviteExpiresAt) },
+            cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+    }
+
+    public async Task<AdminUser?> FindByInviteAsync(
+        string inviteHash, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var row = await connection.QuerySingleOrDefaultAsync<UserRow>(new CommandDefinition(
+            Sql($"{SelectColumns} WHERE [InviteHash] = @InviteHash AND [InviteExpiresAt] > @Now AND [IsDisabled] = 0"),
+            new { InviteHash = inviteHash, Now = DbTime.Format(now) },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row?.ToUser();
+    }
+
+    public async Task<bool> AcceptInviteAsync(
+        string inviteHash, string passwordHash, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        // 招待の印・期限・無効化を条件に含めた 1 文。同時に 2 回来ても、通るのは 1 回だけ
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [AdminUsers] SET [PasswordHash] = @PasswordHash, [InviteHash] = NULL, [InviteExpiresAt] = NULL, "
+                + "[FailedLoginCount] = 0, [LockedUntil] = NULL "
+                + "WHERE [InviteHash] = @InviteHash AND [InviteExpiresAt] > @Now AND [IsDisabled] = 0"),
+            new { InviteHash = inviteHash, PasswordHash = passwordHash, Now = DbTime.Format(now) },
+            cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+    }
+
+    public Task<AdminChangeResult> SetDisabledAsync(
+        string id, bool disabled, CancellationToken cancellationToken = default) =>
+        ChangeAsync(id, "[IsDisabled] = @Value", disabled ? 1 : 0, leavesAdministrator: disabled, cancellationToken);
+
+    public Task<AdminChangeResult> SetRoleAsync(string id, string role, CancellationToken cancellationToken = default) =>
+        ChangeAsync(id, "[Role] = @Value", role, leavesAdministrator: role != AdminRoles.Administrator, cancellationToken);
+
+    /// <summary>
+    /// 1 文で変える。<paramref name="leavesAdministrator"/> のときは、**ほかに有効な Administrator が居る場合だけ**通す
+    /// （同時に 2 人が互いを降格しても、最後の 1 人は残る）。
+    /// </summary>
+    /// <remarks>
+    /// 件数を数える副問い合わせは派生表で包む（MySQL は、更新する表をそのまま副問い合わせに使えない）。
+    /// 「有効な Administrator」は、無効でなく、パスワードを決めた（招待中でない）人。
+    /// </remarks>
+    private async Task<AdminChangeResult> ChangeAsync(
+        string id, string setClause, object value, bool leavesAdministrator, CancellationToken cancellationToken)
+    {
+        var guard = leavesAdministrator
+            ? " AND (NOT ([Role] = @Admin AND [IsDisabled] = 0 AND [PasswordHash] <> '') OR (SELECT COUNT(*) FROM "
+                + "(SELECT [Id] FROM [AdminUsers] WHERE [Role] = @Admin AND [IsDisabled] = 0 AND [PasswordHash] <> '' "
+                + "AND [Id] <> @Id) AS [Others]) > 0)"
+            : string.Empty;
+
+        await using var connection = connections.Create();
+        var updated = await connection.ExecuteAsync(new CommandDefinition(
+            Sql($"UPDATE [AdminUsers] SET {setClause} WHERE [Id] = @Id{guard}"),
+            new { Id = id, Value = value, Admin = AdminRoles.Administrator },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if (updated > 0)
+        {
+            return AdminChangeResult.Updated;
+        }
+
+        return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            Sql("SELECT COUNT(*) FROM [AdminUsers] WHERE [Id] = @Id"), new { Id = id },
+            cancellationToken: cancellationToken)).ConfigureAwait(false) > 0
+            ? AdminChangeResult.LastAdministrator
+            : AdminChangeResult.NotFound;
     }
 
     public async Task<AdminFailure> RecordFailureAsync(
@@ -284,6 +414,10 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
 
         public string PasswordHash { get; set; } = "";
 
+        public string? InviteHash { get; set; }
+
+        public string? InviteExpiresAt { get; set; }
+
         public AdminUser ToUser() => new(
             Id,
             LoginId,
@@ -294,7 +428,10 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
             DbTime.Parse(LastLoginAt),
             DbTime.Parse(CreatedAt)!.Value,
             !string.IsNullOrEmpty(TotpSecretCipher),
-            Language);
+            Language,
+            DbTime.Parse(InviteExpiresAt),
+            // パスワードを決める前（招待中）。受け取り済みなら印は消えている
+            !string.IsNullOrEmpty(InviteHash) && PasswordHash.Length == 0);
     }
 }
 
@@ -315,15 +452,17 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         AdminSessionKind kind,
         TimeSpan lifetime,
         DateTimeOffset now,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? ipAddress = null,
+        string? userAgent = null)
     {
         var sessionId = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
         await using var connection = connections.Create();
         await connection.ExecuteAsync(new CommandDefinition(
-            Sql("INSERT INTO [AdminSessions] ([Id], [UserId], [Kind], [CreatedAt], [ExpiresAt]) "
-                + "VALUES (@Id, @UserId, @Kind, @CreatedAt, @ExpiresAt)"),
+            Sql("INSERT INTO [AdminSessions] ([Id], [UserId], [Kind], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent]) "
+                + "VALUES (@Id, @UserId, @Kind, @CreatedAt, @ExpiresAt, @IpAddress, @UserAgent)"),
             new
             {
                 Id = IdHash(sessionId),
@@ -331,9 +470,36 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
                 Kind = kind.ToString(),
                 CreatedAt = DbTime.Format(now),
                 ExpiresAt = DbTime.Format(now + lifetime),
+                IpAddress = AuditText.Safe(ipAddress, 45),
+                UserAgent = AuditText.Safe(userAgent, 200),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return sessionId;
+    }
+
+    public string HandleOf(string sessionId) => IdHash(sessionId);
+
+    public async Task<IReadOnlyList<AdminSessionInfo>> ListForUserAsync(
+        string userId, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var rows = await connection.QueryAsync<(string Id, string CreatedAt, string ExpiresAt, string? IpAddress, string? UserAgent)>(
+            new CommandDefinition(
+                Sql("SELECT [Id], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent] FROM [AdminSessions] "
+                    + "WHERE [UserId] = @UserId AND [Kind] = @Kind AND [ExpiresAt] > @Now ORDER BY [CreatedAt] DESC"),
+                new { UserId = userId, Kind = nameof(AdminSessionKind.Session), Now = DbTime.Format(now) },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return [.. rows.Select(r => new AdminSessionInfo(
+            r.Id, DbTime.Parse(r.CreatedAt)!.Value, DbTime.Parse(r.ExpiresAt)!.Value, r.IpAddress, r.UserAgent))];
+    }
+
+    public async Task<bool> DeleteByHandleAsync(
+        string userId, string handle, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("DELETE FROM [AdminSessions] WHERE [Id] = @Id AND [UserId] = @UserId"),
+            new { Id = handle, UserId = userId }, cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
     }
 
     public async Task<AdminSession?> FindAsync(

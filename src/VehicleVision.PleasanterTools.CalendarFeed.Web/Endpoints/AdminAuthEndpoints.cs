@@ -23,6 +23,12 @@ public static class AdminAuthEndpoints
         error = "ログイン ID またはパスワードが違います。何度も失敗した場合は、しばらく待ってからやり直してください。",
     };
 
+    /// <summary>端末の一覧に出す接続元（表示用。認可には使わない）。</summary>
+    internal static string? Ip(HttpContext http) => http.Connection.RemoteIpAddress?.ToString();
+
+    /// <summary>端末の一覧に出す User-Agent（表示用。長さは保管側で切る）。</summary>
+    internal static string? UserAgentOf(HttpContext http) => http.Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null;
+
     private static IResult Unauthorized() => Results.Json(Generic, statusCode: StatusCodes.Status401Unauthorized);
 
     private static IResult Bad(string error) => Results.Json(new { error }, statusCode: StatusCodes.Status400BadRequest);
@@ -123,9 +129,9 @@ public static class AdminAuthEndpoints
         }
 
         var (user, hash) = found.Value;
-        if (user.IsDisabled || user.IsLocked(now))
+        if (user.IsDisabled || user.IsLocked(now) || user.InvitePending)
         {
-            await audit.WriteAsync(http, AuditActions.LoginFailed, false, user, detail: user.IsDisabled ? "disabled" : "locked");
+            await audit.WriteAsync(http, AuditActions.LoginFailed, false, user, detail: user.IsDisabled ? "disabled" : user.IsLocked(now) ? "locked" : "invite-pending");
             return Unauthorized();
         }
 
@@ -155,7 +161,8 @@ public static class AdminAuthEndpoints
         var mustEnroll = !user.TotpEnabled && options.TwoFactor == TwoFactorMode.Required;
         if (needsSecondFactor || mustEnroll)
         {
-            var pending = await sessions.CreateAsync(user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct);
+            var pending = await sessions.CreateAsync(
+                user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct, Ip(http), UserAgentOf(http));
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
             AdminSessionGuard.SetCookie(http, AdminSessionGuard.PendingCookie, pending, options.PendingLifetime);
             return Results.Ok(new { step = needsSecondFactor ? "totp" : "enroll" });
@@ -468,7 +475,8 @@ public static class AdminAuthEndpoints
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var sessionId = await sessions.CreateAsync(user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct);
+        var sessionId = await sessions.CreateAsync(
+            user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct, Ip(http), UserAgentOf(http));
         AdminSessionGuard.SetCookie(http, AdminSessionGuard.SessionCookie, sessionId, options.SessionLifetime);
         await users.RecordSuccessAsync(user.Id, now, ct);
         await sessions.DeleteExpiredAsync(now, ct);
@@ -557,7 +565,7 @@ public static class AdminAuthEndpoints
         }
     }
 
-    private static string? ValidateLoginId(string? loginId)
+    internal static string? ValidateLoginId(string? loginId)
     {
         var trimmed = loginId?.Trim();
         return string.IsNullOrEmpty(trimmed) || trimmed.Length > 100 || trimmed.Any(char.IsControl)

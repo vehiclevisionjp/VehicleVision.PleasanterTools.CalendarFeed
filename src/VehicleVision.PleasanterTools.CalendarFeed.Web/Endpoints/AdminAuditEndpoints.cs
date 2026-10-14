@@ -5,7 +5,7 @@ using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Endpoints;
 
-/// <summary>監査ログの閲覧 API。**ログイン済みの管理者（<c>Session</c>）だけ**が読める。</summary>
+/// <summary>監査ログの閲覧 API。**ログイン済みの <c>Administrator</c> だけ**が読める（閲覧のみの役割には見せない）。</summary>
 public static class AdminAuditEndpoints
 {
     /// <summary>監査ログの閲覧 API を登録する。</summary>
@@ -13,6 +13,7 @@ public static class AdminAuditEndpoints
     {
         var group = app.MapGroup("/admin/api/audit-logs");
         group.AddEndpointFilter<AdminSessionFilter>();
+        group.AddEndpointFilter<AdministratorOnlyFilter>();
 
         // 新しい順。ページ送りは、前のページの最後の occurredAt を before へ渡す
         group.MapGet("/", async (
