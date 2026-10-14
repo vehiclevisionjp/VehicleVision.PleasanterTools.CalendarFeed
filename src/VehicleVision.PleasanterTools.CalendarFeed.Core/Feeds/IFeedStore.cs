@@ -36,7 +36,17 @@ public interface IFeedStore
     /// </summary>
     Task<bool> UpdateAsync(Guid id, FeedUpdate update, CancellationToken cancellationToken = default);
     /// <summary>最後に Pleasanter へ取りに行った結果を残す（上書き）。</summary>
-    Task RecordFetchAsync(Guid id, FeedFetchResult result, CancellationToken cancellationToken = default);
+    /// <summary>取得の結果を残し、<b>連続の失敗の回数</b>（成功なら 0）を返す。</summary>
+    Task<int> RecordFetchAsync(Guid id, FeedFetchResult result, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 失敗の通知を出したことを残す。<b>まだ通知していない、または前の通知から <paramref name="repeatAfter"/> が過ぎているときだけ</b>残せて
+    /// <c>true</c>（1 文の UPDATE で原子的。複数台でも、通知は 1 回）。
+    /// </summary>
+    Task<bool> TryMarkFailureNotifiedAsync(Guid id, DateTimeOffset now, TimeSpan repeatAfter, CancellationToken cancellationToken = default);
+
+    /// <summary>失敗の通知の印を消す。<b>印があったときだけ</b> <c>true</c>（回復の通知を出す合図。原子的）。</summary>
+    Task<bool> TryClearFailureNotifiedAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>API キー（と利用者のタイムゾーン）を差し替える。フィードが無い・失効済みなら <c>false</c>。</summary>
     Task<bool> SetApiKeyAsync(

@@ -47,6 +47,7 @@ builder.Services.AddTransient(sp => sp.GetRequiredService<RuntimeSettings>().Cur
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<PleasanterClient>();
+builder.Services.AddSingleton<FeedFailureNotifier>();
 builder.Services.AddSingleton<FeedService>();
 builder.Services.AddSingleton<IDbConnectionFactory>(sp =>
 {

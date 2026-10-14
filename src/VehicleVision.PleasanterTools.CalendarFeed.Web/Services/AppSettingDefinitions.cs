@@ -127,6 +127,9 @@ public static class AppSettingDefinitions
 
     public const string FeedCacheSeconds = "CALENDARFEED_FEED_CACHESECONDS";
     public const string FeedMaxEvents = "CALENDARFEED_FEED_MAXEVENTS";
+    public const string FeedFailureNotify = "CALENDARFEED_FEED_FAILURENOTIFY";
+    public const string FeedFailureNotifyThreshold = "CALENDARFEED_FEED_FAILURENOTIFYTHRESHOLD";
+    public const string FeedFailureNotifyRepeatHours = "CALENDARFEED_FEED_FAILURENOTIFYREPEATHOURS";
     public const string FeedPageSize = "CALENDARFEED_FEED_PAGESIZE";
 
     public const string AdminTwoFactor = "CALENDARFEED_ADMIN_TWOFACTOR";
@@ -190,6 +193,9 @@ public static class AppSettingDefinitions
 
         new(FeedCacheSeconds, AppSettingGroups.Feed, AppSettingValueType.Integer, "300", "キャッシュ秒数", Minimum: 1, Maximum: 86400),
         new(FeedMaxEvents, AppSettingGroups.Feed, AppSettingValueType.Integer, "5000", "1 フィードの予定の上限", Minimum: 1, Maximum: 100000),
+        new(FeedFailureNotify, AppSettingGroups.Feed, AppSettingValueType.Boolean, "false", "フィードの取得の失敗が続いたらメールで知らせる"),
+        new(FeedFailureNotifyThreshold, AppSettingGroups.Feed, AppSettingValueType.Integer, "3", "失敗を知らせる連続の回数", Minimum: 1, Maximum: 100),
+        new(FeedFailureNotifyRepeatHours, AppSettingGroups.Feed, AppSettingValueType.Integer, "24", "失敗が続くときの再通知の間隔（時間）", Minimum: 1, Maximum: 720),
         new(FeedPageSize, AppSettingGroups.Feed, AppSettingValueType.Integer, "1000", "1 ページの取得件数", Minimum: 1, Maximum: 10000),
 
         new(AdminTwoFactor, AppSettingGroups.Security, AppSettingValueType.String, "optional", "管理者の 2 要素", AllowedValues: TwoFactorModes),

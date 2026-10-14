@@ -70,6 +70,9 @@ public sealed class RuntimeSettings : IPleasanterOptionsSource
             CacheSeconds = I(AppSettingDefinitions.FeedCacheSeconds),
             MaxEvents = I(AppSettingDefinitions.FeedMaxEvents),
             PageSize = I(AppSettingDefinitions.FeedPageSize),
+            NotifyFailure = bool.Parse(V(AppSettingDefinitions.FeedFailureNotify)),
+            NotifyThreshold = I(AppSettingDefinitions.FeedFailureNotifyThreshold),
+            NotifyRepeat = TimeSpan.FromHours(I(AppSettingDefinitions.FeedFailureNotifyRepeatHours)),
         };
 
         var adminAuth = new AdminAuthOptions(
