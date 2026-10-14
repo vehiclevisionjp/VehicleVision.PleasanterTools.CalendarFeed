@@ -43,7 +43,7 @@ public static class ParameterFiles
 
     /// <summary>読む対象。</summary>
     private static readonly ImmutableArray<string> Names =
-        ["Service", "Pleasanter", "Feed", "Rds", "Security"];
+        ["Service", "Pleasanter", "Feed", "Rds", "Security", "Mail"];
 
     /// <summary>ファイルのキー → 正式な設定名（環境変数と同じ名前）。</summary>
     /// <remarks>**ここに無いキーはそのままの名前で積まれる**（読まれない）。</remarks>
@@ -77,6 +77,23 @@ public static class ParameterFiles
             ["PasswordMinimumLength"] = AppSettings.PasswordMinimumLength,
             ["PasswordAllowSameAsLoginId"] = AppSettings.PasswordAllowSameAsLoginId,
             ["SecretKey"] = AppSettings.SecretKey,
+
+            // Mail.json（Questionnaire の QUESTIONNAIRE_MAIL_* と同じ項目）
+            ["Enabled"] = "CALENDARFEED_MAIL_ENABLED",
+            ["Transport"] = "CALENDARFEED_MAIL_TRANSPORT",
+            ["SmtpHost"] = "CALENDARFEED_MAIL_SMTP_HOST",
+            ["SmtpPort"] = "CALENDARFEED_MAIL_SMTP_PORT",
+            ["SmtpSecurity"] = "CALENDARFEED_MAIL_SMTP_SECURITY",
+            ["SmtpUser"] = "CALENDARFEED_MAIL_SMTP_USER",
+            ["SmtpPassword"] = "CALENDARFEED_MAIL_SMTP_PASSWORD",
+            ["FromAddress"] = "CALENDARFEED_MAIL_FROM_ADDRESS",
+            ["FromName"] = "CALENDARFEED_MAIL_FROM_NAME",
+            ["ReplyToAddress"] = "CALENDARFEED_MAIL_REPLYTO_ADDRESS",
+            ["SesRegion"] = "CALENDARFEED_MAIL_SES_REGION",
+            ["AcsEndpoint"] = "CALENDARFEED_MAIL_ACS_ENDPOINT",
+            ["SendTimeoutSeconds"] = "CALENDARFEED_MAIL_TIMEOUT_SECONDS",
+            ["SendPerMinute"] = MailSenderOptions.MaxSendsPerMinuteKey,
+            ["Worker"] = MailSenderOptions.WorkerKey,
             ["AuditLogRetentionDays"] = AppSettings.AuditLogRetentionDays,
             ["ForwardedProxyNetworks"] = AppSettings.ForwardedProxyNetworks,
         }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);

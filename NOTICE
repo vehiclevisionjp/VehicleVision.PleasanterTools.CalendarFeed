@@ -26,6 +26,19 @@ Copyright (C) PMC Co.,Ltd.
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
   System.Security.Cryptography.Pkcs 10.0.13 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Pkcs
     （推移的依存の脆弱性 GHSA-846f-f764-76mx を避けるための直接参照。参照日 2026-10-14）
+  MailKit 4.18.1 / MIT / https://github.com/jstedfast/MailKit
+    （招待メールの送信。Questionnaire の NOTICE と同じ依存・同じ版。**認証付きリレーの 587 番は Azure でブロックされない**ので、
+      これ 1 本で SendGrid・Amazon SES・Azure Communication Services・Microsoft 365 へ送れる。参照日 2026-10-14）
+  MimeKit 4.18.1 / MIT / https://github.com/jstedfast/MimeKit
+    （MailKit が推移的に伴う。メールの組み立て）
+  BouncyCastle.Cryptography 2.6.2 / MIT / https://github.com/bcgit/bc-csharp
+    （MimeKit が推移的に伴う）
+  AWSSDK.SimpleEmailV2 4.0.106.2 / Apache-2.0 / https://github.com/aws/aws-sdk-net
+    （Amazon SES の送信経路。**IAM ロールで通るので、保管する秘密が 0 になる**。Questionnaire と同じ版）
+  Azure.Communication.Email 1.1.0 / MIT / https://github.com/Azure/azure-sdk-for-net
+    （Azure Communication Services の送信経路。**マネージド ID で通る**）
+  Azure.Identity 1.21.0 / MIT / https://github.com/Azure/azure-sdk-for-net
+    （マネージド ID から資格情報を取る。Azure.Core などを推移的に伴う。同リポジトリの MIT）
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
     （管理者の TOTP（RFC 6238）。Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-13）
   Microsoft.Extensions.DependencyInjection 10.0.13 / MIT

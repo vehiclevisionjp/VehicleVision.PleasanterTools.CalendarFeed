@@ -7,6 +7,7 @@ using VehicleVision.PleasanterTools.CalendarFeed.Security;
 namespace VehicleVision.PleasanterTools.CalendarFeed.Core.Tests;
 
 /// <summary>管理者・セッション・復旧コードの保管（4 種の RDBMS）。</summary>
+[Collection(TestDatabases.CollectionName)]
 public sealed class AdminStoreTests : IDisposable
 {
     private static readonly string TestKey = SecretProtector.GenerateKey();

@@ -20,6 +20,9 @@ public static class TestDatabases
 {
     public const string RequireAllKey = "CALENDARFEED_REQUIRE_ALL_RDBMS";
 
+    /// <summary>共有の DB の表を触るテストクラスを直列にする xUnit のコレクション名（クラスをまたいで表を空にし合わないように）。</summary>
+    public const string CollectionName = "RDBMS";
+
     public static string? ConnectionString(DatabaseProvider provider) => provider switch
     {
         DatabaseProvider.Sqlite => null,
@@ -55,6 +58,7 @@ public sealed class EnabledDatabasesAttribute : DataAttribute
         Enum.GetValues<DatabaseProvider>().Where(TestDatabases.IsEnabled).Select(p => new object[] { p });
 }
 
+[Collection(TestDatabases.CollectionName)]
 public sealed class FeedStoreTests : IDisposable
 {
     private static readonly string TestKey = SecretProtector.GenerateKey();

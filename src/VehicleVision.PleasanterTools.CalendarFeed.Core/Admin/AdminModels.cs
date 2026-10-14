@@ -11,9 +11,7 @@ public sealed record AdminUser(
     DateTimeOffset? LastLoginAt,
     DateTimeOffset CreatedAt,
     bool TotpEnabled,
-    string Language,
-    DateTimeOffset? InviteExpiresAt = null,
-    bool InvitePending = false)
+    string Language)
 {
     /// <summary>締め出し中か。</summary>
     public bool IsLocked(DateTimeOffset now) => LockedUntil is { } until && until > now;
@@ -22,21 +20,35 @@ public sealed record AdminUser(
     /// 長い間使われていないか（棚卸し用）。**招待中・無効のアカウントは対象にしない**（使っていないのではなく、使えない）。
     /// 一度もログインしていなければ、作られた日から数える。
     /// </summary>
-    public bool IsStale(DateTimeOffset now, TimeSpan threshold) =>
-        !InvitePending && !IsDisabled && now - (LastLoginAt ?? CreatedAt) > threshold;
+    public bool IsStale(DateTimeOffset now, TimeSpan threshold, bool invitationPending) =>
+        !invitationPending && !IsDisabled && now - (LastLoginAt ?? CreatedAt) > threshold;
 }
 
-/// <summary>役割。認可はこれだけで判定する（Pleasanter のグループ・組織では判定しない）。</summary>
+/// <summary>役割。**認可は本アプリの役割だけで行う**（Pleasanter のグループ・組織では判定しない）。権限の割り当ては <see cref="AdminPermissions"/>。</summary>
+/// <remarks>Questionnaire の役割（Administrator / SurveyAdministrator / UserAdministrator / Editor / Auditor）に則る。DB には名前で入る。</remarks>
 public static class AdminRoles
 {
-    /// <summary>すべてを許す（管理者の管理・監査ログ・フィードの変更）。</summary>
+    /// <summary>特権管理者。すべてを許す。</summary>
     public const string Administrator = "Administrator";
 
-    /// <summary>フィードの一覧を見るだけ。**変更・監査ログ・管理者の管理は許さない。**</summary>
-    public const string Viewer = "Viewer";
+    /// <summary>フィード管理者。フィードの運用を任せる相手。<b>人には触れない。</b></summary>
+    public const string FeedAdministrator = "FeedAdministrator";
+
+    /// <summary>ユーザ管理者。人の出入りと、その記録。<b>フィードには触れない。</b></summary>
+    public const string UserAdministrator = "UserAdministrator";
+
+    /// <summary>フィード編集者。作るところまで。<b>失効はできない。</b></summary>
+    public const string Editor = "Editor";
+
+    /// <summary>監査担当。見るだけ。</summary>
+    public const string Auditor = "Auditor";
+
+    /// <summary>すべての役割。</summary>
+    public static readonly IReadOnlyList<string> All =
+        [Administrator, FeedAdministrator, UserAdministrator, Editor, Auditor];
 
     /// <summary>知っている役割か。</summary>
-    public static bool IsValid(string? role) => role is Administrator or Viewer;
+    public static bool IsValid(string? role) => role is not null && All.Contains(role, StringComparer.Ordinal);
 }
 
 /// <summary>管理者の変更の結果。</summary>
@@ -103,34 +115,21 @@ public interface IAdminUserStore
     Task<IReadOnlyList<AdminUser>> ListAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// **招待して管理者を作る。** パスワードはまだ無い（<c>PasswordHash</c> は空で、ログインできない）。
-    /// ログイン ID がすでにあれば <c>null</c>。
+    /// 管理者を作る（招待用）。<paramref name="passwordHash"/> には**誰も知らない値**のハッシュを渡す
+    /// （既定のパスワードを配らないための埋め草。資格情報ではない）。ログイン ID がすでにあれば <c>null</c>。
     /// </summary>
-    /// <param name="inviteHash">招待トークンの SHA-256（16 進）。現物は保管しない。</param>
-    Task<AdminUser?> CreateInvitedAsync(
+    Task<AdminUser?> CreateAsync(
         string loginId,
+        string passwordHash,
         string role,
         string language,
-        string inviteHash,
-        DateTimeOffset inviteExpiresAt,
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
-    /// <summary>**招待の出し直し。** 前の招待は使えなくなる。招待中（パスワード未設定）の管理者だけが対象。</summary>
-    Task<bool> ReissueInviteAsync(
-        string id, string inviteHash, DateTimeOffset inviteExpiresAt, CancellationToken cancellationToken = default);
-
-    /// <summary>招待トークンの SHA-256 から、有効な（期限内・無効化されていない）招待中の管理者を引く。</summary>
-    Task<AdminUser?> FindByInviteAsync(
-        string inviteHash, DateTimeOffset now, CancellationToken cancellationToken = default);
-
     /// <summary>
-    /// **招待を受け取る**（パスワードを決める）。使い切り: 招待の印を条件に含めた 1 文の UPDATE の件数で判断する。
+    /// 無効化・有効化。**最後の有効な Administrator は無効化できない。**
+    /// 「有効な Administrator」は、無効でなく、<b>一度でもログインした</b>人（招待しただけの人は、誰も知らないパスワードしか持たないので数えない）。
     /// </summary>
-    Task<bool> AcceptInviteAsync(
-        string inviteHash, string passwordHash, DateTimeOffset now, CancellationToken cancellationToken = default);
-
-    /// <summary>無効化・有効化。**最後の有効な Administrator は無効化できない。**</summary>
     Task<AdminChangeResult> SetDisabledAsync(string id, bool disabled, CancellationToken cancellationToken = default);
 
     /// <summary>役割を変える。**最後の有効な Administrator は降格できない。**</summary>

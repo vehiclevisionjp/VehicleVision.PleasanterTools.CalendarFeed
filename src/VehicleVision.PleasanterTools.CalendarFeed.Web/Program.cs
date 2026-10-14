@@ -5,6 +5,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Caching.Memory;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
+using VehicleVision.PleasanterTools.CalendarFeed.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
@@ -51,6 +52,18 @@ builder.Services.AddSingleton<IFeedStore, FeedStore>();
 builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
 builder.Services.AddSingleton<IAdminSessionStore, AdminSessionStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
+builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
+
+// ---- メール（招待）。送信待ちへ暗号化して積み、アプリの中のワーカーが送る ----------------------
+// **無効（既定）なら何も送らない。** 招待は画面の URL を手で渡す。有効なのに設定が足りなければ起動時に落とす
+builder.Services.AddSingleton(sp => AppSettings.ReadMail(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
+builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
+builder.Services.AddSingleton<IMailTransport, ConfiguredMailTransport>();
+builder.Services.AddSingleton(sp => MailSenderOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<MailSender>();
+builder.Services.AddSingleton<AdminInvitationMailer>();
+builder.Services.AddHostedService<MailSenderHostedService>();
 builder.Services.AddSingleton<AuditLogService>();
 builder.Services.AddSingleton<AuditLogRetentionService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditLogRetentionService>());
@@ -75,6 +88,7 @@ var app = builder.Build();
 
 // 設定の読み間違いは、最初の要求ではなく起動時に分かるようにする
 _ = app.Services.GetRequiredService<AdminAuthOptions>();
+_ = app.Services.GetRequiredService<VehicleVision.PleasanterTools.CalendarFeed.Mail.MailOptions>();
 
 // ⚠️ **何を読んだかを残す。** 設定ファイルは optional なので、置き場を間違えても黙って既定で動いてしまう
 app.Logger.LogInformation(

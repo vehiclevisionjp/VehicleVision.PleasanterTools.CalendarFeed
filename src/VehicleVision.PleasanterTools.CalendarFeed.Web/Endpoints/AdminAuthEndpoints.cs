@@ -129,9 +129,9 @@ public static class AdminAuthEndpoints
         }
 
         var (user, hash) = found.Value;
-        if (user.IsDisabled || user.IsLocked(now) || user.InvitePending)
+        if (user.IsDisabled || user.IsLocked(now))
         {
-            await audit.WriteAsync(http, AuditActions.LoginFailed, false, user, detail: user.IsDisabled ? "disabled" : user.IsLocked(now) ? "locked" : "invite-pending");
+            await audit.WriteAsync(http, AuditActions.LoginFailed, false, user, detail: user.IsDisabled ? "disabled" : "locked");
             return Unauthorized();
         }
 
@@ -157,6 +157,24 @@ public static class AdminAuthEndpoints
         // 前のセッションがあれば捨てる（ログインし直したら、前の cookie は使えない）
         await DropExistingAsync(http, sessions, ct);
 
+        return Results.Ok(new { step = await SignInAsync(http, sessions, users, user, options, audit, now, ct) });
+    }
+
+    /// <summary>
+    /// パスワードが通った人を、2 要素の方針に従って次の段階へ進める。<b>ログインと招待の受け取りで同じ道を通す</b>
+    /// （片方だけ違うと、招待された人だけ方針が食い違う）。登録済みなら <c>totp</c>、必須で未登録なら <c>enroll</c>（どちらも途中の cookie）、
+    /// それ以外はそのままログイン済み（<c>done</c>）。
+    /// </summary>
+    internal static async Task<string> SignInAsync(
+        HttpContext http,
+        IAdminSessionStore sessions,
+        IAdminUserStore users,
+        AdminUser user,
+        AdminAuthOptions options,
+        AuditLogService audit,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
         var needsSecondFactor = user.TotpEnabled;
         var mustEnroll = !user.TotpEnabled && options.TwoFactor == TwoFactorMode.Required;
         if (needsSecondFactor || mustEnroll)
@@ -165,12 +183,12 @@ public static class AdminAuthEndpoints
                 user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct, Ip(http), UserAgentOf(http));
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
             AdminSessionGuard.SetCookie(http, AdminSessionGuard.PendingCookie, pending, options.PendingLifetime);
-            return Results.Ok(new { step = needsSecondFactor ? "totp" : "enroll" });
+            return needsSecondFactor ? "totp" : "enroll";
         }
 
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
         await StartSessionAsync(http, sessions, users, user, options, audit, now, ct);
-        return Results.Ok(new { step = "done" });
+        return "done";
     }
 
     private static async Task<IResult> LoginTotp(
@@ -302,6 +320,8 @@ public static class AdminAuthEndpoints
             admin.User.Language,
             admin.User.TotpEnabled,
             admin.User.LastLoginAt,
+            // 画面はこれで出し分ける（「Administrator かどうか」で分けると、役割を増やすたびに画面を直すことになる）
+            permissions = AdminPermissions.Of(admin.User.Role),
             twoFactor = options.TwoFactor.ToString(),
             recoveryCodesLeft = admin.User.TotpEnabled ? await users.CountRecoveryCodesAsync(admin.User.Id, ct) : 0,
         });
