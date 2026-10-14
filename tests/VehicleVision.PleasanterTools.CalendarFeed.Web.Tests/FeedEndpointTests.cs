@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -45,7 +46,8 @@ internal sealed class TestApp : IDisposable
         bool setUpAdmin = true,
         string? existingDb = null,
         string? secretKeyValue = null,
-        string? retentionDays = null)
+        string? retentionDays = null,
+        string? forwardedNetworks = null)
     {
         _ownsDb = existingDb is null;
         _db = existingDb ?? Path.Combine(Path.GetTempPath(), $"calendarfeed-{Guid.NewGuid():N}.db");
@@ -80,6 +82,11 @@ internal sealed class TestApp : IDisposable
                     settings[AppSettings.AuditLogRetentionDays] = retentionDays;
                 }
 
+                if (forwardedNetworks is not null)
+                {
+                    settings[AppSettings.ForwardedProxyNetworks] = forwardedNetworks;
+                }
+
                 if (twoFactor is not null)
                 {
                     settings[AppSettings.AdminTwoFactor] = twoFactor;
@@ -92,6 +99,7 @@ internal sealed class TestApp : IDisposable
                 services.AddHttpClient<Pleasanter.PleasanterClient>()
                     .ConfigurePrimaryHttpMessageHandler(() => Pleasanter);
                 services.AddSingleton<TimeProvider>(Time);
+                services.AddSingleton<IStartupFilter, RemoteIpStartupFilter>();
             });
         });
 
@@ -158,6 +166,29 @@ internal sealed class TestApp : IDisposable
             File.Delete(_db);
         }
     }
+}
+
+/// <summary>
+/// テストの接続元 IP を、ヘッダ <c>X-Test-Remote-Ip</c> で決める（TestServer は接続元を持たない）。
+/// **パイプラインの先頭**に入るので、転送ヘッダの処理より前の <c>RemoteIpAddress</c> を作る。
+/// </summary>
+internal sealed class RemoteIpStartupFilter : IStartupFilter
+{
+    public const string Header = "X-Test-Remote-Ip";
+
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+    {
+        app.Use((http, nextMiddleware) =>
+        {
+            if (http.Request.Headers[Header].FirstOrDefault() is { } ip)
+            {
+                http.Connection.RemoteIpAddress = IPAddress.Parse(ip);
+            }
+
+            return nextMiddleware(http);
+        });
+        next(app);
+    };
 }
 
 /// <summary>Pleasanter の Get API の応答を真似る。</summary>
