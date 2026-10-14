@@ -85,6 +85,82 @@ public sealed class AdminPasswordPolicyTests
     }
 }
 
+public sealed class AdminPasswordRuleTests
+{
+    private static AdminPasswordRule Rule(string regex, params (string? Language, string Body)[] messages) =>
+        new() { Regex = regex, Languages = [.. messages.Select(m => new AdminPasswordRuleMessage { Language = m.Language, Body = m.Body })] };
+
+    private static AdminPasswordPolicy Policy(params AdminPasswordRule[] rules) => new(8, false, rules);
+
+    [Fact]
+    public void 部分一致で判定し_合えば通る()
+    {
+        var policy = Policy(Rule("[0-9]", (null, "数字を含めてください。")));
+
+        Assert.Null(policy.Validate("admin", "abcdefg1"));
+        Assert.Equal("数字を含めてください。", policy.Validate("admin", "abcdefgh"));
+    }
+
+    [Fact]
+    public void 全体一致にしたいときは書いた記号で縛れる()
+    {
+        var policy = Policy(Rule("^[a-z0-9]+$", (null, "英小文字と数字だけにしてください。")));
+
+        Assert.Null(policy.Validate("admin", "abcdef12"));
+        Assert.NotNull(policy.Validate("admin", "abcdef 12"));
+    }
+
+    [Fact]
+    public void 上から順に見て_最初に合わなかった条件の文言を返す()
+    {
+        var policy = Policy(
+            Rule("[0-9]", (null, "数字")),
+            Rule("[A-Z]", (null, "大文字")));
+
+        Assert.Equal("数字", policy.Validate("admin", "abcdefgh"));
+        Assert.Equal("大文字", policy.Validate("admin", "abcdefg1"));
+        Assert.Null(policy.Validate("admin", "Abcdefg1"));
+    }
+
+    [Fact]
+    public void 言語に合う文言を選び_無ければ既定_それも無ければ先頭_文言が無くても弾く()
+    {
+        var policy = Policy(
+            Rule("[0-9]", ("en", "Include a digit."), (null, "数字を含めてください。")),
+            Rule("[A-Z]", ("en", "Include an uppercase letter.")),
+            Rule("[!-/]"));
+
+        Assert.Equal("Include a digit.", policy.Validate("admin", "abcdefgh", "en"));
+        Assert.Equal("数字を含めてください。", policy.Validate("admin", "abcdefgh", "ja"));
+        Assert.Equal("数字を含めてください。", policy.Validate("admin", "abcdefgh"));
+        Assert.Equal("Include an uppercase letter.", policy.Validate("admin", "abcdefg1", "ja"));
+        Assert.NotNull(policy.Validate("admin", "Abcdefg1"));
+    }
+
+    [Fact]
+    public void 使わない条件は見ない() =>
+        Assert.Null(Policy(new AdminPasswordRule { Enabled = false, Regex = "[0-9]" }).Validate("admin", "abcdefgh"));
+
+    [Theory]
+    [InlineData("(?=.*[0-9])")]
+    [InlineData(@"(.)\1")]
+    [InlineData("(?>a+)")]
+    [InlineData("(")]
+    [InlineData("")]
+    public void 組み立てられない正規表現は作る時点で落とす(string regex) =>
+        Assert.Throws<InvalidOperationException>(() => Policy(new AdminPasswordRule { Regex = regex }));
+
+    [Fact]
+    public void 破滅的な書き方でも入力の長さに比例した時間で終わる()
+    {
+        var policy = Policy(Rule("^(a+)+$", (null, "a だけにしてください。")));
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        Assert.NotNull(policy.Validate("admin", new string('a', 200) + "!"));
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), $"所要 {watch.Elapsed}");
+    }
+}
+
 public sealed class TotpServiceTests
 {
     private static readonly DateTime Now = new(2026, 10, 13, 9, 0, 0, DateTimeKind.Utc);
