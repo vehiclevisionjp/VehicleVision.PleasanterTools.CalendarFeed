@@ -4,6 +4,7 @@
   import { t } from '../lib/i18n/state.svelte';
   import type { MessageKey } from '../lib/i18n/messages';
   import type { MailStatus, Setting } from '../lib/types';
+  import CopyField from './CopyField.svelte';
   import Notice from './Notice.svelte';
 
   const GROUPS: { id: Setting['group']; title: MessageKey }[] = [
@@ -12,9 +13,16 @@
     { id: 'feed', title: 'groupFeed' },
     { id: 'security', title: 'groupSecurity' },
     { id: 'mail', title: 'groupMail' },
+    { id: 'saml', title: 'groupSaml' },
   ];
 
+
   let settings = $state<Setting[] | null>(null);
+
+  // IdP へ登録する値（SP のメタデータ・ACS）。公開 URL の設定があれば、その URL で見せる
+  const origin = $derived(
+    (settings?.find((s) => s.key === 'CALENDARFEED_PUBLIC_BASEURL')?.value || location.origin).replace(/\/$/, ''),
+  );
   /** 入力中の値（キー → 文字列）。秘密は入力したときだけ入る。 */
   let values = $state<Record<string, string>>({});
   /** 既定へ戻す（null で送る）キー・秘密を消すキー。 */
@@ -122,6 +130,22 @@
       <fieldset>
         <legend>{t(group.title)}</legend>
 
+        {#if group.id === 'saml'}
+          <p class="muted">{t('samlLead')}</p>
+          <div class="grid">
+            <div class="field">
+              <label for="saml-meta">{t('samlMetadataUrl')}</label>
+              <CopyField value={`${origin}/admin/api/saml/metadata`} label={t('samlMetadataUrl')} />
+            </div>
+            <div class="field">
+              <label for="saml-acs">{t('samlAcsUrl')}</label>
+              <CopyField value={`${origin}/admin/api/saml/acs`} label={t('samlAcsUrl')} />
+            </div>
+          </div>
+          <p class="muted small">{t('samlHttpsNote')}</p>
+          <p class="muted small">{t('samlDisabledHint')}</p>
+        {/if}
+
         {#if group.id === 'mail'}
           <div class="field">
             {#if mail}
@@ -153,6 +177,8 @@
                   <select id={s.key} disabled={s.isFixed} bind:value={values[s.key]}>
                     {#each s.allowedValues as option (option)}<option value={option}>{option}</option>{/each}
                   </select>
+                {:else if s.multiline}
+                  <textarea id={s.key} spellcheck="false" disabled={s.isFixed} bind:value={values[s.key]}></textarea>
                 {:else if s.isSecret}
                   <input
                     id={s.key}

@@ -6,7 +6,12 @@
   import LanguageSelect from './LanguageSelect.svelte';
   import Notice from './Notice.svelte';
 
-  let { onstep }: { onstep: (step: Step) => void } = $props();
+  let { onstep, saml = { enabled: false, buttonLabel: null } }: { onstep: (step: Step) => void; saml?: { enabled: boolean; buttonLabel: string | null } } = $props();
+
+  // SAML の失敗は、サーバが ?samlError= を付けてこの画面へ戻す。理由は 3 種類だけ（詳しい理由はサーバのログと監査ログ）
+  const samlError = new URLSearchParams(location.search).get('samlError');
+  const samlErrorText =
+    samlError === 'unknown-user' ? t('samlErrorUnknownUser') : samlError === 'disabled' ? t('samlErrorDisabled') : samlError ? t('samlErrorInvalid') : '';
 
   let loginId = $state('');
   let password = $state('');
@@ -35,7 +40,11 @@
       <h1>{t('loginTitle')}</h1>
       <LanguageSelect />
     </div>
+    {#if samlErrorText}<Notice>{samlErrorText}</Notice>{/if}
     {#if error}<Notice>{error}</Notice>{/if}
+    {#if saml.enabled}
+      <p><a class="btn-link" href="/admin/api/saml/login">{saml.buttonLabel ?? t('signInWithSaml')}</a></p>
+    {/if}
     <form onsubmit={submit}>
       <div class="field">
         <label for="login-id">{t('loginId')}</label>

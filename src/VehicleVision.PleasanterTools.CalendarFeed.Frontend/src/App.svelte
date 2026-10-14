@@ -22,6 +22,7 @@
 
   let phase = $state<Phase>('loading');
   let me = $state<Me | null>(null);
+  let saml = $state<{ enabled: boolean; buttonLabel: string | null }>({ enabled: false, buttonLabel: null });
   let tab = $state<Tab>('feeds');
   const inviteToken = new URLSearchParams(location.search).get('token') ?? '';
 
@@ -69,6 +70,7 @@
     }
 
     const status = await api.status();
+    if (status.ok) saml = status.value.saml;
     if (status.ok && status.value.setupRequired) {
       phase = 'setup';
       return;
@@ -89,6 +91,12 @@
   }
 
   async function signOut(): Promise<void> {
+    // SAML で入ったセッションは、こちらのセッションを捨てたうえで、IdP の単一ログアウトへも進む（経路はサーバが決める）
+    if (me?.viaSaml) {
+      location.assign('/admin/api/saml/logout');
+      return;
+    }
+
     await api.logout();
     me = null;
     phase = 'login';
@@ -109,7 +117,7 @@
 {:else if phase === 'setup'}
   <SetupPanel ondone={() => onStep('done')} />
 {:else if phase === 'login'}
-  <LoginPanel onstep={onStep} />
+  <LoginPanel onstep={onStep} {saml} />
 {:else if phase === 'totp'}
   <TotpPanel ondone={() => onStep('done')} oncancel={() => (phase = 'login')} />
 {:else if phase === 'enroll'}
