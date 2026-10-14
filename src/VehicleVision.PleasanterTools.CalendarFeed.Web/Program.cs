@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Caching.Memory;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
@@ -92,6 +93,34 @@ if (AppSettings.ReadAutoMigrate(app.Configuration))
 else
 {
     app.Logger.LogWarning("起動時のマイグレーションは無効です。DB に表が無いと動きません。");
+}
+
+// ---- 転送ヘッダ（リバースプロキシの背後でクライアントの IP・スキーム・Host を見る） ------------
+// ⚠️ **信頼するネットワークを設定で明示したときだけ有効にする。** 既定では誰も信頼しない
+// （X-Forwarded-For を鵜呑みにすると、IP ごとのレート制限を回避できる）。**レート制限より前に置く**
+var forwardedNetworks = AppSettings.ReadForwardedProxyNetworks(app.Configuration);
+if (forwardedNetworks.Count > 0)
+{
+    var forwarded = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
+    };
+
+    // 既定で信頼されるループバックも外し、設定のネットワークだけにする
+    forwarded.KnownProxies.Clear();
+    forwarded.KnownIPNetworks.Clear();
+    foreach (var network in forwardedNetworks)
+    {
+        forwarded.KnownIPNetworks.Add(network);
+    }
+
+    app.UseForwardedHeaders(forwarded);
+}
+else
+{
+    app.Logger.LogInformation(
+        "転送ヘッダは無視します（{Setting} が未設定）。プロキシの背後ではレート制限が全員で共有になります。",
+        AppSettings.ForwardedProxyNetworks);
 }
 
 app.UseRateLimiter();

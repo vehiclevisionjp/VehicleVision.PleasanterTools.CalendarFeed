@@ -1,3 +1,4 @@
+using System.Net;
 using System.Globalization;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
@@ -33,6 +34,7 @@ public static class AppSettings
     public const string PasswordMinimumLength = "CALENDARFEED_PASSWORD_MINIMUMLENGTH";
     public const string PasswordAllowSameAsLoginId = "CALENDARFEED_PASSWORD_ALLOWSAMEASLOGINID";
     public const string SecretKey = "CALENDARFEED_SECRET_KEY";
+    public const string ForwardedProxyNetworks = "CALENDARFEED_FORWARDED_PROXY_NETWORKS";
 
     /// <summary>Pleasanter の接続設定を読む。必須の値が無ければ、設定名を挙げて止める。</summary>
     public static PleasanterOptions ReadPleasanter(IConfiguration configuration) => new()
@@ -85,6 +87,19 @@ public static class AppSettings
                 PositiveInt(configuration, PasswordMinimumLength, 12),
                 string.Equals(Text(configuration, PasswordAllowSameAsLoginId), "true", StringComparison.OrdinalIgnoreCase)));
     }
+
+    /// <summary>
+    /// 転送ヘッダ（<c>X-Forwarded-*</c>）を信頼するプロキシのネットワーク（カンマ区切りの CIDR）を読む。
+    /// **未設定なら空（誰も信頼しない）。** CIDR でない値は起動時に落とす。
+    /// </summary>
+    public static IReadOnlyList<IPNetwork> ReadForwardedProxyNetworks(IConfiguration configuration) =>
+        (Text(configuration, ForwardedProxyNetworks) ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => IPNetwork.TryParse(value, out var network)
+                ? network
+                : throw new InvalidOperationException(
+                    $"{ForwardedProxyNetworks} に CIDR でない値があります: {value}（例: 10.0.0.0/8, 192.0.2.10/32）"))
+            .ToArray();
 
     /// <summary>起動時にマイグレーションを当てるか。既定は当てる。<c>false</c> で無効（手で当てる）。</summary>
     public static bool ReadAutoMigrate(IConfiguration configuration) =>
