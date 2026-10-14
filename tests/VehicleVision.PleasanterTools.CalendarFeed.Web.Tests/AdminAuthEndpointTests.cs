@@ -359,6 +359,60 @@ public sealed class AdminAuthEndpointTests : IDisposable
     }
 }
 
+/// <summary>秘密の鍵を失った・変えた状態（運用手順書「鍵を失ったとき」）。</summary>
+public sealed class AdminLostSecretKeyTests
+{
+    [Fact]
+    public async Task 鍵を変えるとTOTPでは入れず_500にもならず_復旧コードでは入れる()
+    {
+        string[] codes;
+        string db;
+        using (var before = new TestApp(setUpAdmin: false))
+        {
+            db = before.DbPath;
+            before.KeepDb = true;
+            var client = before.Client();
+            await client.PostAsJsonAsync("/admin/api/setup", new { loginId = TestApp.AdminLoginId, password = TestApp.AdminPassword });
+            await client.PostAsJsonAsync("/admin/api/login", new { loginId = TestApp.AdminLoginId, password = TestApp.AdminPassword });
+            var begin = await (await client.PostAsync("/admin/api/me/totp/begin", null)).Content.ReadFromJsonAsync<JsonElement>();
+            var complete = await client.PostAsJsonAsync(
+                "/admin/api/me/totp/complete",
+                new { code = TotpService.Compute(begin.GetProperty("secret").GetString()!, before.Time.Now.UtcDateTime) });
+            codes = (await complete.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("recoveryCodes")
+                .EnumerateArray().Select(e => e.GetString()!).ToArray();
+        }
+
+        try
+        {
+            // 同じ DB を、別の鍵で開く
+            using var after = new TestApp(setUpAdmin: false, existingDb: db);
+            var other = after.Client();
+            var login = await other.PostAsJsonAsync("/admin/api/login", new { loginId = TestApp.AdminLoginId, password = TestApp.AdminPassword });
+            Assert.Equal("totp", (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("step").GetString());
+
+            var totp = await other.PostAsJsonAsync("/admin/api/login/totp", new { code = "123456" });
+            Assert.Equal(HttpStatusCode.Unauthorized, totp.StatusCode);
+
+            // 復旧コードは鍵に依存しないので、それで入れる
+            var recovery = await other.PostAsJsonAsync("/admin/api/login/recovery", new { code = codes[0] });
+            Assert.Equal(HttpStatusCode.OK, recovery.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await other.GetAsync("/admin/api/feeds/")).StatusCode);
+
+            // 入れたら、2 要素を登録し直せる（古い共有鍵は復号できないまま、新しい鍵で上書きされる）
+            var begin = await (await other.PostAsync("/admin/api/me/totp/begin", null)).Content.ReadFromJsonAsync<JsonElement>();
+            var done = await other.PostAsJsonAsync(
+                "/admin/api/me/totp/complete",
+                new { code = TotpService.Compute(begin.GetProperty("secret").GetString()!, after.Time.Now.UtcDateTime) });
+            Assert.Equal(HttpStatusCode.OK, done.StatusCode);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            File.Delete(db);
+        }
+    }
+}
+
 /// <summary>状態を変える要求は、同じサイトからのものだけ（CSRF）。</summary>
 public sealed class AdminCsrfTests : IDisposable
 {
