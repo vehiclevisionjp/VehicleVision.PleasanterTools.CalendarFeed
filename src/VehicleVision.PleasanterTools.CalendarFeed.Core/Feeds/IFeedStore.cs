@@ -35,6 +35,8 @@ public interface IFeedStore
     /// **トークン（購読 URL）と API キーは変えない。** フィードが無い・失効済みなら <c>false</c>。
     /// </summary>
     Task<bool> UpdateAsync(Guid id, FeedUpdate update, CancellationToken cancellationToken = default);
+    /// <summary>最後に Pleasanter へ取りに行った結果を残す（上書き）。</summary>
+    Task RecordFetchAsync(Guid id, FeedFetchResult result, CancellationToken cancellationToken = default);
 
     /// <summary>API キー（と利用者のタイムゾーン）を差し替える。フィードが無い・失効済みなら <c>false</c>。</summary>
     Task<bool> SetApiKeyAsync(

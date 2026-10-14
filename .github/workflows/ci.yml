@@ -61,3 +61,32 @@ jobs:
         run: >-
           dotnet test VehicleVision.PleasanterTools.CalendarFeed.slnx
           --no-build -c Release
+
+  # 管理画面（Svelte）の型検査・単体テスト・組み立て。組み立てた成果物は配布物（.Web の wwwroot/admin）へ入る
+  admin-ui:
+    name: 管理画面のビルドとテスト
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/VehicleVision.PleasanterTools.CalendarFeed.Frontend
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: Node.js を用意する
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: src/VehicleVision.PleasanterTools.CalendarFeed.Frontend/package-lock.json
+
+      - name: 依存を復元する
+        run: npm ci
+
+      - name: 単体テストを実行する
+        run: npm test
+
+      - name: 型を検査して組み立てる
+        run: npm run build

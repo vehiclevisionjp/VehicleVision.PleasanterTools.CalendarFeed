@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Dapper;
+using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 
@@ -23,7 +24,8 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
 
     private const string SelectColumns =
         "SELECT [Id], [Name], [SiteId], [MappingJson], [FiltersJson], [CreatedAt], [IsRevoked], "
-        + "[Language], [ApiKeyUserTimeZoneId], [ApiKeyHint] FROM [Feeds]";
+        + "[Language], [ApiKeyUserTimeZoneId], [ApiKeyHint], "
+        + "[LastFetchAt], [LastFetchStatus], [LastFetchMessage], [LastFetchEventCount] FROM [Feeds]";
 
     private string Sql(string sql) => SqlDialect.Format(connections.Provider, sql);
 
@@ -153,6 +155,25 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
         return string.IsNullOrEmpty(cipher) ? null : protector.Unprotect(cipher, ContextOf(id));
     }
 
+    public async Task RecordFetchAsync(
+        Guid id, FeedFetchResult result, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [Feeds] SET [LastFetchAt] = @At, [LastFetchStatus] = @Status, [LastFetchMessage] = @Message, "
+                + "[LastFetchEventCount] = @EventCount WHERE [Id] = @Id"),
+            new
+            {
+                Id = id.ToString("D"),
+                At = DbTime.Format(result.At),
+                Status = AuditText.Safe(result.Status, 32),
+                // 制御文字を落として桁で切る（桁溢れで記録が落ちないように。API キーは渡さない前提）
+                Message = AuditText.Safe(result.Message, 500),
+                result.EventCount,
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
     public async Task<bool> SetApiKeyAsync(
         Guid id,
         string apiKey,
@@ -198,6 +219,14 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
 
         public string? ApiKeyHint { get; set; }
 
+        public string? LastFetchAt { get; set; }
+
+        public string? LastFetchStatus { get; set; }
+
+        public string? LastFetchMessage { get; set; }
+
+        public int? LastFetchEventCount { get; set; }
+
         public FeedDefinition ToDefinition() => new(
             Guid.Parse(Id),
             Name,
@@ -209,6 +238,9 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
             IsRevoked != 0,
             Language,
             ApiKeyUserTimeZoneId,
-            ApiKeyHint);
+            ApiKeyHint,
+            DbTime.Parse(LastFetchAt) is { } at && !string.IsNullOrEmpty(LastFetchStatus)
+                ? new FeedFetchResult(at, LastFetchStatus, LastFetchMessage, LastFetchEventCount)
+                : null);
     }
 }

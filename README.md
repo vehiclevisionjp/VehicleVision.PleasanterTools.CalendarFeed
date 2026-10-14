@@ -77,7 +77,13 @@ curl -b jar -X POST $B/admin/api/feeds -H "Content-Type: application/json" \
 git submodule update --init --recursive   # _reference（Pleasanter 本体・参照専用）
 dotnet build
 dotnet test
+
+# 管理画面（Svelte。Node.js 24）。成果物は .Web の wwwroot/admin へ出る
+cd src/VehicleVision.PleasanterTools.CalendarFeed.Frontend
+npm ci && npm test && npm run build
 ```
+
+管理画面の画面の写しは [`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md)（[`tools/screenshots`](tools/screenshots/README.md) で撮り直せる）。
 
 **4 種の RDBMS の結合テスト**は、検証環境（`tools/pleasanter-testenv`）の PostgreSQL・MySQL・SQL Server に当てる。
 **接続文字列の環境変数を設定しないと、SQLite 以外は何も流れずに緑になる**ので、`CALENDARFEED_REQUIRE_ALL_RDBMS=1` で

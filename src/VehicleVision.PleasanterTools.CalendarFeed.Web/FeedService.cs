@@ -38,8 +38,46 @@ public sealed class FeedService(
             async entry =>
             {
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(options.CacheSeconds);
-                return await BuildAsync(feed, cancellationToken).ConfigureAwait(false);
+                return await BuildAndRecordAsync(feed, cancellationToken).ConfigureAwait(false);
             })!;
+
+    /// <summary>
+    /// 組み立てて、**Pleasanter へ取りに行った結果を残す**（管理画面の「最後の取得結果」）。
+    /// 失敗は握りつぶさず、そのまま呼び出し側へ投げる（応答の状態の決め方は呼び出し側）。
+    /// </summary>
+    private async Task<string> BuildAndRecordAsync(FeedDefinition feed, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var (body, count) = await BuildAsync(feed, cancellationToken).ConfigureAwait(false);
+            await RecordAsync(feed, new FeedFetchResult(time.GetUtcNow(), FeedFetchStatus.Success, null, count)).ConfigureAwait(false);
+            return body;
+        }
+        catch (PleasanterException ex)
+        {
+            await RecordAsync(feed, new FeedFetchResult(time.GetUtcNow(), ex.Kind.ToString(), ex.Message)).ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or InvalidOperationException)
+        {
+            // 秘密の鍵が未設定、または保管時と違う鍵。**メッセージは固定にする**（例外の文面を画面へ出さない）
+            await RecordAsync(feed, new FeedFetchResult(time.GetUtcNow(), FeedFetchStatus.KeyError, "API キーを復号できません。")).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    /// <summary>記録の失敗で .ics の応答を落とさない。</summary>
+    private async Task RecordAsync(FeedDefinition feed, FeedFetchResult result)
+    {
+        try
+        {
+            await feeds.RecordFetchAsync(feed.Id, result, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (System.Data.Common.DbException)
+        {
+            // 次の取得でやり直す
+        }
+    }
 
     /// <summary>レコードに対応する、解決済みの表示名。</summary>
     private static IReadOnlyDictionary<string, string>? ResolvedOf(
@@ -53,7 +91,7 @@ public sealed class FeedService(
     /// <summary>生成済みの .ics を捨てる。**API キーを差し替えたら呼ぶ**（古いキーで取った結果を返さない）。</summary>
     public void Invalidate(Guid feedId) => cache.Remove(feedId);
 
-    private async Task<string> BuildAsync(FeedDefinition feed, CancellationToken cancellationToken)
+    private async Task<(string Body, int EventCount)> BuildAsync(FeedDefinition feed, CancellationToken cancellationToken)
     {
         // フィードごとの API キー。未登録なら全フィード共通の既定（任意）。どちらも無ければ止める
         var apiKey = await feeds.GetApiKeyAsync(feed.Id, cancellationToken).ConfigureAwait(false)
@@ -103,10 +141,9 @@ public sealed class FeedService(
             }
         }
 
-        return ICalWriter.Write(
-            feed.Name,
-            events.Take(options.MaxEvents),
-            time.GetUtcNow(),
-            TimeSpan.FromSeconds(options.CacheSeconds));
+        var output = events.Take(options.MaxEvents).ToList();
+        return (
+            ICalWriter.Write(feed.Name, output, time.GetUtcNow(), TimeSpan.FromSeconds(options.CacheSeconds)),
+            output.Count);
     }
 }

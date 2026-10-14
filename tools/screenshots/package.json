@@ -1,0 +1,12 @@
+{
+  "name": "calendarfeed-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "管理画面の写しを撮る（開発専用。配布物に含まれない）",
+  "scripts": {
+    "shot": "node capture.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.60.0"
+  }
+}
