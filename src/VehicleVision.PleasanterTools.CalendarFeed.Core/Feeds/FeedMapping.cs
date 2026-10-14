@@ -197,9 +197,14 @@ public sealed class FeedMapping
 
         try
         {
-            var sample = new DateTime(2026, 3, 5, 14, 30, 45, DateTimeKind.Unspecified);
-            var text = sample.ToString(format, CultureInfo.InvariantCulture);
-            return DateTime.TryParseExact(text, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out _)
+            // 曜日だけの書式（ddd）は、読み戻すと「実行した日」の曜日と食い違うかどうかで結果が変わる（日付の無い書式は今日の日付で補われる）。
+            // 曜日の違う 2 日を両方とも読み戻せることを求め、実行した曜日によって通ったり弾かれたりしないようにする
+            var samples = new[]
+            {
+                new DateTime(2026, 3, 5, 14, 30, 45, DateTimeKind.Unspecified),
+                new DateTime(2026, 3, 6, 14, 30, 45, DateTimeKind.Unspecified),
+            };
+            return samples.All(sample => DateTime.TryParseExact(sample.ToString(format, CultureInfo.InvariantCulture), format, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
                 ? null
                 : $"書式「{format}」は、日付を読む書式として使えません（整形した値を同じ書式で読み戻せません）。";
         }
