@@ -91,7 +91,7 @@ public static class AdminSamlEndpoints
             // 要求の識別子を、応答の InResponseTo と突き合わせるために、暗号化した cookie へ置く
             SaveRelay(http, protection, request.IdAsString, LocalReturnUrl(returnUrl));
             return Results.Redirect(binding.RedirectLocation.OriginalString);
-        }).RequireRateLimiting("adminLogin");
+        }).RequireAdminLoginRateLimit();
 
         // IdP からの応答（POST）
         group.MapPost("/acs", async (
@@ -201,7 +201,7 @@ public static class AdminSamlEndpoints
                 http, sessions, users, user, config.AdminAuth, audit, time.GetUtcNow(), ct, new SessionSso(ReadSessionKeys(response.ClaimsIdentity)));
             _ = step;
             return Results.Redirect(relay.ReturnUrl);
-        }).RequireRateLimiting("adminLogin");
+        }).RequireAdminLoginRateLimit();
 
         MapSingleLogout(group);
     }
@@ -247,7 +247,7 @@ public static class AdminSamlEndpoints
             SaveRelay(http, protection, request.IdAsString, Entry);
             logger.LogInformation("IdP へ単一ログアウトを頼みました。");
             return Results.Redirect(binding.RedirectLocation.OriginalString);
-        }).RequireRateLimiting("adminLogin");
+        }).RequireAdminLoginRateLimit();
 
         // IdP からの単一ログアウト（要求と、こちらが頼んだ応答の両方がここへ来る）
         var slo = async (
@@ -319,8 +319,8 @@ public static class AdminSamlEndpoints
             }
         };
 
-        group.MapGet("/slo", slo).RequireRateLimiting("adminLogin");
-        group.MapPost("/slo", slo).RequireRateLimiting("adminLogin");
+        group.MapGet("/slo", slo).RequireAdminLoginRateLimit();
+        group.MapPost("/slo", slo).RequireAdminLoginRateLimit();
     }
 
     /// <summary>
