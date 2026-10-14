@@ -35,6 +35,7 @@ public static class AppSettings
     public const string PasswordAllowSameAsLoginId = "CALENDARFEED_PASSWORD_ALLOWSAMEASLOGINID";
     public const string PasswordPolicies = "PasswordPolicies";
     public const string SecretKey = "CALENDARFEED_SECRET_KEY";
+    public const string AuditLogRetentionDays = "CALENDARFEED_AUDITLOG_RETENTION_DAYS";
     public const string ForwardedProxyNetworks = "CALENDARFEED_FORWARDED_PROXY_NETWORKS";
 
     /// <summary>Pleasanter の接続設定を読む。必須の値が無ければ、設定名を挙げて止める。</summary>
@@ -91,6 +92,11 @@ public static class AppSettings
                 configuration.GetSection(PasswordPolicies).Get<List<AdminPasswordRule>>() ?? []));
     }
 
+    /// <summary>監査ログを残す日数（既定 365）。<c>0</c> なら消さない。読めない値は既定へ落とす。</summary>
+    public static int ReadAuditLogRetentionDays(IConfiguration configuration) =>
+        int.TryParse(Text(configuration, AuditLogRetentionDays), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) && v >= 0
+            ? v
+            : 365;
     /// <summary>
     /// 転送ヘッダ（<c>X-Forwarded-*</c>）を信頼するプロキシのネットワーク（カンマ区切りの CIDR）を読む。
     /// **未設定なら空（誰も信頼しない）。** CIDR でない値は起動時に落とす。

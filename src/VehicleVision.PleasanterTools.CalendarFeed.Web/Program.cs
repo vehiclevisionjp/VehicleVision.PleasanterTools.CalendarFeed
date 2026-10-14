@@ -50,6 +50,10 @@ builder.Services.AddSingleton(sp => AppSettings.ReadSecretProtector(sp.GetRequir
 builder.Services.AddSingleton<IFeedStore, FeedStore>();
 builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
 builder.Services.AddSingleton<IAdminSessionStore, AdminSessionStore>();
+builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
+builder.Services.AddSingleton<AuditLogService>();
+builder.Services.AddSingleton<AuditLogRetentionService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditLogRetentionService>());
 builder.Services.AddSingleton<AdminSessionFilter>();
 // **知らない値は起動時に落とす。** 黙って既定へ落ちると、必須にしたつもりで任意のまま動く
 builder.Services.AddSingleton(sp => AppSettings.ReadAdminAuth(sp.GetRequiredService<IConfiguration>()));
@@ -186,6 +190,7 @@ app.MapGet("/feeds/{token}.ics", async (
 // フィードの管理 API は、ログイン済みの管理者（Session）だけが使える
 app.MapAdminAuth();
 app.MapAdminFeeds();
+app.MapAdminAudit();
 
 app.Run();
 

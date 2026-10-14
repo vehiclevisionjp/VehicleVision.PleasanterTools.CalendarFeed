@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
@@ -27,6 +28,7 @@ public static class AdminFeedEndpoints
             PleasanterOptions pleasanter,
             ISecretProtector protector,
             IConfiguration configuration,
+            AuditLogService audit,
             CancellationToken ct) =>
         {
             if (request.Validate() is { } error)
@@ -52,6 +54,9 @@ public static class AdminFeedEndpoints
                 request.Filters ?? new Dictionary<string, string>(),
                 new FeedAccess(request.ApiKey, request.ApiKeyUserTimeZoneId, FeedLanguages.Normalize(request.Language)),
                 ct);
+            await audit.WriteAsync(
+                http, AuditActions.FeedCreated, true, AdminContext.Of(http).User, targetType: "Feed", targetId: feed.Id.ToString("D"),
+                detail: $"siteId={request.SiteId}");
             return Results.Created(
                 $"/admin/api/feeds/{feed.Id}",
                 new { feed = FeedView.From(feed), url = FeedUrl(http, configuration, token) });
@@ -62,18 +67,27 @@ public static class AdminFeedEndpoints
             HttpContext http,
             IFeedStore feeds,
             IConfiguration configuration,
+            AuditLogService audit,
             CancellationToken ct) =>
-            await feeds.RotateTokenAsync(id, ct) is { } token
-                ? Results.Ok(new { url = FeedUrl(http, configuration, token) })
-                : Results.NotFound());
+        {
+            if (await feeds.RotateTokenAsync(id, ct) is not { } token)
+            {
+                return Results.NotFound();
+            }
+
+            await audit.WriteAsync(http, AuditActions.FeedTokenRotated, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));
+            return Results.Ok(new { url = FeedUrl(http, configuration, token) });
+        });
 
         // **API キーの差し替え。** 登録後の値は返さない。差し替えたら、古いキーで取った生成済みの .ics を捨てる
         admin.MapPut("/{id:guid}/apikey", async (
             Guid id,
             SetApiKeyRequest request,
+            HttpContext http,
             IFeedStore feeds,
             FeedService service,
             ISecretProtector protector,
+            AuditLogService audit,
             CancellationToken ct) =>
         {
             if (request.Validate() is { } error)
@@ -92,10 +106,13 @@ public static class AdminFeedEndpoints
             }
 
             service.Invalidate(id);
+            // **API キーそのものは残さない**（対象のフィードだけ）
+            await audit.WriteAsync(http, AuditActions.FeedApiKeySet, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));
             return Results.NoContent();
         });
 
-        admin.MapDelete("/{id:guid}", async (Guid id, IFeedStore feeds, FeedService service, CancellationToken ct) =>
+        admin.MapDelete("/{id:guid}", async (
+            Guid id, HttpContext http, IFeedStore feeds, FeedService service, AuditLogService audit, CancellationToken ct) =>
         {
             if (!await feeds.RevokeAsync(id, ct))
             {
@@ -103,6 +120,7 @@ public static class AdminFeedEndpoints
             }
 
             service.Invalidate(id);
+            await audit.WriteAsync(http, AuditActions.FeedRevoked, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));
             return Results.NoContent();
         });
     }
