@@ -94,6 +94,35 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
         return rows.Select(r => r.ToDefinition()).ToList();
     }
 
+    public async Task<FeedDefinition?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var row = await connection.QuerySingleOrDefaultAsync<FeedRow>(new CommandDefinition(
+            Sql($"{SelectColumns} WHERE [Id] = @Id AND [IsRevoked] = 0"), new { Id = id.ToString("D") },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row?.ToDefinition();
+    }
+
+    public async Task<bool> UpdateAsync(Guid id, FeedUpdate update, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        // トークン・API キーは触らない。失効済みは更新しない
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [Feeds] SET [Name] = @Name, [SiteId] = @SiteId, [MappingJson] = @MappingJson, [FiltersJson] = @FiltersJson, "
+                + "[Language] = @Language, [ApiKeyUserTimeZoneId] = @ApiKeyUserTimeZoneId WHERE [Id] = @Id AND [IsRevoked] = 0"),
+            new
+            {
+                Id = id.ToString("D"),
+                update.Name,
+                update.SiteId,
+                MappingJson = JsonSerializer.Serialize(update.Mapping, Json),
+                FiltersJson = JsonSerializer.Serialize(update.Filters, Json),
+                Language = FeedLanguages.Normalize(update.Language),
+                update.ApiKeyUserTimeZoneId,
+            },
+            cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+    }
+
     public async Task<string?> RotateTokenAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var token = FeedTokens.Generate();

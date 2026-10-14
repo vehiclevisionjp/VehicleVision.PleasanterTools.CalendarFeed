@@ -22,6 +22,7 @@ public static class AuditActions
     public const string TotpDisabled = "totp.disabled";
     public const string TotpDisableFailed = "totp.disable_failed";
     public const string FeedCreated = "feed.created";
+    public const string FeedUpdated = "feed.updated";
     public const string FeedTokenRotated = "feed.token_rotated";
     public const string FeedApiKeySet = "feed.apikey_set";
     public const string FeedRevoked = "feed.revoked";

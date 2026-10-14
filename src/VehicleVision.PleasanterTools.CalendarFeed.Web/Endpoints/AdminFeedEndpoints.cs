@@ -64,6 +64,55 @@ public static class AdminFeedEndpoints
                 new { feed = FeedView.From(feed), url = FeedUrl(http, configuration, token) });
         }).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.FeedsWrite));
 
+        // **フィードの編集。** 購読 URL（トークン）と API キーは変えない。変えた項目の名前だけを監査ログへ残す（値は残さない）
+        admin.MapPut("/{id:guid}", async (
+            Guid id,
+            UpdateFeedRequest request,
+            HttpContext http,
+            IFeedStore feeds,
+            FeedService service,
+            AuditLogService audit,
+            CancellationToken ct) =>
+        {
+            if (request.Validate() is { } error)
+            {
+                return Results.BadRequest(new { error });
+            }
+
+            if (await feeds.FindByIdAsync(id, ct) is not { } before)
+            {
+                return Results.NotFound();
+            }
+
+            var update = new FeedUpdate(
+                request.Name.Trim(),
+                request.SiteId,
+                request.Mapping ?? new FeedMapping(),
+                request.Filters ?? new Dictionary<string, string>(),
+                FeedLanguages.Normalize(request.Language),
+                string.IsNullOrWhiteSpace(request.ApiKeyUserTimeZoneId) ? null : request.ApiKeyUserTimeZoneId);
+            if (!await feeds.UpdateAsync(id, update, ct))
+            {
+                return Results.NotFound();
+            }
+
+            // 古い定義で作った .ics を返さない
+            service.Invalidate(id);
+
+            var changed = new List<string>();
+            if (before.Name != update.Name) { changed.Add("name"); }
+            if (before.SiteId != update.SiteId) { changed.Add("siteId"); }
+            if (System.Text.Json.JsonSerializer.Serialize(before.Mapping) != System.Text.Json.JsonSerializer.Serialize(update.Mapping)) { changed.Add("mapping"); }
+            if (!before.Filters.OrderBy(p => p.Key).SequenceEqual(update.Filters.OrderBy(p => p.Key))) { changed.Add("filters"); }
+            if (before.Language != update.Language) { changed.Add("language"); }
+            if (before.ApiKeyUserTimeZoneId != update.ApiKeyUserTimeZoneId) { changed.Add("apiKeyUserTimeZoneId"); }
+
+            await audit.WriteAsync(
+                http, AuditActions.FeedUpdated, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"),
+                detail: changed.Count == 0 ? "no-change" : $"changed={string.Join(',', changed)}");
+            return Results.Ok(FeedView.From((await feeds.FindByIdAsync(id, ct))!));
+        }).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.FeedsWrite));
+
         admin.MapPost("/{id:guid}/rotate", async (
             Guid id,
             HttpContext http,
@@ -186,6 +235,19 @@ public sealed record CreateFeedRequest(
             ? $"Language は {string.Join(" / ", FeedLanguages.Supported)} のいずれかで指定してください。"
             : null;
     }
+}
+
+/// <summary>フィードの更新の要求。**全項目を置き換える**（PUT）。API キーは別の口（<c>PUT …/apikey</c>）。</summary>
+public sealed record UpdateFeedRequest(
+    string Name,
+    long SiteId,
+    FeedMapping? Mapping,
+    Dictionary<string, string>? Filters,
+    string? ApiKeyUserTimeZoneId = null,
+    string? Language = null)
+{
+    /// <summary>入力を検証する（作成と同じ条件）。問題があれば理由を返す。</summary>
+    public string? Validate() => new CreateFeedRequest(Name, SiteId, Mapping, Filters, null, ApiKeyUserTimeZoneId, Language).Validate();
 }
 
 /// <summary>API キーの差し替えの要求。</summary>
