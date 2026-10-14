@@ -87,30 +87,3 @@ public static class PasswordHasher
         return salt.Length > 0 && hash.Length == HashBytes;
     }
 }
-
-/// <summary>パスワードに求める条件。</summary>
-/// <param name="MinimumLength">最低の長さ。</param>
-/// <param name="AllowSameAsLoginId">ログイン ID と同じパスワードを許すか（大文字小文字は区別しない）。</param>
-public sealed record AdminPasswordPolicy(int MinimumLength = 12, bool AllowSameAsLoginId = false)
-{
-    /// <summary>上限。極端に長い入力で照合の負荷を上げさせない。</summary>
-    public const int MaximumLength = 256;
-
-    /// <summary>条件を満たさなければ理由を返す。**最初の管理者・パスワードの変更のどちらもここを通す**（片方だけ緩いと、そこが一番弱い所になる）。</summary>
-    public string? Validate(string loginId, string password)
-    {
-        if (string.IsNullOrEmpty(password) || password.Length < MinimumLength)
-        {
-            return $"パスワードは {MinimumLength} 文字以上にしてください。";
-        }
-
-        if (password.Length > MaximumLength)
-        {
-            return $"パスワードは {MaximumLength} 文字以下にしてください。";
-        }
-
-        return !AllowSameAsLoginId && string.Equals(password, loginId, StringComparison.OrdinalIgnoreCase)
-            ? "パスワードにログイン ID と同じものは使えません。"
-            : null;
-    }
-}

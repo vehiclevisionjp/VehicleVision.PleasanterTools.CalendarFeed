@@ -10,6 +10,9 @@
   "//PasswordAllowSameAsLoginId": "ログイン ID と同じパスワードを許すか（大文字小文字は区別しない）",
   "PasswordAllowSameAsLoginId": false,
 
+  "//PasswordPolicies": "パスワードの条件を正規表現で足す（Pleasanter 本体の Security.json の PasswordPolicies と同じ書き方）。**部分一致**（全体一致は ^…$）。上から順に見て、最初に合わなかった条件の文言を返す。Languages の Language が空の文言は既定。**先読み・後方参照・原子グループは使えない**（後退戻りしない照合器で、時間の上限つきで動かす。使えない書き方は起動時に落とす）。例: [{ \"Enabled\": true, \"Regex\": \"[0-9]\", \"Languages\": [{ \"Language\": \"ja\", \"Body\": \"数字を含めてください。\" }, { \"Language\": \"en\", \"Body\": \"Include a digit.\" }] }]。環境変数で与えるときは PasswordPolicies__0__Regex のように書く",
+  "PasswordPolicies": [],
+
   "//SecretKey": "フィードごとの Pleasanter API キーと管理者の TOTP の共有鍵を DB へ暗号化して置くための鍵（AES-256-GCM。Base64・32 バイト）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_SECRET_KEY（デプロイ先の秘密の保管先）か Security.local.json で与える。`dotnet run -- --generate-secret-key` で作れる。**失うと保管した API キーと 2 要素は復号できない**（登録し直す）。**運用開始後に変えると、同じく復号できなくなる**",
   "SecretKey": null
 }

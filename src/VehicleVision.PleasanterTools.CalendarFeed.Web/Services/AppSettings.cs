@@ -32,6 +32,7 @@ public static class AppSettings
     public const string AdminTwoFactor = "CALENDARFEED_ADMIN_TWOFACTOR";
     public const string PasswordMinimumLength = "CALENDARFEED_PASSWORD_MINIMUMLENGTH";
     public const string PasswordAllowSameAsLoginId = "CALENDARFEED_PASSWORD_ALLOWSAMEASLOGINID";
+    public const string PasswordPolicies = "PasswordPolicies";
     public const string SecretKey = "CALENDARFEED_SECRET_KEY";
 
     /// <summary>Pleasanter の接続設定を読む。必須の値が無ければ、設定名を挙げて止める。</summary>
@@ -83,7 +84,9 @@ public static class AppSettings
             mode,
             new AdminPasswordPolicy(
                 PositiveInt(configuration, PasswordMinimumLength, 12),
-                string.Equals(Text(configuration, PasswordAllowSameAsLoginId), "true", StringComparison.OrdinalIgnoreCase)));
+                string.Equals(Text(configuration, PasswordAllowSameAsLoginId), "true", StringComparison.OrdinalIgnoreCase),
+                // Pleasanter 本体の Security.json と同じ書き方。**組み立てられない正規表現は、ここで起動時に落ちる**
+                configuration.GetSection(PasswordPolicies).Get<List<AdminPasswordRule>>() ?? []));
     }
 
     /// <summary>起動時にマイグレーションを当てるか。既定は当てる。<c>false</c> で無効（手で当てる）。</summary>

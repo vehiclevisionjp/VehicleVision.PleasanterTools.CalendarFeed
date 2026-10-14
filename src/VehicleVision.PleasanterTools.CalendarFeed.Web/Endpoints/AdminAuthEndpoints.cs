@@ -72,7 +72,7 @@ public static class AdminAuthEndpoints
             return Bad(loginIdError);
         }
 
-        if (options.PasswordPolicy.Validate(request.LoginId!.Trim(), request.Password ?? "") is { } passwordError)
+        if (options.PasswordPolicy.Validate(request.LoginId!.Trim(), request.Password ?? "", request.Language) is { } passwordError)
         {
             return Bad(passwordError);
         }
@@ -306,7 +306,7 @@ public static class AdminAuthEndpoints
         }
 
         // **最初の管理者と同じ条件を通す**（片方だけ緩いと、そこが一番弱い所になる）
-        if (options.PasswordPolicy.Validate(admin.User.LoginId, request.NewPassword ?? "") is { } error)
+        if (options.PasswordPolicy.Validate(admin.User.LoginId, request.NewPassword ?? "", admin.User.Language) is { } error)
         {
             return Bad(error);
         }
