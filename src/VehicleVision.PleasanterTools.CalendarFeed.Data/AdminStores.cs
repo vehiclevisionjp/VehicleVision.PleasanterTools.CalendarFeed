@@ -514,14 +514,15 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         string userId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         await using var connection = connections.Create();
-        var rows = await connection.QueryAsync<(string Id, string CreatedAt, string ExpiresAt, string? IpAddress, string? UserAgent)>(
+        var rows = await connection.QueryAsync<(string Id, string CreatedAt, string ExpiresAt, string? IpAddress, string? UserAgent, string? SamlNameId, int? PleasanterUserId)>(
             new CommandDefinition(
-                Sql("SELECT [Id], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent] FROM [AdminSessions] "
+                Sql("SELECT [Id], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent], [SamlNameId], [PleasanterUserId] FROM [AdminSessions] "
                     + "WHERE [UserId] = @UserId AND [Kind] = @Kind AND [ExpiresAt] > @Now ORDER BY [CreatedAt] DESC"),
                 new { UserId = userId, Kind = nameof(AdminSessionKind.Session), Now = DbTime.Format(now) },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         return [.. rows.Select(r => new AdminSessionInfo(
-            r.Id, DbTime.Parse(r.CreatedAt)!.Value, DbTime.Parse(r.ExpiresAt)!.Value, r.IpAddress, r.UserAgent))];
+            r.Id, DbTime.Parse(r.CreatedAt)!.Value, DbTime.Parse(r.ExpiresAt)!.Value, r.IpAddress, r.UserAgent,
+            !string.IsNullOrEmpty(r.SamlNameId) ? SessionVia.Saml : r.PleasanterUserId is not null ? SessionVia.Pleasanter : SessionVia.Password))];
     }
 
     public async Task<bool> DeleteByHandleAsync(

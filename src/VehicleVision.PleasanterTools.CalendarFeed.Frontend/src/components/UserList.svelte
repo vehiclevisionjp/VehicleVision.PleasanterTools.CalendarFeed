@@ -2,7 +2,7 @@
   import { api } from '../lib/api';
   import { errorText } from '../lib/errors';
   import { dt, language, t } from '../lib/i18n/state.svelte';
-  import { ROLES, type AdminUser, type Invitation, type Me, type Permission, type Role } from '../lib/types';
+  import { ROLES, type AdminUser, type UserSessionInfo, type Invitation, type Me, type Permission, type Role } from '../lib/types';
   import type { MessageKey } from '../lib/i18n/messages';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import CopyField from './CopyField.svelte';
@@ -25,6 +25,34 @@
   let inviteRole = $state<Role>('Editor');
   let inviteError = $state('');
   let issued = $state<Invitation | null>(null);
+  // 利用者のログイン中の端末（管理者が見る。1 つずつ失効させられる）
+  let sessionsOf = $state<{ user: AdminUser; list: UserSessionInfo[] } | null>(null);
+
+  async function showSessions(user: AdminUser): Promise<void> {
+    const result = await api.userSessions(user.id);
+    if (!result.ok) {
+      error = errorText(result);
+      return;
+    }
+
+    sessionsOf = { user, list: result.value };
+  }
+
+  async function revokeOne(handle: string): Promise<void> {
+    if (!sessionsOf) return;
+    const result = await api.revokeUserSession(sessionsOf.user.id, handle);
+    if (!result.ok) {
+      error = errorText(result);
+      return;
+    }
+
+    flash = t('sessionRevoked');
+    await showSessions(sessionsOf.user);
+  }
+
+  const viaLabel = (via: string): string =>
+    via === 'saml' ? t('sessionViaSaml') : via === 'pleasanter' ? t('sessionViaPleasanter') : t('sessionViaPassword');
+
   let action = $state<{ kind: 'disable' | 'resetTotp' | 'revokeSessions'; user: AdminUser } | null>(null);
 
   const roleLabel = (role: Role): string => t(`role${role}` as MessageKey);
@@ -165,6 +193,9 @@
                   {/if}
                   <button class="btn small" type="button" onclick={() => (action = { kind: 'revokeSessions', user })}>{t('userRevokeSessions')}</button>
                 {/if}
+                {#if user.id !== me.id}
+                  <button class="btn small" type="button" onclick={() => showSessions(user)}>{t('userSessions')}</button>
+                {/if}
                 {#if canResetTotp && user.id !== me.id && user.totpEnabled}
                   <button class="btn small" type="button" onclick={() => (action = { kind: 'resetTotp', user })}>{t('userResetTotp')}</button>
                 {/if}
@@ -209,6 +240,38 @@
       <div class="hint">{t('invitationUrlOnce', { expires: dt(issued.expiresAt) })}</div>
     </div>
     <div class="dialog-actions"><button class="btn primary" type="button" onclick={() => (issued = null)}>{t('close')}</button></div>
+  </Modal>
+{/if}
+
+{#if sessionsOf}
+  <Modal title={t('userSessionsTitle', { name: sessionsOf.user.loginId })} wide onclose={() => (sessionsOf = null)}>
+    {#if sessionsOf.list.length === 0}
+      <p class="muted">{t('userSessionsEmpty')}</p>
+    {:else}
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            {#each sessionsOf.list as session (session.handle)}
+              <tr>
+                <td>
+                  <span class="badge">{viaLabel(session.via)}</span>
+                  <div class="small mono">{session.ipAddress ?? ''}</div>
+                  <div class="small muted">{session.userAgent ?? ''}</div>
+                </td>
+                <td class="small">
+                  <div>{t('sessionSince', { time: dt(session.createdAt) })}</div>
+                  <div class="muted">{t('sessionExpires', { time: dt(session.expiresAt) })}</div>
+                </td>
+                <td>
+                  {#if canWrite}<button class="btn small danger" type="button" onclick={() => revokeOne(session.handle)}>{t('sessionRevoke')}</button>{/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+    <div class="dialog-actions"><button class="btn primary" type="button" onclick={() => (sessionsOf = null)}>{t('close')}</button></div>
   </Modal>
 {/if}
 

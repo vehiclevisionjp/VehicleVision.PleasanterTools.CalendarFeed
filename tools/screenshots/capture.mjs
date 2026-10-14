@@ -288,6 +288,14 @@ try {
   await page.waitForSelector('text=接続を試す');
   await shot(page, '設定-SAML');
 
+  // 12. 管理者が見る、利用者のログイン中の端末（入った方式つき。1 つずつ失効させられる）
+  await page.click('nav button:has-text("管理者")');
+  await page.waitForSelector('text=editor@example.com');
+  await page.locator('tr', { hasText: 'editor@example.com' }).locator('button:text-is("端末")').click();
+  await page.waitForSelector('dialog .badge');
+  await shot(page, '管理者-端末');
+  await page.click('dialog button:has-text("閉じる")');
+
   await browser.close();
   if (violations.length > 0) throw new Error(`CSP 違反: ${violations.join(' / ')}`);
   console.log(`\n${files.length} 枚を ${outDir} へ出した`);

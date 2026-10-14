@@ -67,6 +67,9 @@
     onchanged();
   }
 
+  const viaLabel = (via: string): string =>
+    via === 'saml' ? t('sessionViaSaml') : via === 'pleasanter' ? t('sessionViaPleasanter') : t('sessionViaPassword');
+
   async function revoke(handle: string): Promise<void> {
     const result = await api.revokeMySession(handle);
     if (!result.ok) error = errorText(result);
@@ -161,6 +164,7 @@
             <tr>
               <td>
                 {#if session.isCurrent}<span class="badge ok">{t('sessionCurrent')}</span>{/if}
+                <span class="badge">{viaLabel(session.via)}</span>
                 <div class="small mono">{session.ipAddress ?? ''}</div>
                 <div class="small muted">{session.userAgent ?? ''}</div>
               </td>
