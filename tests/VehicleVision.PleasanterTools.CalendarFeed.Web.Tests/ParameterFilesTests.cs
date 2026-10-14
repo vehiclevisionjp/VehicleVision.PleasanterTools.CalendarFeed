@@ -86,39 +86,57 @@ public sealed class ParameterFilesTests : IDisposable
             "VehicleVision.PleasanterTools.CalendarFeed.Web", "App_Data", "Parameters"));
         var config = new ConfigurationBuilder().AddParameterFiles(shipped).Build();
 
-        Assert.Equal("Asia/Tokyo", config[AppSettings.TimeZoneDefault]);
-        Assert.Equal("300", config[AppSettings.FeedCacheSeconds]);
-        Assert.Null(config[AppSettings.PleasanterApiKey]);
+        // **管理画面から編集できる設定は、同梱のファイルで固定しない**（値が入っていると外部設定として固定され、画面から変えられなくなる）。
+        // 既定値はコードにある
+        foreach (var definition in AppSettingDefinitions.All)
+        {
+            Assert.True(config[definition.Key] is null, $"同梱のファイルが {definition.Key} を固定している: {config[definition.Key]}");
+        }
+
         Assert.Null(config[AppSettings.SecretKey]);
-        Assert.Equal("optional", config[AppSettings.AdminTwoFactor]);
-        Assert.Equal("12", config[AppSettings.PasswordMinimumLength]);
     }
 
     [Fact]
-    public void 必須の設定が無ければ設定名を挙げて止める()
+    public void Pleasanterの接続先が未設定でも起動できる_画面から設定できる()
     {
         var config = new ConfigurationBuilder().Build();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => AppSettings.ReadPleasanter(config));
-        Assert.Contains(AppSettings.PleasanterBaseUrl, ex.Message);
+        var options = TestSettings.Build(config).Pleasanter;
+
+        Assert.Equal(string.Empty, options.BaseUrl);
+        Assert.Equal("Asia/Tokyo", options.ApiKeyUserTimeZoneId);
+        Assert.Equal(1.1m, options.ApiVersion);
+        Assert.Equal(30, options.TimeoutSeconds);
+    }
+
+    [Theory]
+    [InlineData("CALENDARFEED_PLEASANTER_APIVERSION", "abc")]
+    [InlineData("CALENDARFEED_PLEASANTER_TIMEOUTSECONDS", "abc")]
+    [InlineData("CALENDARFEED_PLEASANTER_BASEURL", "ftp://a.test")]
+    public void 読めない外部設定は起動時に落とす(string key, string value)
+    {
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [key] = value }).Build();
+
+        Assert.Throws<AppSettingValidationException>(() => TestSettings.Build(config));
     }
 
     [Fact]
-    public void 読めない数値は既定へ落とす()
+    public void 外部設定の値を読む()
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [AppSettings.PleasanterBaseUrl] = "https://a.test",
+            [AppSettings.PleasanterBaseUrl] = "https://a.test/",
             [AppSettings.PleasanterApiKey] = "k",
             [AppSettings.TimeZoneDefault] = "Asia/Tokyo",
-            [AppSettings.PleasanterApiVersion] = "abc",
-            [AppSettings.PleasanterTimeoutSeconds] = "-5",
+            [AppSettings.PleasanterApiVersion] = "1.0",
+            [AppSettings.PleasanterTimeoutSeconds] = "45",
         }).Build();
 
-        var options = AppSettings.ReadPleasanter(config);
+        var options = TestSettings.Build(config).Pleasanter;
 
-        Assert.Equal(1.1m, options.ApiVersion);
-        Assert.Equal(30, options.TimeoutSeconds);
-        Assert.Equal("Asia/Tokyo", options.ApiKeyUserTimeZoneId);
+        Assert.Equal("https://a.test", options.BaseUrl);
+        Assert.Equal("k", options.ApiKey);
+        Assert.Equal(1.0m, options.ApiVersion);
+        Assert.Equal(45, options.TimeoutSeconds);
     }
 }

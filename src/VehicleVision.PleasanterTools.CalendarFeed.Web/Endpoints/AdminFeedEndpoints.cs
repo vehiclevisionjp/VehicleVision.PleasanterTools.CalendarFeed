@@ -29,7 +29,7 @@ public static class AdminFeedEndpoints
             IFeedStore feeds,
             PleasanterOptions pleasanter,
             ISecretProtector protector,
-            IConfiguration configuration,
+            RuntimeSettings settings,
             AuditLogService audit,
             CancellationToken ct) =>
         {
@@ -61,7 +61,7 @@ public static class AdminFeedEndpoints
                 detail: $"siteId={request.SiteId}");
             return Results.Created(
                 $"/admin/api/feeds/{feed.Id}",
-                new { feed = FeedView.From(feed), url = FeedUrl(http, configuration, token) });
+                new { feed = FeedView.From(feed), url = FeedUrl(http, settings, token) });
         }).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.FeedsWrite));
 
         // **フィードの編集。** 購読 URL（トークン）と API キーは変えない。変えた項目の名前だけを監査ログへ残す（値は残さない）
@@ -117,7 +117,7 @@ public static class AdminFeedEndpoints
             Guid id,
             HttpContext http,
             IFeedStore feeds,
-            IConfiguration configuration,
+            RuntimeSettings settings,
             AuditLogService audit,
             CancellationToken ct) =>
         {
@@ -127,7 +127,7 @@ public static class AdminFeedEndpoints
             }
 
             await audit.WriteAsync(http, AuditActions.FeedTokenRotated, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));
-            return Results.Ok(new { url = FeedUrl(http, configuration, token) });
+            return Results.Ok(new { url = FeedUrl(http, settings, token) });
         }).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.FeedsWrite));
 
         // **API キーの差し替え。** 登録後の値は返さない。差し替えたら、古いキーで取った生成済みの .ics を捨てる
@@ -176,10 +176,10 @@ public static class AdminFeedEndpoints
         }).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.FeedsDelete));
     }
 
-    private static string FeedUrl(HttpContext http, IConfiguration configuration, string token)
+    private static string FeedUrl(HttpContext http, RuntimeSettings settings, string token)
     {
         // **リバースプロキシの内側では Host が内部の値になる。公開 URL は設定で固定する**
-        var baseUrl = AppSettings.Text(configuration, AppSettings.PublicBaseUrl)?.TrimEnd('/')
+        var baseUrl = settings.Current.PublicBaseUrl?.TrimEnd('/')
             ?? $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}";
         return $"{baseUrl}/feeds/{token}.ics";
     }

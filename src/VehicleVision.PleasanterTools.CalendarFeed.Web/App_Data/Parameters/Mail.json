@@ -1,47 +1,47 @@
 {
-  "//": "メールの送信設定（管理者の招待メール）。Questionnaire の QUESTIONNAIRE_MAIL_* と同じ項目。**無効（既定）なら何も送らない**（招待は画面の URL を手で渡す）。**SMTP のパスワードなど実値はこのファイルへ書かない**。環境変数か Mail.local.json（git 管理外）で与える",
+  "//": "メールの送信設定（管理者の招待メール）。**管理画面から編集できる**ので、ここへ値を書くのは固定したいときだけ。Questionnaire の QUESTIONNAIRE_MAIL_* と同じ項目。**無効（既定）なら何も送らない**（招待は画面の URL を手で渡す）。**SMTP のパスワードなど実値はこのファイルへ書かない**。環境変数か Mail.local.json（git 管理外）で与える",
 
-  "//Enabled": "メール送信を有効にするか。true にするなら、送信経路に応じた設定が要る（足りなければ起動時に落とす）。招待のリンクは Service.json の PublicBaseUrl から作る（**要求の Host からは作らない**）ので、PublicBaseUrl も要る",
-  "Enabled": false,
+  "//Enabled": "メール送信を有効にするか。true にするなら、送信経路に応じた設定が要る（足りなければ起動時に落とす）。招待のリンクは Service.json の PublicBaseUrl から作る（**要求の Host からは作らない**）ので、PublicBaseUrl も要る **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "Enabled": null,
 
-  "//Transport": "送信経路。Smtp（既定。587 番の認証付きリレーで SendGrid・Amazon SES・Microsoft 365 などに届く）/ AmazonSes（HTTPS。IAM ロールで通るので、秘密を保管しない）/ AzureCommunicationServices（HTTPS。マネージド ID で通る）",
-  "Transport": "Smtp",
+  "//Transport": "送信経路。Smtp（既定。587 番の認証付きリレーで SendGrid・Amazon SES・Microsoft 365 などに届く）/ AmazonSes（HTTPS。IAM ロールで通るので、秘密を保管しない）/ AzureCommunicationServices（HTTPS。マネージド ID で通る） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "Transport": null,
 
-  "//SmtpHost": "Transport=Smtp のときの接続先",
+  "//SmtpHost": "Transport=Smtp のときの接続先 **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "SmtpHost": null,
 
-  "//SmtpPort": "Transport=Smtp のときのポート（既定 587）",
-  "SmtpPort": 587,
+  "//SmtpPort": "Transport=Smtp のときのポート（既定 587） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "SmtpPort": null,
 
-  "//SmtpSecurity": "StartTls（既定）/ ImplicitTls / None",
-  "SmtpSecurity": "StartTls",
+  "//SmtpSecurity": "StartTls（既定）/ ImplicitTls / None **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "SmtpSecurity": null,
 
-  "//SmtpUser": "認証の利用者。認証が要らなければ空",
+  "//SmtpUser": "認証の利用者。認証が要らなければ空 **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "SmtpUser": null,
 
-  "//SmtpPassword": "認証のパスワード。**ここへ実値を書かない。** 環境変数 CALENDARFEED_MAIL_SMTP_PASSWORD か Mail.local.json で与える。画面にも返さない",
+  "//SmtpPassword": "認証のパスワード。**ここへ実値を書かない。** 環境変数 CALENDARFEED_MAIL_SMTP_PASSWORD か Mail.local.json で与える。画面にも返さない **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "SmtpPassword": null,
 
-  "//FromAddress": "差出人のアドレス（有効にするなら必須）",
+  "//FromAddress": "差出人のアドレス（有効にするなら必須） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "FromAddress": null,
 
-  "//FromName": "差出人の表示名（任意）",
+  "//FromName": "差出人の表示名（任意） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "FromName": null,
 
-  "//ReplyToAddress": "返信先（任意）",
+  "//ReplyToAddress": "返信先（任意） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "ReplyToAddress": null,
 
-  "//SesRegion": "Transport=AmazonSes のときのリージョン（例: ap-northeast-1）。資格情報の設定口は作っていない（IAM ロールで通す）",
+  "//SesRegion": "Transport=AmazonSes のときのリージョン（例: ap-northeast-1）。資格情報の設定口は作っていない（IAM ロールで通す） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "SesRegion": null,
 
-  "//AcsEndpoint": "Transport=AzureCommunicationServices のときの https の URL（例: https://xxx.communication.azure.com）。資格情報の設定口は作っていない（マネージド ID で通す）",
+  "//AcsEndpoint": "Transport=AzureCommunicationServices のときの https の URL（例: https://xxx.communication.azure.com）。資格情報の設定口は作っていない（マネージド ID で通す） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "AcsEndpoint": null,
 
-  "//SendTimeoutSeconds": "1 通あたりの送信のタイムアウト（既定 30）",
-  "SendTimeoutSeconds": 30,
+  "//SendTimeoutSeconds": "1 通あたりの送信のタイムアウト（既定 30） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "SendTimeoutSeconds": null,
 
-  "//SendPerMinute": "1 分あたりの送信数の上限（既定 60）。送信元の流量の上限を超えると弾かれ、再送で余計に混む",
-  "SendPerMinute": 60,
+  "//SendPerMinute": "1 分あたりの送信数の上限（既定 60）。送信元の流量の上限を超えると弾かれ、再送で余計に混む **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "SendPerMinute": null,
 
   "//Worker": "このインスタンスで送信ワーカーを動かすか（既定 true）。複数台にするとき、送信を担う台を絞るために false にできる（確保は 1 文の UPDATE で原子的なので、全台で動かしても二重には送らない）",
   "Worker": true

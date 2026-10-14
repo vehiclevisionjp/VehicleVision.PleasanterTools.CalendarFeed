@@ -110,7 +110,7 @@ public static class AdminUserEndpoints
         IAdminInvitationStore invitations,
         AdminInvitationMailer mailer,
         AdminAuthOptions options,
-        IConfiguration configuration,
+        RuntimeSettings settings,
         TimeProvider time,
         AuditLogService audit,
         CancellationToken ct)
@@ -138,7 +138,7 @@ public static class AdminUserEndpoints
 
         await audit.WriteAsync(http, AuditActions.UserInvited, true, actor, targetType: "AdminUser", targetId: created.Id, detail: $"role={request.Role}");
 
-        var invitation = await IssueAsync(actor, created, invitations, mailer, options, configuration, http, now, ct);
+        var invitation = await IssueAsync(actor, created, invitations, mailer, options, settings, http, now, ct);
         return Results.Created($"/admin/api/users/{created.Id}", new { user = new { created.Id, created.LoginId, created.Role }, invitation });
     }
 
@@ -149,7 +149,7 @@ public static class AdminUserEndpoints
         IAdminInvitationStore invitations,
         AdminInvitationMailer mailer,
         AdminAuthOptions options,
-        IConfiguration configuration,
+        RuntimeSettings settings,
         TimeProvider time,
         AuditLogService audit,
         CancellationToken ct)
@@ -167,7 +167,7 @@ public static class AdminUserEndpoints
 
         var actor = AdminContext.Of(http).User;
         // **出し直しはパスワードの決め直しでもある**（受け取ると、以前のパスワードで張られたセッションはすべて失効する）
-        var invitation = await IssueAsync(actor, target, invitations, mailer, options, configuration, http, time.GetUtcNow(), ct);
+        var invitation = await IssueAsync(actor, target, invitations, mailer, options, settings, http, time.GetUtcNow(), ct);
         await audit.WriteAsync(http, AuditActions.UserInviteReissued, true, actor, targetType: "AdminUser", targetId: id);
         return Results.Ok(new { invitation });
     }
@@ -179,7 +179,7 @@ public static class AdminUserEndpoints
         IAdminInvitationStore invitations,
         AdminInvitationMailer mailer,
         AdminAuthOptions options,
-        IConfiguration configuration,
+        RuntimeSettings settings,
         HttpContext http,
         DateTimeOffset now,
         CancellationToken ct)
@@ -196,7 +196,7 @@ public static class AdminUserEndpoints
             adminUserId = target.Id,
             // **返せるのはこの時だけ。** 保存しているのはハッシュのみ
             invitationToken = token,
-            url = InviteUrl(http, configuration, token),
+            url = InviteUrl(http, settings, token),
             expiresAt = expires,
             // メールを積めたか。**送れていなければ、画面の URL を手で渡してもらう必要がある**
             mailSent,
@@ -403,11 +403,11 @@ public static class AdminUserEndpoints
         return Results.NoContent();
     }
 
-    private static string InviteUrl(HttpContext http, IConfiguration configuration, string token)
+    private static string InviteUrl(HttpContext http, RuntimeSettings settings, string token)
     {
         // 画面へ返す URL（ログイン済みの管理者が見る）。リバースプロキシの内側では Host が内部の値になるので、公開 URL を優先する。
         // ⚠️ メールのリンクは、Host から組み立てない（AdminInvitationMailer）
-        var baseUrl = AppSettings.Text(configuration, AppSettings.PublicBaseUrl)?.TrimEnd('/')
+        var baseUrl = settings.Current.PublicBaseUrl?.TrimEnd('/')
             ?? $"{http.Request.Scheme}://{http.Request.Host}{http.Request.PathBase}";
         return $"{baseUrl}{AdminInvitationMailer.AcceptPath}?token={Uri.EscapeDataString(token)}";
     }

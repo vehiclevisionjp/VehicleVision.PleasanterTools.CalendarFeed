@@ -47,8 +47,8 @@ public static class AdminSessionGuard
     /// </summary>
     public static bool IsSecure(HttpContext http) =>
         http.Request.IsHttps
-        || (http.RequestServices.GetService<IConfiguration>() is { } configuration
-            && AppSettings.Text(configuration, AppSettings.PublicBaseUrl) is { } baseUrl
+        || (http.RequestServices.GetService<RuntimeSettings>() is { } settings
+            && settings.Current.PublicBaseUrl is { } baseUrl
             && baseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
@@ -76,8 +76,8 @@ public static class AdminSessionGuard
             return true;
         }
 
-        var configuration = http.RequestServices.GetRequiredService<IConfiguration>();
-        var expected = AppSettings.Text(configuration, AppSettings.PublicBaseUrl) is { } baseUrl
+        var settings = http.RequestServices.GetRequiredService<RuntimeSettings>();
+        var expected = settings.Current.PublicBaseUrl is { } baseUrl
             && Uri.TryCreate(baseUrl, UriKind.Absolute, out var configured)
             ? configured.GetLeftPart(UriPartial.Authority)
             : $"{request.Scheme}://{request.Host}";

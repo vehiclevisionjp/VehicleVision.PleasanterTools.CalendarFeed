@@ -48,10 +48,10 @@ public sealed class AuditLogService(IAuditLogStore store, TimeProvider time, ILo
 }
 
 /// <summary>古い監査ログを定期的に消す。</summary>
-/// <remarks>**消さないと増え続ける。** 残す日数は <c>CALENDARFEED_AUDITLOG_RETENTION_DAYS</c>（既定 365。0 なら消さない）。</remarks>
+/// <remarks>**消さないと増え続ける。** 残す日数は設定 <c>CALENDARFEED_AUDITLOG_RETENTION_DAYS</c>（管理画面から編集できる。既定 365。0 なら消さない）。</remarks>
 public sealed class AuditLogRetentionService(
     IAuditLogStore store,
-    IConfiguration configuration,
+    RuntimeSettings settings,
     TimeProvider time,
     ILogger<AuditLogRetentionService> logger) : BackgroundService
 {
@@ -61,7 +61,7 @@ public sealed class AuditLogRetentionService(
     /// <summary>古い記録を消す。消した件数を返す（無効なら 0）。</summary>
     public async Task<int> SweepAsync(CancellationToken cancellationToken)
     {
-        var days = AppSettings.ReadAuditLogRetentionDays(configuration);
+        var days = settings.Current.AuditLogRetentionDays;
         if (days <= 0)
         {
             return 0;
