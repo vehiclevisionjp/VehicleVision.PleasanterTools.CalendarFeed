@@ -10,7 +10,7 @@
 // ブラウザは入っている Edge / Chrome を使う（ブラウザのダウンロードはしない）。
 import { createHmac } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -231,9 +231,28 @@ try {
   await page.waitForSelector('text=登録済みです');
   await shot(page, 'アカウント');
 
-  // 9. ログイン（2 要素）
+  // SAML を有効にする（ログイン画面に釦が出る。IdP の値は検証用の Keycloak の realm のもの。実際には繋がない）
+  const realm = JSON.parse(readFileSync(path.join(here, '..', 'saml-idp', 'realm', 'realm-calendarfeed.json'), 'utf8'));
+  const idpCertificate = realm.components['org.keycloak.keys.KeyProvider'].find((c) => c.config.certificate).config.certificate[0];
+  const saml = await page.request.put(`${APP}/admin/api/settings/`, {
+    data: {
+      values: {
+        CALENDARFEED_SAML_ENABLED: 'true',
+        CALENDARFEED_SAML_ENTITYID: 'http://localhost:5099/admin/api/saml/metadata',
+        CALENDARFEED_SAML_IDPENTITYID: 'https://idp.example.com/realms/calendarfeed',
+        CALENDARFEED_SAML_SINGLESIGNONURL: 'https://idp.example.com/realms/calendarfeed/protocol/saml',
+        CALENDARFEED_SAML_IDPCERTIFICATE: `-----BEGIN CERTIFICATE-----\n${idpCertificate}\n-----END CERTIFICATE-----`,
+        CALENDARFEED_SAML_BUTTONLABEL: '社内アカウント（SAML）でログイン',
+      },
+    },
+  });
+  if (!saml.ok()) throw new Error(`SAML の設定に失敗: ${saml.status()} ${await saml.text()}`);
+
+  // 9. ログイン（2 要素）。SAML の釦も出る
   await page.click('button:has-text("ログアウト")');
+  await page.reload(); // SAML の有効・無効は、画面を開いたときに読む
   await page.waitForSelector('#login-id');
+  await page.waitForSelector('a.btn-link');
   await shot(page, 'ログイン', { full: false });
   await page.fill('#login-id', 'admin@example.com');
   await page.fill('#login-pw', PASSWORD);
@@ -255,6 +274,13 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.emulateMedia({ colorScheme: 'dark' });
   await shot(page, 'フィード-ダークモード');
+
+  // 11. 設定の SAML の群（IdP へ登録する URL が出る）
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.selectOption('select.lang', 'ja');
+  await page.click('nav button:has-text("設定")');
+  await page.waitForSelector('text=SP のメタデータ URL');
+  await shot(page, '設定-SAML');
 
   await browser.close();
   if (violations.length > 0) throw new Error(`CSP 違反: ${violations.join(' / ')}`);
