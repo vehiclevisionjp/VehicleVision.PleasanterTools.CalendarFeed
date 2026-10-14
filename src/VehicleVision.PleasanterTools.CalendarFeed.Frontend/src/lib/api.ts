@@ -1,4 +1,5 @@
 import type {
+  PleasanterSsoTest,
   AdminUser,
   AuditEntry,
   Feed,
@@ -17,7 +18,7 @@ import type {
  * 呼び出しの結果。**例外を投げずに返す**（画面は「通った / 通らなかった」と理由を出し分ける）。
  * サーバの `error`（日本語）は、400 の検証メッセージだけ画面へ出す。それ以外は状態から画面の言語で書く。
  */
-export type Result<T> = { ok: true; value: T } | { ok: false; status: number; message: string };
+export type Result<T> = { ok: true; value: T } | { ok: false; status: number; message: string; code?: string };
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<Result<T>> {
   let response: Response;
@@ -48,8 +49,14 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<Re
     return { ok: true, value: json as T };
   }
 
-  const error = (json as { error?: unknown } | null)?.error;
-  return { ok: false, status: response.status, message: typeof error === 'string' ? error : '' };
+  const errorBody = json as { error?: unknown; code?: unknown } | null;
+  return {
+    ok: false,
+    status: response.status,
+    message: typeof errorBody?.error === 'string' ? errorBody.error : '',
+    // 決まった印（Pleasanter のログインの失敗など）
+    code: typeof errorBody?.code === 'string' ? errorBody.code : undefined,
+  };
 }
 
 const get = <T>(path: string) => call<T>('GET', path);
@@ -109,5 +116,7 @@ export const api = {
   mailStatus: () => get<MailStatus>('/mail/status'),
   settings: () => get<{ settings: Setting[] }>('/settings/'),
   saveSettings: (values: Record<string, string | null>) => put<{ settings: Setting[] }>('/settings/', { values }),
+  pleasanterSsoCheck: () => post<{ status: 'unauthenticated' } | { status: 'signedIn'; next: Step }>('/pleasanter-sso/check'),
+  pleasanterSsoTest: () => post<PleasanterSsoTest>('/pleasanter-sso/test'),
   testMail: () => post<{ queued: boolean; reason: string | null }>('/settings/mail/test'),
 };

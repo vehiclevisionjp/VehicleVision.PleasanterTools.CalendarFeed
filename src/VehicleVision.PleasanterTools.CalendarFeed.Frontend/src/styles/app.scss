@@ -327,8 +327,11 @@ button.btn.small {
   font-size: 0.85rem;
 }
 
-a.btn-link {
+.btn-link {
   display: inline-block;
+  cursor: pointer;
+  background: transparent;
+  font: inherit;
   width: 100%;
   text-align: center;
   padding: 0.55rem 1rem;
@@ -339,7 +342,7 @@ a.btn-link {
   text-decoration: none;
 }
 
-a.btn-link:hover {
+.btn-link:hover:not(:disabled) {
   background: var(--surface-2);
 }
 

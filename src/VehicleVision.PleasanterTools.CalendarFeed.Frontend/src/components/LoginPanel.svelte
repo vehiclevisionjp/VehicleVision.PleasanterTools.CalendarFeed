@@ -2,11 +2,20 @@
   import { api } from '../lib/api';
   import { errorText } from '../lib/errors';
   import { t } from '../lib/i18n/state.svelte';
-  import type { Step } from '../lib/types';
+  import type { PleasanterSsoStatus, Step } from '../lib/types';
   import LanguageSelect from './LanguageSelect.svelte';
   import Notice from './Notice.svelte';
+  import PleasanterSsoLogin from './PleasanterSsoLogin.svelte';
 
-  let { onstep, saml = { enabled: false, buttonLabel: null } }: { onstep: (step: Step) => void; saml?: { enabled: boolean; buttonLabel: string | null } } = $props();
+  let {
+    onstep,
+    saml = { enabled: false, buttonLabel: null },
+    pleasanterSso = { enabled: false, loginUrl: null, logoutUrl: null, buttonLabel: null },
+  }: {
+    onstep: (step: Step) => void;
+    saml?: { enabled: boolean; buttonLabel: string | null };
+    pleasanterSso?: PleasanterSsoStatus;
+  } = $props();
 
   // SAML の失敗は、サーバが ?samlError= を付けてこの画面へ戻す。理由は 3 種類だけ（詳しい理由はサーバのログと監査ログ）
   const samlError = new URLSearchParams(location.search).get('samlError');
@@ -44,6 +53,9 @@
     {#if error}<Notice>{error}</Notice>{/if}
     {#if saml.enabled}
       <p><a class="btn-link" href="/admin/api/saml/login">{saml.buttonLabel ?? t('signInWithSaml')}</a></p>
+    {/if}
+    {#if pleasanterSso.enabled}
+      <PleasanterSsoLogin sso={pleasanterSso} {onstep} />
     {/if}
     <form onsubmit={submit}>
       <div class="field">
