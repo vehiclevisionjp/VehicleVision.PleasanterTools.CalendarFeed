@@ -159,6 +159,7 @@ catch (Exception ex)
     app.Logger.LogWarning(ex, "保存済みのアプリケーション設定を読めませんでした。外部設定と既定値で動きます。");
 }
 
+app.UseAdminSecurityHeaders();
 app.UseRateLimiter();
 
 // ---- 購読フィード ----------------------------------------------------------------
@@ -225,6 +226,7 @@ app.MapAdminFeeds();
 app.MapAdminAudit();
 app.MapAdminUsers();
 app.MapAdminSettings();
+app.MapAdminUi();
 
 app.Run();
 

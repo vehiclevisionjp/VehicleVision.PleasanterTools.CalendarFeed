@@ -282,9 +282,10 @@ public sealed record FeedView(
     string Language,
     string? ApiKeyUserTimeZoneId,
     bool HasApiKey,
-    string? ApiKeyHint)
+    string? ApiKeyHint,
+    FeedFetchResult? LastFetch)
 {
     public static FeedView From(FeedDefinition f) => new(
         f.Id, f.Name, f.SiteId, f.Mapping, f.Filters, f.CreatedAt,
-        f.Language, f.ApiKeyUserTimeZoneId, f.HasApiKey, f.ApiKeyHint);
+        f.Language, f.ApiKeyUserTimeZoneId, f.HasApiKey, f.ApiKeyHint, f.LastFetch);
 }

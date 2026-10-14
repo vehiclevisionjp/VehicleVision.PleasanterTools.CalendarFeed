@@ -49,7 +49,8 @@ internal sealed class TestApp : IDisposable
         string? secretKeyValue = null,
         string? retentionDays = null,
         bool mail = false,
-        string? forwardedNetworks = null)
+        string? forwardedNetworks = null,
+        string? webRoot = null)
     {
         _ownsDb = existingDb is null;
         _db = existingDb ?? Path.Combine(Path.GetTempPath(), $"calendarfeed-{Guid.NewGuid():N}.db");
@@ -105,6 +106,11 @@ internal sealed class TestApp : IDisposable
 
                 config.AddInMemoryCollection(settings);
             });
+            if (webRoot is not null)
+            {
+                builder.UseWebRoot(webRoot);
+            }
+
             builder.ConfigureTestServices(services =>
             {
                 services.AddHttpClient<Pleasanter.PleasanterClient>()
