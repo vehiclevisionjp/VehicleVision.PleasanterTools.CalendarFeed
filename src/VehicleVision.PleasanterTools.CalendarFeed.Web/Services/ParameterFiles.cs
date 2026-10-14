@@ -77,6 +77,7 @@ public static class ParameterFiles
             ["PasswordMinimumLength"] = AppSettings.PasswordMinimumLength,
             ["PasswordAllowSameAsLoginId"] = AppSettings.PasswordAllowSameAsLoginId,
             ["SecretKey"] = AppSettings.SecretKey,
+            ["ForwardedProxyNetworks"] = AppSettings.ForwardedProxyNetworks,
         }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
