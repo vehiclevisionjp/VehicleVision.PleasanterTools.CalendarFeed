@@ -86,6 +86,13 @@ jobs:
           # 利用者の情報はキャッシュされるので、入れ替えたら再起動して捨てる
           docker compose restart pleasanter
           docker compose up -d --wait pleasanter
+          # **ポートが開いただけでは、まだ API が 503 を返す**（healthcheck は TCP の待ち受けだけを見る）。ログイン画面が 200 を返すまで待つ
+          for i in $(seq 1 90); do
+              code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18090/users/login || true)"
+              [ "$code" = "200" ] && break
+              sleep 2
+          done
+          [ "$code" = "200" ] || { echo "::error title=Pleasanter did not become ready::last status $code"; exit 1; }
 
       - name: Pleasanter からの取得を通す
         working-directory: tools/pleasanter-testenv
