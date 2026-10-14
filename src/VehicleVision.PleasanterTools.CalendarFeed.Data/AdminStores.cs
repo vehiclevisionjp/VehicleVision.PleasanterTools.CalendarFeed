@@ -112,6 +112,114 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
         return row?.ToUser();
     }
 
+    public async Task<IReadOnlyList<AdminUser>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var rows = await connection.QueryAsync<UserRow>(new CommandDefinition(
+            Sql($"{SelectColumns} ORDER BY [CreatedAt], [Id]"), cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return [.. rows.Select(r => r.ToUser())];
+    }
+
+    public async Task<AdminUser?> CreateAsync(
+        string loginId,
+        string passwordHash,
+        string role,
+        string language,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        var id = Guid.NewGuid().ToString("D");
+        await using var connection = connections.Create();
+        try
+        {
+            // ログイン ID の一意性は LoginIdKey の一意索引が守る
+            await connection.ExecuteAsync(new CommandDefinition(
+                Sql("INSERT INTO [AdminUsers] ([Id], [LoginId], [LoginIdKey], [PasswordHash], [Role], [IsDisabled], "
+                    + "[FailedLoginCount], [CreatedAt], [Language]) "
+                    + "VALUES (@Id, @LoginId, @LoginIdKey, @PasswordHash, @Role, 0, 0, @CreatedAt, @Language)"),
+                new
+                {
+                    Id = id,
+                    LoginId = loginId.Trim(),
+                    LoginIdKey = KeyOf(loginId),
+                    PasswordHash = passwordHash,
+                    Role = role,
+                    CreatedAt = DbTime.Format(now),
+                    Language = FeedLanguages.Normalize(language),
+                },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+        catch (System.Data.Common.DbException)
+        {
+            // 一意制約で落ちた（同じログイン ID がある）なら null。それ以外の失敗は握りつぶさない
+            if (await FindForLoginAsync(loginId, cancellationToken).ConfigureAwait(false) is not null)
+            {
+                return null;
+            }
+
+            throw;
+        }
+
+        return await FindByIdAsync(id, cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<AdminChangeResult> SetDisabledAsync(
+        string id, bool disabled, CancellationToken cancellationToken = default) =>
+        ChangeAsync(id, "[IsDisabled] = @Value", disabled ? 1 : 0, leavesAdministrator: disabled, cancellationToken);
+
+    public Task<AdminChangeResult> SetRoleAsync(string id, string role, CancellationToken cancellationToken = default) =>
+        ChangeAsync(id, "[Role] = @Value", role, leavesAdministrator: role != AdminRoles.Administrator, cancellationToken);
+
+    /// <summary>
+    /// 1 文で変える。<paramref name="leavesAdministrator"/> のときは、**ほかに有効な Administrator が居る場合だけ**通す
+    /// （同時に 2 人が互いを降格しても、最後の 1 人は残る）。
+    /// </summary>
+    /// <remarks>
+    /// 件数を数える副問い合わせは派生表で包む（MySQL は、更新する表をそのまま副問い合わせに使えない）。
+    /// 「有効な Administrator」は、無効でなく、**一度でもログインした**人（招待しただけの人は、誰も知らないパスワードしか持たないので数えない。
+    /// この条件は厳しい側に外れる＝まだ入っていない人が居る間は断るが、断るのは安全側）。
+    /// </remarks>
+    private async Task<AdminChangeResult> ChangeAsync(
+        string id, string setClause, object value, bool leavesAdministrator, CancellationToken cancellationToken)
+    {
+        var guard = leavesAdministrator
+            ? " AND (NOT ([Role] = @Admin AND [IsDisabled] = 0 AND [LastLoginAt] IS NOT NULL) OR (SELECT COUNT(*) FROM "
+                + "(SELECT [Id] FROM [AdminUsers] WHERE [Role] = @Admin AND [IsDisabled] = 0 AND [LastLoginAt] IS NOT NULL "
+                + "AND [Id] <> @Id) AS [Others]) > 0)"
+            : string.Empty;
+
+        await using var connection = connections.Create();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        // ⚠️ **Administrator の行を先にロックして、同時の変更を 1 つずつにする。**
+        // 1 文の UPDATE の副問い合わせは、PostgreSQL（READ COMMITTED）では文の開始時点の状態を見るので、
+        // 2 人が同時に互いを外すと「相手が残る」と見て両方通り、有効な Administrator が 0 人になる（実機で再現）。
+        // ロックの順序は主キー順に揃える（揃えないと MySQL でデッドロックする）。SQLite は書き込みが直列なので不要
+        if (leavesAdministrator)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(
+                SqlDialect.LockAdministrators(connections.Provider),
+                new { Admin = AdminRoles.Administrator }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+
+        var updated = await connection.ExecuteAsync(new CommandDefinition(
+            Sql($"UPDATE [AdminUsers] SET {setClause} WHERE [Id] = @Id{guard}"),
+            new { Id = id, Value = value, Admin = AdminRoles.Administrator },
+            transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if (updated > 0)
+        {
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return AdminChangeResult.Updated;
+        }
+
+        var exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            Sql("SELECT COUNT(*) FROM [AdminUsers] WHERE [Id] = @Id"), new { Id = id },
+            transaction, cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return exists ? AdminChangeResult.LastAdministrator : AdminChangeResult.NotFound;
+    }
+
     public async Task<AdminFailure> RecordFailureAsync(
         string id, int threshold, TimeSpan lockout, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
@@ -315,15 +423,17 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         AdminSessionKind kind,
         TimeSpan lifetime,
         DateTimeOffset now,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? ipAddress = null,
+        string? userAgent = null)
     {
         var sessionId = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
         await using var connection = connections.Create();
         await connection.ExecuteAsync(new CommandDefinition(
-            Sql("INSERT INTO [AdminSessions] ([Id], [UserId], [Kind], [CreatedAt], [ExpiresAt]) "
-                + "VALUES (@Id, @UserId, @Kind, @CreatedAt, @ExpiresAt)"),
+            Sql("INSERT INTO [AdminSessions] ([Id], [UserId], [Kind], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent]) "
+                + "VALUES (@Id, @UserId, @Kind, @CreatedAt, @ExpiresAt, @IpAddress, @UserAgent)"),
             new
             {
                 Id = IdHash(sessionId),
@@ -331,9 +441,36 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
                 Kind = kind.ToString(),
                 CreatedAt = DbTime.Format(now),
                 ExpiresAt = DbTime.Format(now + lifetime),
+                IpAddress = AuditText.Safe(ipAddress, 45),
+                UserAgent = AuditText.Safe(userAgent, 200),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return sessionId;
+    }
+
+    public string HandleOf(string sessionId) => IdHash(sessionId);
+
+    public async Task<IReadOnlyList<AdminSessionInfo>> ListForUserAsync(
+        string userId, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var rows = await connection.QueryAsync<(string Id, string CreatedAt, string ExpiresAt, string? IpAddress, string? UserAgent)>(
+            new CommandDefinition(
+                Sql("SELECT [Id], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent] FROM [AdminSessions] "
+                    + "WHERE [UserId] = @UserId AND [Kind] = @Kind AND [ExpiresAt] > @Now ORDER BY [CreatedAt] DESC"),
+                new { UserId = userId, Kind = nameof(AdminSessionKind.Session), Now = DbTime.Format(now) },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return [.. rows.Select(r => new AdminSessionInfo(
+            r.Id, DbTime.Parse(r.CreatedAt)!.Value, DbTime.Parse(r.ExpiresAt)!.Value, r.IpAddress, r.UserAgent))];
+    }
+
+    public async Task<bool> DeleteByHandleAsync(
+        string userId, string handle, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("DELETE FROM [AdminSessions] WHERE [Id] = @Id AND [UserId] = @UserId"),
+            new { Id = handle, UserId = userId }, cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
     }
 
     public async Task<AdminSession?> FindAsync(

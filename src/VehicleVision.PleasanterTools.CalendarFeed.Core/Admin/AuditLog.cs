@@ -25,6 +25,16 @@ public static class AuditActions
     public const string FeedTokenRotated = "feed.token_rotated";
     public const string FeedApiKeySet = "feed.apikey_set";
     public const string FeedRevoked = "feed.revoked";
+    public const string UserInvited = "user.invited";
+    public const string UserInviteReissued = "user.invite_reissued";
+    public const string UserInviteAccepted = "user.invite_accepted";
+    public const string UserDisabled = "user.disabled";
+    public const string UserEnabled = "user.enabled";
+    public const string UserRoleChanged = "user.role_changed";
+    public const string UserTotpReset = "user.totp_reset";
+    public const string UserSessionsRevoked = "user.sessions_revoked";
+    public const string SessionRevoked = "session.revoked";
+    public const string SessionsRevokedOthers = "session.revoked_others";
 }
 
 /// <summary>残す操作 1 件。</summary>

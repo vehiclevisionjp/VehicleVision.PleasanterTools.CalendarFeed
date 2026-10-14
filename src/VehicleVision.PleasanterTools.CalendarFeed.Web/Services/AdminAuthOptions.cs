@@ -32,8 +32,30 @@ public sealed record AdminAuthOptions(TwoFactorMode TwoFactor, AdminPasswordPoli
     /// <summary>ログイン済みセッションの有効期間。</summary>
     public TimeSpan SessionLifetime { get; init; } = TimeSpan.FromHours(8);
 
+    /// <summary>招待の有効期間（既定 48 時間。Questionnaire と同じ）。**短すぎると届く前に切れ、長すぎると URL が残る。** 切れたら出し直す。</summary>
+    public TimeSpan InvitationLifetime { get; init; } = TimeSpan.FromHours(48);
+
+    /// <summary>棚卸しで「長期間使われていない」とみなす日数。</summary>
+    public TimeSpan StaleAfter { get; init; } = TimeSpan.FromDays(90);
+
     /// <summary>認証アプリに出す発行元の名前。</summary>
     public string Issuer { get; init; } = "CalendarFeed";
+}
+
+/// <summary>指定の権限を持つ役割だけを通す。<b>ログイン済みの確認（<see cref="AdminSessionFilter"/>）の後ろに付ける。</b></summary>
+/// <remarks>
+/// **認可は本アプリの役割だけで行う**（Pleasanter のグループ・組織では判定しない）。権限は役割から、その都度対応表を引く
+/// （cookie へ焼かない。焼くと、役割を変えても再ログインまで効かない）。
+/// </remarks>
+public sealed class RequirePermissionFilter(string permission) : IEndpointFilter
+{
+    public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
+        AdminPermissions.Has(AdminContext.Of(context.HttpContext).User.Role, permission)
+            ? await next(context).ConfigureAwait(false)
+            : Results.Json(new { error = $"この操作には権限（{permission}）が要ります。" }, statusCode: StatusCodes.Status403Forbidden);
+
+    /// <summary>エンドポイントへ付けるフィルタを作る。</summary>
+    public static RequirePermissionFilter Of(string permission) => new(permission);
 }
 
 /// <summary>認証済みの管理者（エンドポイントフィルタが <c>HttpContext.Items</c> へ置く）。</summary>

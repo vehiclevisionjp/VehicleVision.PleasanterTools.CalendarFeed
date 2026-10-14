@@ -138,4 +138,4 @@ jobs:
         run: >-
           dotnet test tests/VehicleVision.PleasanterTools.CalendarFeed.Core.Tests
           -c Release
-          --filter "FullyQualifiedName~FeedStoreTests|FullyQualifiedName~AdminStoreTests|FullyQualifiedName~SqlDialectTests"
+          --filter "FullyQualifiedName~StoreTests|FullyQualifiedName~SqlDialectTests"

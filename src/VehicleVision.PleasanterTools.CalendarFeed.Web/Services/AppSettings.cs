@@ -1,5 +1,6 @@
 using System.Net;
 using System.Globalization;
+using VehicleVision.PleasanterTools.CalendarFeed.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
@@ -109,6 +110,12 @@ public static class AppSettings
                 : throw new InvalidOperationException(
                     $"{ForwardedProxyNetworks} に CIDR でない値があります: {value}（例: 10.0.0.0/8, 192.0.2.10/32）"))
             .ToArray();
+
+    /// <summary>
+    /// メールの送信設定（<c>CALENDARFEED_MAIL_*</c>）を読む。<b>無効なら他の値を読まない</b>（使わない設定の不備で起動を止めない）。
+    /// 有効なのに足りない・読めない値は起動時に落とす。
+    /// </summary>
+    public static MailOptions ReadMail(IConfiguration configuration) => MailOptions.FromConfiguration(configuration);
 
     /// <summary>起動時にマイグレーションを当てるか。既定は当てる。<c>false</c> で無効（手で当てる）。</summary>
     public static bool ReadAutoMigrate(IConfiguration configuration) =>

@@ -23,6 +23,12 @@ public static class AdminAuthEndpoints
         error = "ログイン ID またはパスワードが違います。何度も失敗した場合は、しばらく待ってからやり直してください。",
     };
 
+    /// <summary>端末の一覧に出す接続元（表示用。認可には使わない）。</summary>
+    internal static string? Ip(HttpContext http) => http.Connection.RemoteIpAddress?.ToString();
+
+    /// <summary>端末の一覧に出す User-Agent（表示用。長さは保管側で切る）。</summary>
+    internal static string? UserAgentOf(HttpContext http) => http.Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null;
+
     private static IResult Unauthorized() => Results.Json(Generic, statusCode: StatusCodes.Status401Unauthorized);
 
     private static IResult Bad(string error) => Results.Json(new { error }, statusCode: StatusCodes.Status400BadRequest);
@@ -151,19 +157,38 @@ public static class AdminAuthEndpoints
         // 前のセッションがあれば捨てる（ログインし直したら、前の cookie は使えない）
         await DropExistingAsync(http, sessions, ct);
 
+        return Results.Ok(new { step = await SignInAsync(http, sessions, users, user, options, audit, now, ct) });
+    }
+
+    /// <summary>
+    /// パスワードが通った人を、2 要素の方針に従って次の段階へ進める。<b>ログインと招待の受け取りで同じ道を通す</b>
+    /// （片方だけ違うと、招待された人だけ方針が食い違う）。登録済みなら <c>totp</c>、必須で未登録なら <c>enroll</c>（どちらも途中の cookie）、
+    /// それ以外はそのままログイン済み（<c>done</c>）。
+    /// </summary>
+    internal static async Task<string> SignInAsync(
+        HttpContext http,
+        IAdminSessionStore sessions,
+        IAdminUserStore users,
+        AdminUser user,
+        AdminAuthOptions options,
+        AuditLogService audit,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
         var needsSecondFactor = user.TotpEnabled;
         var mustEnroll = !user.TotpEnabled && options.TwoFactor == TwoFactorMode.Required;
         if (needsSecondFactor || mustEnroll)
         {
-            var pending = await sessions.CreateAsync(user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct);
+            var pending = await sessions.CreateAsync(
+                user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct, Ip(http), UserAgentOf(http));
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
             AdminSessionGuard.SetCookie(http, AdminSessionGuard.PendingCookie, pending, options.PendingLifetime);
-            return Results.Ok(new { step = needsSecondFactor ? "totp" : "enroll" });
+            return needsSecondFactor ? "totp" : "enroll";
         }
 
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
         await StartSessionAsync(http, sessions, users, user, options, audit, now, ct);
-        return Results.Ok(new { step = "done" });
+        return "done";
     }
 
     private static async Task<IResult> LoginTotp(
@@ -295,6 +320,8 @@ public static class AdminAuthEndpoints
             admin.User.Language,
             admin.User.TotpEnabled,
             admin.User.LastLoginAt,
+            // 画面はこれで出し分ける（「Administrator かどうか」で分けると、役割を増やすたびに画面を直すことになる）
+            permissions = AdminPermissions.Of(admin.User.Role),
             twoFactor = options.TwoFactor.ToString(),
             recoveryCodesLeft = admin.User.TotpEnabled ? await users.CountRecoveryCodesAsync(admin.User.Id, ct) : 0,
         });
@@ -468,7 +495,8 @@ public static class AdminAuthEndpoints
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var sessionId = await sessions.CreateAsync(user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct);
+        var sessionId = await sessions.CreateAsync(
+            user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct, Ip(http), UserAgentOf(http));
         AdminSessionGuard.SetCookie(http, AdminSessionGuard.SessionCookie, sessionId, options.SessionLifetime);
         await users.RecordSuccessAsync(user.Id, now, ct);
         await sessions.DeleteExpiredAsync(now, ct);
@@ -557,7 +585,7 @@ public static class AdminAuthEndpoints
         }
     }
 
-    private static string? ValidateLoginId(string? loginId)
+    internal static string? ValidateLoginId(string? loginId)
     {
         var trimmed = loginId?.Trim();
         return string.IsNullOrEmpty(trimmed) || trimmed.Length > 100 || trimmed.Any(char.IsControl)

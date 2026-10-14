@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Core\VehicleVision.PleasanterTools.CalendarFeed.Core.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Data\VehicleVision.PleasanterTools.CalendarFeed.Data.csproj" />
+    <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Mail\VehicleVision.PleasanterTools.CalendarFeed.Mail.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Pleasanter\VehicleVision.PleasanterTools.CalendarFeed.Pleasanter.csproj" />
   </ItemGroup>
 

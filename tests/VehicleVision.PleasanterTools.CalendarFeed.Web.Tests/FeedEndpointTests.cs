@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using VehicleVision.PleasanterTools.CalendarFeed.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
@@ -47,6 +48,7 @@ internal sealed class TestApp : IDisposable
         string? existingDb = null,
         string? secretKeyValue = null,
         string? retentionDays = null,
+        bool mail = false,
         string? forwardedNetworks = null)
     {
         _ownsDb = existingDb is null;
@@ -77,6 +79,15 @@ internal sealed class TestApp : IDisposable
                     settings[AppSettings.SecretKey] = SecretKeyValue;
                 }
 
+                // **送信ワーカーは動かさない**（テストが 1 通ずつ SendOnceAsync で進める）。メールは設定したときだけ有効にする
+                settings[MailSenderOptions.WorkerKey] = "false";
+                if (mail)
+                {
+                    settings["CALENDARFEED_MAIL_ENABLED"] = "true";
+                    settings["CALENDARFEED_MAIL_SMTP_HOST"] = "smtp.test";
+                    settings["CALENDARFEED_MAIL_FROM_ADDRESS"] = "noreply@feed.test";
+                }
+
                 if (retentionDays is not null)
                 {
                     settings[AppSettings.AuditLogRetentionDays] = retentionDays;
@@ -99,6 +110,7 @@ internal sealed class TestApp : IDisposable
                 services.AddHttpClient<Pleasanter.PleasanterClient>()
                     .ConfigurePrimaryHttpMessageHandler(() => Pleasanter);
                 services.AddSingleton<TimeProvider>(Time);
+                services.AddSingleton<IMailTransport>(MailTransport);
                 services.AddSingleton<IStartupFilter, RemoteIpStartupFilter>();
             });
         });
@@ -109,6 +121,9 @@ internal sealed class TestApp : IDisposable
     public FakePleasanter Pleasanter { get; } = new();
 
     public ManualTime Time { get; } = new();
+
+    /// <summary>送ったメールを受け取る（実際には送らない）。</summary>
+    public FakeMailTransport MailTransport { get; } = new();
 
     /// <summary>Dispose で DB を消さない（同じ DB を別のアプリで開き直すテスト用）。</summary>
     public bool KeepDb { get; set; }
@@ -189,6 +204,26 @@ internal sealed class RemoteIpStartupFilter : IStartupFilter
         });
         next(app);
     };
+}
+
+/// <summary>メールの送信を真似る。送った中身を取っておき、<see cref="Failure"/> があればそれを投げる。</summary>
+internal sealed class FakeMailTransport : IMailTransport
+{
+    public List<OutgoingMail> Sent { get; } = [];
+
+    /// <summary>送るときに投げる失敗（<c>null</c> なら送れる）。</summary>
+    public Exception? Failure { get; set; }
+
+    public Task SendAsync(OutgoingMail mail, CancellationToken cancellationToken = default)
+    {
+        if (Failure is not null)
+        {
+            throw Failure;
+        }
+
+        Sent.Add(mail);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Pleasanter の Get API の応答を真似る。</summary>
