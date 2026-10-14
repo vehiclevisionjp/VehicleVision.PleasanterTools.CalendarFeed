@@ -15,6 +15,8 @@ public static class AuditActions
     public const string LoginRecoveryUsed = "login.recovery_used";
     public const string LoginLocked = "login.locked";
     public const string Logout = "logout";
+    public const string SamlLoginFailed = "login.saml_failed";
+    public const string SamlRegistered = "user.saml_registered";
     public const string PasswordChanged = "password.changed";
     public const string PasswordChangeFailed = "password.change_failed";
     public const string TotpEnrolled = "totp.enrolled";

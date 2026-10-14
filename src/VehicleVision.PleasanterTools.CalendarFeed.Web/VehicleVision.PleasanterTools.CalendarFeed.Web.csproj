@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <!-- 管理画面の SAML 2.0 ログイン（Questionnaire と同じ依存・同じ版）。BSD-3-Clause -->
+    <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.21.0" />
+    <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.21.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- 実値を置く *.local.json は配布物へ入れない -->
     <Content Remove="App_Data/Parameters/*.local.json" />
     <None Remove="App_Data/Parameters/*.local.json" />

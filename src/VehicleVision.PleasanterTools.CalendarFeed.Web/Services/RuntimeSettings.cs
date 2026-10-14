@@ -13,6 +13,7 @@ public sealed record RuntimeConfig(
     AdminAuthOptions AdminAuth,
     MailOptions Mail,
     MailSenderOptions MailSender,
+    SamlOptions Saml,
     string? PublicBaseUrl,
     int AuditLogRetentionDays);
 
@@ -92,6 +93,9 @@ public sealed class RuntimeSettings : IPleasanterOptionsSource
             WorkerEnabled = MailSenderOptions.FromConfiguration(configuration).WorkerEnabled,
         };
 
+        // SAML（既定は無効）。有効なのに足りない・読めない外部設定は、ここで起動を止める
+        var saml = SamlOptions.FromValues(key => snapshot.Values.TryGetValue(key, out var v) ? v : null);
+
         return new RuntimeConfig(
             snapshot,
             pleasanter,
@@ -99,6 +103,7 @@ public sealed class RuntimeSettings : IPleasanterOptionsSource
             adminAuth,
             mail,
             mailSender,
+            saml,
             Blank(V(AppSettingDefinitions.PublicBaseUrl)),
             I(AppSettingDefinitions.AuditLogRetentionDays));
     }

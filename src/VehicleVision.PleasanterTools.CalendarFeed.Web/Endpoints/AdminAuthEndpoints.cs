@@ -44,8 +44,17 @@ public static class AdminAuthEndpoints
                 ? await next(context)
                 : Results.Json(new { error = "別のサイトからの要求は受け付けません。" }, statusCode: StatusCodes.Status403Forbidden));
 
-        group.MapGet("/status", async (IAdminUserStore users, AdminAuthOptions options, CancellationToken ct) =>
-            Results.Ok(new { setupRequired = await users.CountAsync(ct) == 0, twoFactor = options.TwoFactor.ToString() }));
+        // ログイン画面が出し分けに使う（認証前に見える値だけ。SAML の釦の有無と文字）
+        group.MapGet("/status", async (IAdminUserStore users, AdminAuthOptions options, RuntimeSettings settings, CancellationToken ct) =>
+        {
+            var saml = settings.Current.Saml;
+            return Results.Ok(new
+            {
+                setupRequired = await users.CountAsync(ct) == 0,
+                twoFactor = options.TwoFactor.ToString(),
+                saml = new { enabled = saml.Enabled, buttonLabel = saml.Enabled && saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null },
+            });
+        });
 
         // **ログインの試行だけ別枠のレート制限**（全体の枠に紛れさせると総当たりが通る）
         group.MapPost("/setup", Setup).RequireRateLimiting("adminLogin");
@@ -173,21 +182,22 @@ public static class AdminAuthEndpoints
         AdminAuthOptions options,
         AuditLogService audit,
         DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct,
+        SamlSessionKeys? samlKeys = null)
     {
         var needsSecondFactor = user.TotpEnabled;
         var mustEnroll = !user.TotpEnabled && options.TwoFactor == TwoFactorMode.Required;
         if (needsSecondFactor || mustEnroll)
         {
             var pending = await sessions.CreateAsync(
-                user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct, Ip(http), UserAgentOf(http));
+                user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct, Ip(http), UserAgentOf(http), samlKeys);
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
             AdminSessionGuard.SetCookie(http, AdminSessionGuard.PendingCookie, pending, options.PendingLifetime);
             return needsSecondFactor ? "totp" : "enroll";
         }
 
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, samlKeys);
         return "done";
     }
 
@@ -243,9 +253,11 @@ public static class AdminAuthEndpoints
             return Unauthorized();
         }
 
+        // SAML で入った人は、途中の段階が持つ単一ログアウトの鍵を、ログイン済みのセッションへ引き継ぐ
+        var samlKeys = await sessions.GetSamlKeysAsync(pendingId, ct);
         await sessions.DeleteAsync(pendingId, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, samlKeys);
         return Results.Ok(new { step = "done" });
     }
 
@@ -282,9 +294,11 @@ public static class AdminAuthEndpoints
 
         logger.LogWarning("管理者 {UserId} が復旧コードでログインしました", user.Id);
         await audit.WriteAsync(http, AuditActions.LoginRecoveryUsed, true, user);
+        // SAML で入った人は、途中の段階が持つ単一ログアウトの鍵を、ログイン済みのセッションへ引き継ぐ
+        var samlKeys = await sessions.GetSamlKeysAsync(pendingId, ct);
         await sessions.DeleteAsync(pendingId, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, samlKeys);
         return Results.Ok(new { step = "done", recoveryCodesLeft = await users.CountRecoveryCodesAsync(user.Id, ct) });
     }
 
@@ -309,7 +323,7 @@ public static class AdminAuthEndpoints
     // ---- 自分 ------------------------------------------------------------------------
 
     private static async Task<IResult> Me(
-        HttpContext http, IAdminUserStore users, AdminAuthOptions options, CancellationToken ct)
+        HttpContext http, IAdminUserStore users, IAdminSessionStore sessions, AdminAuthOptions options, CancellationToken ct)
     {
         var admin = AdminContext.Of(http);
         return Results.Ok(new
@@ -324,6 +338,8 @@ public static class AdminAuthEndpoints
             permissions = AdminPermissions.Of(admin.User.Role),
             twoFactor = options.TwoFactor.ToString(),
             recoveryCodesLeft = admin.User.TotpEnabled ? await users.CountRecoveryCodesAsync(admin.User.Id, ct) : 0,
+            // SAML で入ったセッションか。ログアウトは IdP へも頼む経路（/admin/api/saml/logout）を通す
+            viaSaml = await sessions.GetSamlKeysAsync(admin.SessionId, ct) is not null,
         });
     }
 
@@ -436,9 +452,10 @@ public static class AdminAuthEndpoints
         // 「必須で未登録」の途中（Pending）から来た人は、ここでログインが完了する
         if (who.Kind == AdminSessionKind.Pending)
         {
+            var samlKeys = await sessions.GetSamlKeysAsync(who.SessionId, ct);
             await sessions.DeleteAsync(who.SessionId, ct);
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-            await StartSessionAsync(http, sessions, users, who.User, options, audit, now, ct);
+            await StartSessionAsync(http, sessions, users, who.User, options, audit, now, ct, samlKeys);
         }
 
         return Results.Ok(new { recoveryCodes = codes });
@@ -485,7 +502,7 @@ public static class AdminAuthEndpoints
     // ---- 共通 ------------------------------------------------------------------------
 
     /// <summary>ログイン済みのセッションを始める（cookie を発行し、成功を記録する）。</summary>
-    private static async Task StartSessionAsync(
+    internal static async Task StartSessionAsync(
         HttpContext http,
         IAdminSessionStore sessions,
         IAdminUserStore users,
@@ -493,10 +510,11 @@ public static class AdminAuthEndpoints
         AdminAuthOptions options,
         AuditLogService audit,
         DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct,
+        SamlSessionKeys? samlKeys = null)
     {
         var sessionId = await sessions.CreateAsync(
-            user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct, Ip(http), UserAgentOf(http));
+            user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct, Ip(http), UserAgentOf(http), samlKeys);
         AdminSessionGuard.SetCookie(http, AdminSessionGuard.SessionCookie, sessionId, options.SessionLifetime);
         await users.RecordSuccessAsync(user.Id, now, ct);
         await sessions.DeleteExpiredAsync(now, ct);

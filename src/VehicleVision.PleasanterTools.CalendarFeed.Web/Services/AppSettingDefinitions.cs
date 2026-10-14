@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Globalization;
 using System.Net.Mail;
+using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Mail;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
@@ -21,6 +22,7 @@ public static class AppSettingGroups
     public const string Feed = "feed";
     public const string Security = "security";
     public const string Mail = "mail";
+    public const string Saml = "saml";
 }
 
 /// <summary>画面から検証に落ちた設定。メッセージはそのまま利用者へ返す。</summary>
@@ -39,7 +41,8 @@ public sealed record AppSettingDefinition(
     int? Maximum = null,
     int? MaximumLength = null,
     IReadOnlyList<string>? AllowedValues = null,
-    Func<string, string>? StringNormalizer = null)
+    Func<string, string>? StringNormalizer = null,
+    bool Multiline = false)
 {
     /// <summary>入力を正規化する。範囲・形式が合わなければ <see cref="AppSettingValidationException"/>。</summary>
     public string Normalize(string? requested) => Normalize(requested, enforceRange: true);
@@ -68,7 +71,8 @@ public sealed record AppSettingDefinition(
             throw new AppSettingValidationException($"{Label}は {max} 文字以内で入力してください。");
         }
 
-        if (value.Any(char.IsControl))
+        // 複数行の設定（証明書の PEM など）は、改行とタブだけを許す
+        if (value.Any(c => char.IsControl(c) && !(Multiline && c is '\r' or '\n' or '\t')))
         {
             throw new AppSettingValidationException($"{Label}に制御文字は使えません。");
         }
@@ -144,6 +148,18 @@ public static class AppSettingDefinitions
     public const string MailTimeoutSeconds = "CALENDARFEED_MAIL_TIMEOUT_SECONDS";
     public const string MailSendPerMinute = "CALENDARFEED_MAIL_SEND_PER_MINUTE";
 
+    public const string SamlEnabled = "CALENDARFEED_SAML_ENABLED";
+    public const string SamlEntityId = "CALENDARFEED_SAML_ENTITYID";
+    public const string SamlIdpEntityId = "CALENDARFEED_SAML_IDPENTITYID";
+    public const string SamlSingleSignOnUrl = "CALENDARFEED_SAML_SINGLESIGNONURL";
+    public const string SamlIdpCertificate = "CALENDARFEED_SAML_IDPCERTIFICATE";
+    public const string SamlUnknownUser = "CALENDARFEED_SAML_UNKNOWNUSER";
+    public const string SamlRegisterRole = "CALENDARFEED_SAML_REGISTERROLE";
+    public const string SamlLoginIdSource = "CALENDARFEED_SAML_LOGINIDSOURCE";
+    public const string SamlLoginIdClaim = "CALENDARFEED_SAML_LOGINIDCLAIM";
+    public const string SamlButtonLabel = "CALENDARFEED_SAML_BUTTONLABEL";
+    public const string SamlSingleLogoutUrl = "CALENDARFEED_SAML_SINGLELOGOUTURL";
+
     private static readonly string[] TwoFactorModes = ["required", "optional", "disabled"];
 
     /// <summary>すべての定義（画面に出す順）。</summary>
@@ -182,6 +198,19 @@ public static class AppSettingDefinitions
         new(MailAcsEndpoint, AppSettingGroups.Mail, AppSettingValueType.String, string.Empty, "Azure Communication Services のエンドポイント", MaximumLength: 2000, StringNormalizer: v => Url(v, requireHttps: true)),
         new(MailTimeoutSeconds, AppSettingGroups.Mail, AppSettingValueType.Integer, "30", "1 通あたりのタイムアウト（秒）", Minimum: 1, Maximum: 300),
         new(MailSendPerMinute, AppSettingGroups.Mail, AppSettingValueType.Integer, "60", "1 分あたりの送信数の上限", Minimum: 1, Maximum: 6000),
+
+        // SAML 2.0 でのログイン（既定は無効。Questionnaire の SAML と同じ項目）
+        new(SamlEnabled, AppSettingGroups.Saml, AppSettingValueType.Boolean, "false", "SAML ログインを有効にする"),
+        new(SamlEntityId, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "SP のエンティティ ID", MaximumLength: 2000),
+        new(SamlIdpEntityId, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "IdP のエンティティ ID", MaximumLength: 2000),
+        new(SamlSingleSignOnUrl, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "IdP のシングルサインオン URL", MaximumLength: 2000, StringNormalizer: v => Url(v, requireHttps: false)),
+        new(SamlIdpCertificate, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "IdP の署名証明書", MaximumLength: 20000, Multiline: true),
+        new(SamlUnknownUser, AppSettingGroups.Saml, AppSettingValueType.String, "Reject", "本アプリに居ない利用者の扱い", AllowedValues: ["Reject", "Register"]),
+        new(SamlRegisterRole, AppSettingGroups.Saml, AppSettingValueType.String, AdminRoles.Editor, "自動で作る利用者の役割", AllowedValues: AdminRoles.All),
+        new(SamlLoginIdSource, AppSettingGroups.Saml, AppSettingValueType.String, "NameId", "ログイン ID の取り方", AllowedValues: ["NameId", "Claim"]),
+        new(SamlLoginIdClaim, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "ログイン ID にする属性の名前", MaximumLength: 500),
+        new(SamlButtonLabel, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "ログイン画面の釦の文字", MaximumLength: 100),
+        new(SamlSingleLogoutUrl, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "IdP の単一ログアウト URL", MaximumLength: 2000, StringNormalizer: v => Url(v, requireHttps: false)),
     ];
 
     /// <summary>キーで引く。</summary>
@@ -194,6 +223,7 @@ public static class AppSettingDefinitions
     /// </summary>
     public static void ValidateCombination(IReadOnlyDictionary<string, string> values)
     {
+        ValidateSaml(values);
         if (!bool.Parse(values[MailEnabled]))
         {
             return;
@@ -217,6 +247,19 @@ public static class AppSettingDefinitions
                 throw new AppSettingValidationException("Amazon SES を使うにはリージョンが必要です。");
             case MailTransportKind.AzureCommunicationServices when values[MailAcsEndpoint].Length == 0:
                 throw new AppSettingValidationException("Azure Communication Services を使うにはエンドポイントが必要です。");
+        }
+    }
+
+    /// <summary>SAML を有効にするなら、必要な設定がそろっていること（足りないまま有効にすると、ログインできなくなる）。</summary>
+    private static void ValidateSaml(IReadOnlyDictionary<string, string> values)
+    {
+        try
+        {
+            _ = Services.SamlOptions.FromValues(key => values.TryGetValue(key, out var v) ? v : null);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new AppSettingValidationException(ex.Message);
         }
     }
 
