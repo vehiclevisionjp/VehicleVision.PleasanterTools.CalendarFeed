@@ -48,11 +48,20 @@ public static class AdminAuthEndpoints
         group.MapGet("/status", async (IAdminUserStore users, AdminAuthOptions options, RuntimeSettings settings, CancellationToken ct) =>
         {
             var saml = settings.Current.Saml;
+            var sso = settings.Current.PleasanterSso;
             return Results.Ok(new
             {
                 setupRequired = await users.CountAsync(ct) == 0,
                 twoFactor = options.TwoFactor.ToString(),
                 saml = new { enabled = saml.Enabled, buttonLabel = saml.Enabled && saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null },
+                // Pleasanter のログイン。ログイン画面が、別窓で開くログイン画面（loginUrl）と釦の文字を使う
+                pleasanterSso = new
+                {
+                    enabled = sso.Enabled,
+                    loginUrl = sso.Enabled ? sso.LoginUrl : null,
+                    logoutUrl = sso.Enabled && sso.LogoutUrl.Length > 0 ? sso.LogoutUrl : null,
+                    buttonLabel = sso.Enabled && sso.ButtonLabel.Length > 0 ? sso.ButtonLabel : null,
+                },
             });
         });
 
@@ -183,21 +192,21 @@ public static class AdminAuthEndpoints
         AuditLogService audit,
         DateTimeOffset now,
         CancellationToken ct,
-        SamlSessionKeys? samlKeys = null)
+        SessionSso? sso = null)
     {
         var needsSecondFactor = user.TotpEnabled;
         var mustEnroll = !user.TotpEnabled && options.TwoFactor == TwoFactorMode.Required;
         if (needsSecondFactor || mustEnroll)
         {
             var pending = await sessions.CreateAsync(
-                user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct, Ip(http), UserAgentOf(http), samlKeys);
+                user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct, Ip(http), UserAgentOf(http), sso);
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
             AdminSessionGuard.SetCookie(http, AdminSessionGuard.PendingCookie, pending, options.PendingLifetime);
             return needsSecondFactor ? "totp" : "enroll";
         }
 
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, samlKeys);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, sso);
         return "done";
     }
 
@@ -254,10 +263,10 @@ public static class AdminAuthEndpoints
         }
 
         // SAML で入った人は、途中の段階が持つ単一ログアウトの鍵を、ログイン済みのセッションへ引き継ぐ
-        var samlKeys = await sessions.GetSamlKeysAsync(pendingId, ct);
+        var sso = await sessions.GetSsoAsync(pendingId, ct);
         await sessions.DeleteAsync(pendingId, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, samlKeys);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, sso);
         return Results.Ok(new { step = "done" });
     }
 
@@ -295,10 +304,10 @@ public static class AdminAuthEndpoints
         logger.LogWarning("管理者 {UserId} が復旧コードでログインしました", user.Id);
         await audit.WriteAsync(http, AuditActions.LoginRecoveryUsed, true, user);
         // SAML で入った人は、途中の段階が持つ単一ログアウトの鍵を、ログイン済みのセッションへ引き継ぐ
-        var samlKeys = await sessions.GetSamlKeysAsync(pendingId, ct);
+        var sso = await sessions.GetSsoAsync(pendingId, ct);
         await sessions.DeleteAsync(pendingId, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, samlKeys);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, sso);
         return Results.Ok(new { step = "done", recoveryCodesLeft = await users.CountRecoveryCodesAsync(user.Id, ct) });
     }
 
@@ -340,6 +349,8 @@ public static class AdminAuthEndpoints
             recoveryCodesLeft = admin.User.TotpEnabled ? await users.CountRecoveryCodesAsync(admin.User.Id, ct) : 0,
             // SAML で入ったセッションか。ログアウトは IdP へも頼む経路（/admin/api/saml/logout）を通す
             viaSaml = await sessions.GetSamlKeysAsync(admin.SessionId, ct) is not null,
+            // Pleasanter で入ったセッションか。ログアウトの後に、Pleasanter のログアウト画面を開く（設定があれば）
+            viaPleasanterSso = (await sessions.GetSsoAsync(admin.SessionId, ct))?.Pleasanter is not null,
         });
     }
 
@@ -452,10 +463,10 @@ public static class AdminAuthEndpoints
         // 「必須で未登録」の途中（Pending）から来た人は、ここでログインが完了する
         if (who.Kind == AdminSessionKind.Pending)
         {
-            var samlKeys = await sessions.GetSamlKeysAsync(who.SessionId, ct);
+            var sso = await sessions.GetSsoAsync(who.SessionId, ct);
             await sessions.DeleteAsync(who.SessionId, ct);
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-            await StartSessionAsync(http, sessions, users, who.User, options, audit, now, ct, samlKeys);
+            await StartSessionAsync(http, sessions, users, who.User, options, audit, now, ct, sso);
         }
 
         return Results.Ok(new { recoveryCodes = codes });
@@ -511,10 +522,10 @@ public static class AdminAuthEndpoints
         AuditLogService audit,
         DateTimeOffset now,
         CancellationToken ct,
-        SamlSessionKeys? samlKeys = null)
+        SessionSso? sso = null)
     {
         var sessionId = await sessions.CreateAsync(
-            user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct, Ip(http), UserAgentOf(http), samlKeys);
+            user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct, Ip(http), UserAgentOf(http), sso);
         AdminSessionGuard.SetCookie(http, AdminSessionGuard.SessionCookie, sessionId, options.SessionLifetime);
         await users.RecordSuccessAsync(user.Id, now, ct);
         await sessions.DeleteExpiredAsync(now, ct);

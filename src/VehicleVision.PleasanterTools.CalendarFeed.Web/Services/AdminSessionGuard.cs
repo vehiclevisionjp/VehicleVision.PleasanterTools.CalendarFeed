@@ -89,6 +89,7 @@ public static class AdminSessionGuard
 public sealed class AdminSessionFilter(
     IAdminSessionStore sessions,
     IAdminUserStore users,
+    PleasanterSsoSessionRevalidator revalidator,
     TimeProvider time) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
@@ -107,6 +108,19 @@ public sealed class AdminSessionFilter(
             || await users.FindByIdAsync(session.UserId, http.RequestAborted).ConfigureAwait(false) is not { IsDisabled: false } user)
         {
             return Results.Json(new { error = "ログインが必要です。" }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        // Pleasanter のログインで入ったセッションは、一定間隔で Pleasanter に確かめ直す（ログアウト・別人・所属の変更を、ここで受け止める）
+        switch (await revalidator.RevalidateAsync(http, sessionId, session, http.RequestAborted).ConfigureAwait(false))
+        {
+            case PleasanterSsoRevalidation.Rejected:
+                await sessions.DeleteAsync(sessionId, http.RequestAborted).ConfigureAwait(false);
+                AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
+                return Results.Json(new { error = "ログインが必要です。" }, statusCode: StatusCodes.Status401Unauthorized);
+            case PleasanterSsoRevalidation.UpstreamError:
+                await sessions.DeleteAsync(sessionId, http.RequestAborted).ConfigureAwait(false);
+                AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
+                return Results.Json(new { error = "Pleasanter に確かめられなかったため、ログインを終了しました。しばらくしてからやり直してください。" }, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
         http.Items[AdminContext.ItemKey] = new AdminContext(user, sessionId, AdminSessionKind.Session);

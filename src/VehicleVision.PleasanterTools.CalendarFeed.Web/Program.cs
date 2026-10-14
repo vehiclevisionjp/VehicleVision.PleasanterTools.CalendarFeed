@@ -79,6 +79,20 @@ builder.Services.AddSingleton<AuditLogRetentionService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditLogRetentionService>());
 builder.Services.AddSingleton<AdminSessionFilter>();
 builder.Services.AddSingleton<SamlAuthenticator>();
+builder.Services.AddSingleton<PleasanterSsoAuthenticator>();
+builder.Services.AddSingleton<IPleasanterSessionVerifier, PleasanterSessionVerifier>();
+builder.Services.AddSingleton<PleasanterSsoSessionRevalidator>();
+builder.Services
+    // 時間切れは要求ごとに設定の値で掛ける（PleasanterSessionVerifier）。ここでは無限にしておく
+    .AddHttpClient(PleasanterSessionVerifier.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        // ⚠️ cookie を覚えさせない。覚えると、ある管理者の cookie が別の管理者の問い合わせへ混ざる（cookie は要求ごとに Cookie ヘッダで付ける）
+        UseCookies = false,
+
+        // ⚠️ 転送を追わない。ログイン画面への転送などを成功と取り違えない
+        AllowAutoRedirect = false,
+    });
 
 // **購読 URL の総当たりを遅くする。** トークンは 256 bit なので当たらないが、無駄な負荷も止める
 builder.Services.AddRateLimiter(o =>
@@ -88,6 +102,10 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("adminLogin", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(5) }));
+    // Pleasanter のログインの確認は、画面が待つ間くり返し呼ぶので別枠（ログインの枠を使い切らせない）
+    o.AddPolicy(AdminPleasanterSsoEndpoints.CheckRateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = AdminPleasanterSsoEndpoints.CheckRequestsPer5Minutes, Window = TimeSpan.FromMinutes(5) }));
     o.AddPolicy("feed", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
@@ -228,6 +246,7 @@ app.MapAdminAudit();
 app.MapAdminUsers();
 app.MapAdminSettings();
 app.MapAdminSaml();
+app.MapAdminPleasanterSso();
 app.MapAdminUi();
 
 app.Run();
