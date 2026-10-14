@@ -83,11 +83,13 @@ jobs:
               docker compose exec -T db /opt/mssql-tools18/bin/sqlcmd \
                   -S localhost -U sa -P "$TESTENV_SA_PASSWORD" -C -b -i "/tmp/${seed}.sql"
           done
-          # 利用者の情報はキャッシュされるので、入れ替えたら再起動して捨てる
+          # 利用者の情報はキャッシュされるので、入れ替えたら再起動して捨てる。
+          # ⚠️ **`up --wait` をやり直さない**（CodeDefiner が走り直し、起動中の Pleasanter の DB 接続を巻き込む）。再起動だけして、応答を待つ
           docker compose restart pleasanter
-          docker compose up -d --wait pleasanter
-          # **ポートが開いただけでは、まだ API が 503 を返す**（healthcheck は TCP の待ち受けだけを見る）。ログイン画面が 200 を返すまで待つ
-          for i in $(seq 1 90); do
+          # **ポートが開いただけでは、まだ API が 503 を返す**（healthcheck は TCP の待ち受けだけを見る。起動の最後に暖機がある）。
+          # ログイン画面が 200 を返すまで待つ（実行の遅い環境でも足りるよう 5 分）
+          code=000
+          for i in $(seq 1 150); do
               code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:18090/users/login || true)"
               [ "$code" = "200" ] && break
               sleep 2
@@ -131,7 +133,8 @@ jobs:
       - name: Pleasanter のログを残す
         if: failure()
         working-directory: tools/pleasanter-testenv
-        run: docker compose logs --no-color pleasanter | tail -200
+        # スタックトレースの行（at …）は除く。起動の流れとエラーの文面を残す
+        run: docker compose logs --no-color --timestamps pleasanter | grep -vE "\|\s+at " | tail -150
 
       - name: 後片付け
         if: always()
