@@ -1,12 +1,12 @@
 {
   "//": "購読フィードの表示に関する設定",
 
-  "//CacheSeconds": "生成した .ics を使い回す秒数。Pleasanter の API 回数制限を守るため 0 にしない。REFRESH-INTERVAL にも同じ値を返す",
-  "CacheSeconds": 300,
+  "//CacheSeconds": "生成した .ics を使い回す秒数。Pleasanter の API 回数制限を守るため 0 にしない。REFRESH-INTERVAL にも同じ値を返す **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "CacheSeconds": null,
 
-  "//MaxEvents": "1 フィードで出す予定の上限。超えた分は出さない",
-  "MaxEvents": 5000,
+  "//MaxEvents": "1 フィードで出す予定の上限。超えた分は出さない **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "MaxEvents": null,
 
-  "//PageSize": "Pleasanter へ求める 1 ページの件数。Pleasanter 側の上限で切られる",
-  "PageSize": 1000
+  "//PageSize": "Pleasanter へ求める 1 ページの件数。Pleasanter 側の上限で切られる **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "PageSize": null
 }

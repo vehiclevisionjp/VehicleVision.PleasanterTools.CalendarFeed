@@ -27,6 +27,15 @@ public interface IFeedStore
     /// <summary>フィードの API キーを復号して返す。未登録・失効済みなら <c>null</c>。**呼び出しのたびにサーバ内だけで使い、ログへ出さない。**</summary>
     Task<string?> GetApiKeyAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>ID から引く。失効済みは <c>null</c>。</summary>
+    Task<FeedDefinition?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 定義を更新する（名前・サイト・列の対応・絞り込み・言語・API キー利用者のタイムゾーン）。
+    /// **トークン（購読 URL）と API キーは変えない。** フィードが無い・失効済みなら <c>false</c>。
+    /// </summary>
+    Task<bool> UpdateAsync(Guid id, FeedUpdate update, CancellationToken cancellationToken = default);
+
     /// <summary>API キー（と利用者のタイムゾーン）を差し替える。フィードが無い・失効済みなら <c>false</c>。</summary>
     Task<bool> SetApiKeyAsync(
         Guid id,

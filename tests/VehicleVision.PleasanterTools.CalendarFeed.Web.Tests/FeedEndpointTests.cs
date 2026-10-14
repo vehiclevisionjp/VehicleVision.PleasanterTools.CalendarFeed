@@ -206,6 +206,13 @@ internal sealed class RemoteIpStartupFilter : IStartupFilter
     };
 }
 
+/// <summary>設定（外部設定だけ）から、実行中に使う値を組み立てる（アプリを起動せずに設定の読み取りを試す）。</summary>
+internal static class TestSettings
+{
+    public static RuntimeConfig Build(IConfiguration configuration) =>
+        RuntimeSettings.Build(AppSettingsProvider.InitialSnapshot(configuration), configuration);
+}
+
 /// <summary>メールの送信を真似る。送った中身を取っておき、<see cref="Failure"/> があればそれを投げる。</summary>
 internal sealed class FakeMailTransport : IMailTransport
 {

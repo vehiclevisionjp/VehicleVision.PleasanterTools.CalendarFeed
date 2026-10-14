@@ -30,8 +30,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddParameterFiles();
 
 // ---- 設定は DI の生成時に読む（テストからの上書きを効かせるため） ---------------
-builder.Services.AddSingleton(sp => AppSettings.ReadPleasanter(sp.GetRequiredService<IConfiguration>()));
-builder.Services.AddSingleton(sp => AppSettings.ReadFeed(sp.GetRequiredService<IConfiguration>()));
+// ---- アプリケーション設定（管理画面から編集できる設定。Questionnaire に則る） -------------------------
+// 優先順位は 外部設定（環境変数・Parameters。固定）＞ DB ＞ 既定値。使う側は、使うたびに RuntimeSettings.Current を読む。
+// **不正な外部設定は、ここで（最初に RuntimeSettings を作るとき）起動を止める**
+builder.Services.AddSingleton<IAppSettingStore, AppSettingStore>();
+builder.Services.AddSingleton<IAppSettingsProvider, AppSettingsProvider>();
+builder.Services.AddSingleton<RuntimeSettings>();
+builder.Services.AddSingleton<IPleasanterOptionsSource>(sp => sp.GetRequiredService<RuntimeSettings>());
+builder.Services.AddSingleton<AppSettingsMonitor>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AppSettingsMonitor>());
+// エンドポイントの引数で受ける設定は、要求ごとに最新の値を渡す
+builder.Services.AddTransient(sp => sp.GetRequiredService<RuntimeSettings>().Current.Pleasanter);
+builder.Services.AddTransient(sp => sp.GetRequiredService<RuntimeSettings>().Current.Feed);
+builder.Services.AddTransient(sp => sp.GetRequiredService<RuntimeSettings>().Current.AdminAuth);
+builder.Services.AddTransient(sp => sp.GetRequiredService<RuntimeSettings>().Current.Mail);
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<PleasanterClient>();
@@ -55,12 +67,10 @@ builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
 builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 
 // ---- メール（招待）。送信待ちへ暗号化して積み、アプリの中のワーカーが送る ----------------------
-// **無効（既定）なら何も送らない。** 招待は画面の URL を手で渡す。有効なのに設定が足りなければ起動時に落とす
-builder.Services.AddSingleton(sp => AppSettings.ReadMail(sp.GetRequiredService<IConfiguration>()));
+// **無効（既定）なら何も送らない。** 招待は画面の URL を手で渡す。設定は管理画面から編集できる
 builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
 builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
 builder.Services.AddSingleton<IMailTransport, ConfiguredMailTransport>();
-builder.Services.AddSingleton(sp => MailSenderOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<MailSender>();
 builder.Services.AddSingleton<AdminInvitationMailer>();
 builder.Services.AddHostedService<MailSenderHostedService>();
@@ -68,8 +78,6 @@ builder.Services.AddSingleton<AuditLogService>();
 builder.Services.AddSingleton<AuditLogRetentionService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditLogRetentionService>());
 builder.Services.AddSingleton<AdminSessionFilter>();
-// **知らない値は起動時に落とす。** 黙って既定へ落ちると、必須にしたつもりで任意のまま動く
-builder.Services.AddSingleton(sp => AppSettings.ReadAdminAuth(sp.GetRequiredService<IConfiguration>()));
 
 // **購読 URL の総当たりを遅くする。** トークンは 256 bit なので当たらないが、無駄な負荷も止める
 builder.Services.AddRateLimiter(o =>
@@ -86,9 +94,8 @@ builder.Services.AddRateLimiter(o =>
 
 var app = builder.Build();
 
-// 設定の読み間違いは、最初の要求ではなく起動時に分かるようにする
-_ = app.Services.GetRequiredService<AdminAuthOptions>();
-_ = app.Services.GetRequiredService<VehicleVision.PleasanterTools.CalendarFeed.Mail.MailOptions>();
+// 設定の読み間違い（外部設定）は、最初の要求ではなく起動時に分かるようにする
+var runtimeSettings = app.Services.GetRequiredService<RuntimeSettings>();
 
 // ⚠️ **何を読んだかを残す。** 設定ファイルは optional なので、置き場を間違えても黙って既定で動いてしまう
 app.Logger.LogInformation(
@@ -141,6 +148,17 @@ else
         AppSettings.ForwardedProxyNetworks);
 }
 
+// ---- 保存済みのアプリケーション設定を反映する（DB を使えるようになったので） ---------------------------
+try
+{
+    runtimeSettings.Apply(await app.Services.GetRequiredService<IAppSettingsProvider>().ReloadAsync());
+}
+catch (Exception ex)
+{
+    // 表が無い（自動マイグレーションを止めている）・秘密の鍵の不整合など。起動は止めず、外部設定と既定値で動く
+    app.Logger.LogWarning(ex, "保存済みのアプリケーション設定を読めませんでした。外部設定と既定値で動きます。");
+}
+
 app.UseRateLimiter();
 
 // ---- 購読フィード ----------------------------------------------------------------
@@ -149,7 +167,7 @@ app.MapGet("/feeds/{token}.ics", async (
     HttpContext http,
     IFeedStore feeds,
     FeedService service,
-    FeedOptions options,
+    RuntimeSettings settings,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {
@@ -185,7 +203,7 @@ app.MapGet("/feeds/{token}.ics", async (
     }
 
     var etag = $"\"{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body)))[..32]}\"";
-    http.Response.Headers.CacheControl = $"private, max-age={options.CacheSeconds}";
+    http.Response.Headers.CacheControl = $"private, max-age={settings.Current.Feed.CacheSeconds}";
     http.Response.Headers.ETag = etag;
     http.Response.Headers["Referrer-Policy"] = "no-referrer";
     http.Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
@@ -206,6 +224,7 @@ app.MapAdminAuth();
 app.MapAdminFeeds();
 app.MapAdminAudit();
 app.MapAdminUsers();
+app.MapAdminSettings();
 
 app.Run();
 

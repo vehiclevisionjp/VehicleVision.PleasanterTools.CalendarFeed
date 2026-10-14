@@ -40,6 +40,9 @@ public static class AdminPermissions
     /// <summary>他人の 2 要素を解除する。</summary>
     public const string UsersResetTwoFactor = "users.resetTwoFactor";
 
+    /// <summary>アプリケーション設定（メール・Pleasanter の接続先・2 要素の方針など）の編集。<b>Administrator だけ。</b></summary>
+    public const string SettingsManage = "settings.manage";
+
     /// <summary>すべての権限。</summary>
     public static readonly ImmutableArray<string> All =
     [
@@ -51,6 +54,7 @@ public static class AdminPermissions
         UsersRead,
         UsersWrite,
         UsersResetTwoFactor,
+        SettingsManage,
     ];
 
     private static readonly FrozenDictionary<string, FrozenSet<string>> ByRole =

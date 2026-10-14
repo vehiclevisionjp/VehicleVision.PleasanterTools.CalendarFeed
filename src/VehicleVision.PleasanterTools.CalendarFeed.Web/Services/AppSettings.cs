@@ -39,68 +39,13 @@ public static class AppSettings
     public const string AuditLogRetentionDays = "CALENDARFEED_AUDITLOG_RETENTION_DAYS";
     public const string ForwardedProxyNetworks = "CALENDARFEED_FORWARDED_PROXY_NETWORKS";
 
-    /// <summary>Pleasanter の接続設定を読む。必須の値が無ければ、設定名を挙げて止める。</summary>
-    public static PleasanterOptions ReadPleasanter(IConfiguration configuration) => new()
-    {
-        BaseUrl = Required(configuration, PleasanterBaseUrl),
-        // 全フィード共通の既定（任意）。フィードごとの API キーが未登録のときだけ使う
-        ApiKey = Text(configuration, PleasanterApiKey),
-
-        // **未設定なら本アプリの既定タイムゾーン**（Questionnaire と同じ）
-        ApiKeyUserTimeZoneId = Text(configuration, PleasanterTimeZone)
-            ?? Required(configuration, TimeZoneDefault),
-        LinkBaseUrl = Text(configuration, PleasanterLinkBaseUrl),
-
-        // **読めない値は既定へ落とす**（書き間違いで起動できなくなるより、既定で動く方がよい）
-        ApiVersion = decimal.TryParse(
-            Text(configuration, PleasanterApiVersion), NumberStyles.Number, CultureInfo.InvariantCulture, out var v) && v > 0
-            ? v
-            : 1.1m,
-        TimeoutSeconds = PositiveInt(configuration, PleasanterTimeoutSeconds, 30),
-    };
-
-    /// <summary>フィードの表示に関する設定を読む。</summary>
-    public static FeedOptions ReadFeed(IConfiguration configuration) => new()
-    {
-        CacheSeconds = PositiveInt(configuration, FeedCacheSeconds, 300),
-        MaxEvents = PositiveInt(configuration, FeedMaxEvents, 5000),
-        PageSize = PositiveInt(configuration, FeedPageSize, 1000),
-    };
-
     /// <summary>秘密の鍵から <see cref="ISecretProtector"/> を作る。未設定なら、使おうとしたときに止まる実装を返す。</summary>
     public static ISecretProtector ReadSecretProtector(IConfiguration configuration) =>
         Text(configuration, SecretKey) is { } key ? new SecretProtector(key) : new UnconfiguredSecretProtector();
 
     /// <summary>
-    /// 管理者認証の設定を読む。**知らない値は起動時に落とす**（黙って既定へ落ちると、必須にしたつもりで任意のまま動く）。
-    /// </summary>
-    public static AdminAuthOptions ReadAdminAuth(IConfiguration configuration)
-    {
-        var raw = Text(configuration, AdminTwoFactor);
-        var mode = raw is null
-            ? TwoFactorMode.Optional
-            : Enum.TryParse<TwoFactorMode>(raw.Trim(), ignoreCase: true, out var parsed) && Enum.IsDefined(parsed)
-                ? parsed
-                : throw new InvalidOperationException(
-                    $"{AdminTwoFactor} の値 '{raw}' は対応していません。required / optional / disabled のいずれかで指定してください。");
-
-        return new AdminAuthOptions(
-            mode,
-            new AdminPasswordPolicy(
-                PositiveInt(configuration, PasswordMinimumLength, 12),
-                string.Equals(Text(configuration, PasswordAllowSameAsLoginId), "true", StringComparison.OrdinalIgnoreCase),
-                // Pleasanter 本体の Security.json と同じ書き方。**組み立てられない正規表現は、ここで起動時に落ちる**
-                configuration.GetSection(PasswordPolicies).Get<List<AdminPasswordRule>>() ?? []));
-    }
-
-    /// <summary>監査ログを残す日数（既定 365）。<c>0</c> なら消さない。読めない値は既定へ落とす。</summary>
-    public static int ReadAuditLogRetentionDays(IConfiguration configuration) =>
-        int.TryParse(Text(configuration, AuditLogRetentionDays), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) && v >= 0
-            ? v
-            : 365;
-    /// <summary>
     /// 転送ヘッダ（<c>X-Forwarded-*</c>）を信頼するプロキシのネットワーク（カンマ区切りの CIDR）を読む。
-    /// **未設定なら空（誰も信頼しない）。** CIDR でない値は起動時に落とす。
+    /// **未設定なら空（誰も信頼しない）。** CIDR でない値は起動時に落とす。**起動に係るので、画面から編集する設定には含めない。**
     /// </summary>
     public static IReadOnlyList<IPNetwork> ReadForwardedProxyNetworks(IConfiguration configuration) =>
         (Text(configuration, ForwardedProxyNetworks) ?? string.Empty)
@@ -110,12 +55,6 @@ public static class AppSettings
                 : throw new InvalidOperationException(
                     $"{ForwardedProxyNetworks} に CIDR でない値があります: {value}（例: 10.0.0.0/8, 192.0.2.10/32）"))
             .ToArray();
-
-    /// <summary>
-    /// メールの送信設定（<c>CALENDARFEED_MAIL_*</c>）を読む。<b>無効なら他の値を読まない</b>（使わない設定の不備で起動を止めない）。
-    /// 有効なのに足りない・読めない値は起動時に落とす。
-    /// </summary>
-    public static MailOptions ReadMail(IConfiguration configuration) => MailOptions.FromConfiguration(configuration);
 
     /// <summary>起動時にマイグレーションを当てるか。既定は当てる。<c>false</c> で無効（手で当てる）。</summary>
     public static bool ReadAutoMigrate(IConfiguration configuration) =>

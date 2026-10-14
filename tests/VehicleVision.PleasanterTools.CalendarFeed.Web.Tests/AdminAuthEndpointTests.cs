@@ -555,7 +555,7 @@ public sealed class AdminAuthSettingsTests
             .AddInMemoryCollection(new Dictionary<string, string?> { [Services.AppSettings.AdminTwoFactor] = "mandatory" })
             .Build();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => Services.AppSettings.ReadAdminAuth(configuration));
+        var ex = Assert.Throws<Services.AppSettingValidationException>(() => TestSettings.Build(configuration));
         Assert.Contains("required / optional / disabled", ex.Message);
     }
 
@@ -569,7 +569,7 @@ public sealed class AdminAuthSettingsTests
             .AddInMemoryCollection(value is null ? [] : new Dictionary<string, string?> { [Services.AppSettings.AdminTwoFactor] = value })
             .Build();
 
-        Assert.Equal(expected, Services.AppSettings.ReadAdminAuth(configuration).TwoFactor);
+        Assert.Equal(expected, TestSettings.Build(configuration).AdminAuth.TwoFactor);
     }
 
     [Fact]
@@ -583,7 +583,7 @@ public sealed class AdminAuthSettingsTests
             })
             .Build();
 
-        var policy = Services.AppSettings.ReadAdminAuth(configuration).PasswordPolicy;
+        var policy = TestSettings.Build(configuration).AdminAuth.PasswordPolicy;
 
         Assert.Equal(20, policy.MinimumLength);
         Assert.True(policy.AllowSameAsLoginId);

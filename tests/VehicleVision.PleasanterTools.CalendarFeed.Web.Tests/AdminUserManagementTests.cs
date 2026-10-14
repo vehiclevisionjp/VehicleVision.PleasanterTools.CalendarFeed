@@ -174,7 +174,7 @@ public sealed class AdminUserManagementTests : IDisposable
     // ---- 権限 ------------------------------------------------------------------------
 
     [Theory]
-    [InlineData(AdminRoles.Administrator, "feeds.read,feeds.write,feeds.delete,outbox.read,audit.read,users.read,users.write,users.resetTwoFactor")]
+    [InlineData(AdminRoles.Administrator, "feeds.read,feeds.write,feeds.delete,outbox.read,audit.read,users.read,users.write,users.resetTwoFactor,settings.manage")]
     [InlineData(AdminRoles.FeedAdministrator, "feeds.read,feeds.write,feeds.delete,outbox.read")]
     [InlineData(AdminRoles.UserAdministrator, "audit.read,users.read,users.write,users.resetTwoFactor")]
     [InlineData(AdminRoles.Editor, "feeds.read,feeds.write")]

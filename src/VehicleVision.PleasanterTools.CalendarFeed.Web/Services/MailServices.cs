@@ -36,13 +36,15 @@ public sealed class MailPayloadProtector(ISecretProtector protector) : IMailPayl
 }
 
 /// <summary>設定の送信経路（SMTP / Amazon SES / Azure Communication Services）で送る。</summary>
-public sealed class ConfiguredMailTransport(MailOptions options, ILoggerFactory loggerFactory) : IMailTransport
+public sealed class ConfiguredMailTransport(RuntimeSettings settings, ILoggerFactory loggerFactory) : IMailTransport
 {
     public async Task SendAsync(OutgoingMail mail, CancellationToken cancellationToken = default)
     {
+        // 送るたびに、いまの設定を読む（管理画面で編集した設定が、再起動なしで効く）
+        var options = settings.Current.Mail;
         if (!options.IsReady)
         {
-            throw new MailDeliveryException("メールの設定が有効になっていません（CALENDARFEED_MAIL_*）。", isTransient: true);
+            throw new MailDeliveryException("メールの設定が有効になっていません。管理画面の設定で有効にしてください。", isTransient: true);
         }
 
         IMailTransport transport = options.Transport switch
@@ -152,10 +154,12 @@ public sealed class MailSender(
     IMailOutbox outbox,
     IMailTransport transport,
     IMailPayloadProtector protector,
-    MailSenderOptions options,
+    RuntimeSettings settings,
     TimeProvider time,
     ILogger<MailSender> logger)
 {
+    private MailSenderOptions options => settings.Current.MailSender;
+
     /// <summary>1 通だけ送る。</summary>
     public async Task<SendOutcome> SendOnceAsync(CancellationToken cancellationToken = default)
     {
@@ -231,12 +235,13 @@ public sealed class MailSender(
 public sealed class MailSenderHostedService(
     MailSender sender,
     IMailOutbox outbox,
-    MailSenderOptions options,
+    RuntimeSettings settings,
     TimeProvider time,
     ILogger<MailSenderHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var options = settings.Current.MailSender;
         if (!options.WorkerEnabled)
         {
             logger.LogInformation("このインスタンスではメール送信ワーカーを動かしません（{Key}=false）", MailSenderOptions.WorkerKey);
@@ -251,6 +256,9 @@ public sealed class MailSenderHostedService(
         {
             try
             {
+                // 流量の上限は、設定の変更を反映するため毎回読む
+                options = settings.Current.MailSender;
+
                 // 確保したまま落ちた行を戻す。ワーカーが落ちてもメールは失われない
                 if (time.GetUtcNow() >= nextRelease)
                 {
@@ -311,8 +319,7 @@ public sealed class MailSenderHostedService(
 public sealed class AdminInvitationMailer(
     IMailOutbox outbox,
     IMailPayloadProtector protector,
-    MailOptions options,
-    IConfiguration configuration,
+    RuntimeSettings settings,
     ILogger<AdminInvitationMailer> logger)
 {
     /// <summary>画面へ出す招待の URL の経路（SPA が受ける）。</summary>
@@ -330,14 +337,15 @@ public sealed class AdminInvitationMailer(
         string? language,
         CancellationToken cancellationToken = default)
     {
+        var options = settings.Current.Mail;
         if (!options.IsReady)
         {
             return false;
         }
 
-        if (AppSettings.Text(configuration, AppSettings.PublicBaseUrl) is not { } baseUrl)
+        if (settings.Current.PublicBaseUrl is not { } baseUrl)
         {
-            logger.LogWarning("招待メールを送れません（{Key} が未設定）。画面の URL を手で渡してください", AppSettings.PublicBaseUrl);
+            logger.LogWarning("招待メールを送れません（公開 URL が未設定）。画面の URL を手で渡してください");
             return false;
         }
 

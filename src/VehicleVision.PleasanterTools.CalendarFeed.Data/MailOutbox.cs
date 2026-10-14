@@ -31,6 +31,9 @@ public enum MailKind
 {
     /// <summary>管理者の招待。<b>本文の URL が、それだけで管理者になれる値。</b></summary>
     AdminInvitation = 2,
+
+    /// <summary>メール設定の試し送信。</summary>
+    SettingsTest = 3,
 }
 
 /// <summary>メールの送信待ち（アウトボックス）。</summary>

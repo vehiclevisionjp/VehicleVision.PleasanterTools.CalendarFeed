@@ -10,7 +10,8 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 public sealed class PleasanterOptions
 {
     /// <summary>API の呼び出し先。末尾のスラッシュは付けない。</summary>
-    public required string BaseUrl { get; init; }
+    /// <summary>Pleasanter の URL。<b>未設定（空）でも起動する</b>（管理画面から設定できる）。未設定のまま取りに行くと失敗する。</summary>
+    public string BaseUrl { get; init; } = string.Empty;
 
     /// <summary>
     /// 全フィード共通の既定の API キー（任意）。**フィードごとの API キーが未登録のときだけ使う。**
@@ -66,8 +67,17 @@ public sealed record PleasanterPage(int TotalCount, int PageSize, IReadOnlyList<
 
 /// <summary>Pleasanter の標準 API を叩く（このアプリで要るのは一覧取得だけ）。</summary>
 /// <remarks>**再試行しない。** 失敗の扱いは呼び出し側が決める。</remarks>
-public sealed class PleasanterClient(HttpClient httpClient, PleasanterOptions options)
+/// <summary>接続設定の出どころ。<b>呼び出すたびに読む</b>（管理画面で編集した設定が、再起動なしで効く）。</summary>
+public interface IPleasanterOptionsSource
 {
+    /// <summary>いまの接続設定。</summary>
+    PleasanterOptions Current { get; }
+}
+
+public sealed class PleasanterClient(HttpClient httpClient, IPleasanterOptionsSource optionsSource)
+{
+    private PleasanterOptions options => optionsSource.Current;
+
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
@@ -177,6 +187,12 @@ public sealed class PleasanterClient(HttpClient httpClient, PleasanterOptions op
         if (view.Count > 0)
         {
             body["View"] = view;
+        }
+
+        // 画面から編集できる設定なので、未設定のまま使われうる。分かるメッセージで止める（再試行しても直らない）
+        if (string.IsNullOrWhiteSpace(options.BaseUrl))
+        {
+            throw new PleasanterException(PleasanterErrorKind.Permanent, "Pleasanter の URL が設定されていません。管理画面の設定で指定してください。");
         }
 
         using var request = new HttpRequestMessage(

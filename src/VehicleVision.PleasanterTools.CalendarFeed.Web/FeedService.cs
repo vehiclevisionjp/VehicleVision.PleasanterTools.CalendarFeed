@@ -2,6 +2,7 @@ using Microsoft.Extensions.Caching.Memory;
 using VehicleVision.PleasanterTools.CalendarFeed.Calendar;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web;
 
@@ -22,11 +23,14 @@ public sealed class FeedOptions
 public sealed class FeedService(
     PleasanterClient client,
     IFeedStore feeds,
-    PleasanterOptions pleasanter,
-    FeedOptions options,
+    RuntimeSettings settings,
     IMemoryCache cache,
     TimeProvider time)
 {
+    private PleasanterOptions pleasanter => settings.Current.Pleasanter;
+
+    private FeedOptions options => settings.Current.Feed;
+
     /// <summary>フィードの .ics を返す。キャッシュがあればそれを返す。</summary>
     public Task<string> GetCalendarAsync(FeedDefinition feed, CancellationToken cancellationToken) =>
         cache.GetOrCreateAsync(

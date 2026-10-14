@@ -1,21 +1,21 @@
 {
   "//": "接続先 Pleasanter の設定。実値は Pleasanter.local.json（git 管理外）か環境変数で上書きする",
 
-  "//BaseUrl": "Pleasanter のベース URL。末尾のスラッシュは付けない。例 https://pleasanter.example.jp",
-  "BaseUrl": "http://localhost:8080",
+  "//BaseUrl": "Pleasanter のベース URL。末尾のスラッシュは付けない。例 https://pleasanter.example.jp **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "BaseUrl": null,
 
-  "//ApiKey": "全フィード共通の既定の API キー（任意）。**フィードごとの API キー（DB へ暗号化して保管）が未登録のときだけ使う。** 通常は使わず、フィードごとに登録する（見える範囲を API キー利用者の権限で分離するため）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_PLEASANTER_APIKEY か Pleasanter.local.json から読む。Pleasanter はリクエストボディの JSON に ApiKey を載せる方式のため、購読側へは渡さない（_documents/アーキテクチャ方針.md 3 章）",
+  "//ApiKey": "全フィード共通の既定の API キー（任意）。**フィードごとの API キー（DB へ暗号化して保管）が未登録のときだけ使う。** 通常は使わず、フィードごとに登録する（見える範囲を API キー利用者の権限で分離するため）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_PLEASANTER_APIKEY か Pleasanter.local.json から読む。Pleasanter はリクエストボディの JSON に ApiKey を載せる方式のため、購読側へは渡さない（_documents/アーキテクチャ方針.md 3 章） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "ApiKey": null,
 
-  "//ApiVersion": "Pleasanter の API バージョン。リクエストボディの ApiVersion に載せる。読めない値は 1.1 に落とす",
-  "ApiVersion": 1.1,
+  "//ApiVersion": "Pleasanter の API バージョン。リクエストボディの ApiVersion に載せる。読めない値は 1.1 に落とす **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "ApiVersion": null,
 
-  "//TimeoutSeconds": "Pleasanter API 呼び出しのタイムアウト（秒）",
-  "TimeoutSeconds": 30,
+  "//TimeoutSeconds": "Pleasanter API 呼び出しのタイムアウト（秒） **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
+  "TimeoutSeconds": null,
 
-  "//ApiKeyUserTimeZoneId": "API キーに紐づく Pleasanter 利用者のタイムゾーンの既定。フィードごとに指定（ApiKeyUserTimeZoneId）がなければこれを使う。Pleasanter は日時をこのタイムゾーンで返す。null なら Service.json の TimeZoneDefault を使う。**運用開始後に変えないこと**",
+  "//ApiKeyUserTimeZoneId": "API キーに紐づく Pleasanter 利用者のタイムゾーンの既定。フィードごとに指定（ApiKeyUserTimeZoneId）がなければこれを使う。Pleasanter は日時をこのタイムゾーンで返す。null なら Service.json の TimeZoneDefault を使う。**運用開始後に変えないこと** **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "ApiKeyUserTimeZoneId": null,
 
-  "//LinkBaseUrl": "予定に付けるレコードへのリンク（URL プロパティ）の基点。利用者のブラウザから届く Pleasanter の URL を書く。null ならリンクを付けない",
+  "//LinkBaseUrl": "予定に付けるレコードへのリンク（URL プロパティ）の基点。利用者のブラウザから届く Pleasanter の URL を書く。null ならリンクを付けない **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "LinkBaseUrl": null
 }
