@@ -11,5 +11,8 @@
   "PasswordAllowSameAsLoginId": false,
 
   "//SecretKey": "フィードごとの Pleasanter API キーと管理者の TOTP の共有鍵を DB へ暗号化して置くための鍵（AES-256-GCM。Base64・32 バイト）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_SECRET_KEY（デプロイ先の秘密の保管先）か Security.local.json で与える。`dotnet run -- --generate-secret-key` で作れる。**失うと保管した API キーと 2 要素は復号できない**（登録し直す）。**運用開始後に変えると、同じく復号できなくなる**",
-  "SecretKey": null
+  "SecretKey": null,
+
+  "//AuditLogRetentionDays": "監査ログ（管理者の操作・ログイン・失敗）を残す日数。これより古い記録を 6 時間ごとに消す。0 なら消さない（表は増え続ける）。法令・社内規程で期間が決まっているなら合わせる",
+  "AuditLogRetentionDays": 365
 }

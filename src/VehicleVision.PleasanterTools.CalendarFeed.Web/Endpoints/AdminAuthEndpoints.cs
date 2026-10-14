@@ -64,6 +64,8 @@ public static class AdminAuthEndpoints
         SetupRequest request,
         IAdminUserStore users,
         AdminAuthOptions options,
+        HttpContext http,
+        AuditLogService audit,
         ILogger<SetupRequest> logger,
         CancellationToken ct)
     {
@@ -86,6 +88,7 @@ public static class AdminAuthEndpoints
         }
 
         logger.LogInformation("最初の管理者を作成しました（{UserId}）", admin.Id);
+        await audit.WriteAsync(http, AuditActions.AdminSetup, true, admin);
         return Results.Created("/admin/api/me", new { admin.Id, admin.LoginId, admin.Role });
     }
 
@@ -98,6 +101,7 @@ public static class AdminAuthEndpoints
         IAdminSessionStore sessions,
         AdminAuthOptions options,
         TimeProvider time,
+        AuditLogService audit,
         ILogger<LoginRequest> logger,
         CancellationToken ct)
     {
@@ -111,23 +115,28 @@ public static class AdminAuthEndpoints
         // **居なくても同じ時間をかけて照合する**（応答の速さで実在が分からないように）
         var verified = PasswordHasher.Verify(password, found?.PasswordHash ?? PasswordHasher.Dummy);
 
+        // **外へは同じ応答にするが、記録には理由を残す**（運用者が総当たりと打ち間違いを見分けられるように）
         if (found is null)
         {
+            await audit.WriteAsync(http, AuditActions.LoginFailed, false, loginId: loginId, detail: "unknown-user");
             return Unauthorized();
         }
 
         var (user, hash) = found.Value;
         if (user.IsDisabled || user.IsLocked(now))
         {
+            await audit.WriteAsync(http, AuditActions.LoginFailed, false, user, detail: user.IsDisabled ? "disabled" : "locked");
             return Unauthorized();
         }
 
         if (!verified)
         {
             var failure = await users.RecordFailureAsync(user.Id, options.LockoutThreshold, options.Lockout, now, ct);
+            await audit.WriteAsync(http, AuditActions.LoginFailed, false, user, detail: "bad-password");
             if (failure.LockedUntil is not null)
             {
                 logger.LogWarning("管理者 {UserId} を {Until} まで締め出しました（ログインの失敗が続いたため）", user.Id, failure.LockedUntil);
+                await audit.WriteAsync(http, AuditActions.LoginLocked, false, user);
             }
 
             return Unauthorized();
@@ -153,7 +162,7 @@ public static class AdminAuthEndpoints
         }
 
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, now, ct);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct);
         return Results.Ok(new { step = "done" });
     }
 
@@ -164,6 +173,7 @@ public static class AdminAuthEndpoints
         IAdminSessionStore sessions,
         AdminAuthOptions options,
         TimeProvider time,
+        AuditLogService audit,
         ILogger<CodeRequest> logger,
         CancellationToken ct)
     {
@@ -204,13 +214,13 @@ public static class AdminAuthEndpoints
             || !await users.TryUseTotpStepAsync(user.Id, step, ct))
         {
             // 同じ時間枠の数字は二度通さない（盗み見られた数字がそのまま使えてしまう）
-            await RecordFailureAndMaybeDropAsync(http, sessions, users, options, user, pendingId, now, ct);
+            await RecordFailureAndMaybeDropAsync(http, sessions, users, options, audit, AuditActions.LoginTotpFailed, user, pendingId, now, ct);
             return Unauthorized();
         }
 
         await sessions.DeleteAsync(pendingId, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, now, ct);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct);
         return Results.Ok(new { step = "done" });
     }
 
@@ -221,6 +231,7 @@ public static class AdminAuthEndpoints
         IAdminSessionStore sessions,
         AdminAuthOptions options,
         TimeProvider time,
+        AuditLogService audit,
         ILogger<CodeRequest> logger,
         CancellationToken ct)
     {
@@ -240,20 +251,30 @@ public static class AdminAuthEndpoints
         if (string.IsNullOrWhiteSpace(request.Code)
             || !await users.TryUseRecoveryCodeAsync(user.Id, RecoveryCodes.Hash(request.Code), now, ct))
         {
-            await RecordFailureAndMaybeDropAsync(http, sessions, users, options, user, pendingId, now, ct);
+            await RecordFailureAndMaybeDropAsync(http, sessions, users, options, audit, AuditActions.LoginRecoveryFailed, user, pendingId, now, ct);
             return Unauthorized();
         }
 
         logger.LogWarning("管理者 {UserId} が復旧コードでログインしました", user.Id);
+        await audit.WriteAsync(http, AuditActions.LoginRecoveryUsed, true, user);
         await sessions.DeleteAsync(pendingId, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, now, ct);
+        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct);
         return Results.Ok(new { step = "done", recoveryCodesLeft = await users.CountRecoveryCodesAsync(user.Id, ct) });
     }
 
     private static async Task<IResult> Logout(
-        HttpContext http, IAdminSessionStore sessions, CancellationToken ct)
+        HttpContext http, IAdminSessionStore sessions, IAdminUserStore users, AuditLogService audit, TimeProvider time, CancellationToken ct)
     {
+        // ログイン済みの端末からのときだけ、誰が出たかを残す（cookie が無い・切れていれば何も残さない）
+        if (http.Request.Cookies.TryGetValue(AdminSessionGuard.SessionCookie, out var sessionId)
+            && !string.IsNullOrEmpty(sessionId)
+            && await sessions.FindAsync(sessionId, time.GetUtcNow(), ct) is { Kind: AdminSessionKind.Session } session
+            && await users.FindByIdAsync(session.UserId, ct) is { } who)
+        {
+            await audit.WriteAsync(http, AuditActions.Logout, true, who);
+        }
+
         await DropExistingAsync(http, sessions, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
@@ -286,6 +307,7 @@ public static class AdminAuthEndpoints
         IAdminSessionStore sessions,
         AdminAuthOptions options,
         TimeProvider time,
+        AuditLogService audit,
         CancellationToken ct)
     {
         var admin = AdminContext.Of(http);
@@ -302,6 +324,7 @@ public static class AdminAuthEndpoints
                 await users.RecordFailureAsync(admin.User.Id, options.LockoutThreshold, options.Lockout, now, ct);
             }
 
+            await audit.WriteAsync(http, AuditActions.PasswordChangeFailed, false, admin.User, detail: "bad-current-password");
             return Results.Json(new { error = "現在のパスワードが違います。" }, statusCode: StatusCodes.Status403Forbidden);
         }
 
@@ -315,6 +338,7 @@ public static class AdminAuthEndpoints
 
         // **いまの端末以外のセッション（盗まれた登録途中の状態も）を失効させる**
         await sessions.DeleteForUserAsync(admin.User.Id, admin.SessionId, ct);
+        await audit.WriteAsync(http, AuditActions.PasswordChanged, true, admin.User);
         return Results.NoContent();
     }
 
@@ -351,6 +375,7 @@ public static class AdminAuthEndpoints
         IAdminSessionStore sessions,
         AdminAuthOptions options,
         TimeProvider time,
+        AuditLogService audit,
         CancellationToken ct)
     {
         var now = time.GetUtcNow();
@@ -372,19 +397,21 @@ public static class AdminAuthEndpoints
         if (!TotpService.Verify(secret, request.Code ?? "", now.UtcDateTime, out var step))
         {
             await users.RecordFailureAsync(who.User.Id, options.LockoutThreshold, options.Lockout, now, ct);
+            await audit.WriteAsync(http, AuditActions.TotpEnrollFailed, false, who.User);
             return Bad("数字が違います。認証アプリに表示されている 6 桁を入力してください。");
         }
 
         // **登録し直すと前の復旧コードは消える。** 復旧コードは、ここで 1 度だけ見せる
         var codes = RecoveryCodes.Generate();
         await users.EnableTotpAsync(who.User.Id, secret, step, codes.Select(RecoveryCodes.Hash).ToList(), ct);
+        await audit.WriteAsync(http, AuditActions.TotpEnrolled, true, who.User);
 
         // 「必須で未登録」の途中（Pending）から来た人は、ここでログインが完了する
         if (who.Kind == AdminSessionKind.Pending)
         {
             await sessions.DeleteAsync(who.SessionId, ct);
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-            await StartSessionAsync(http, sessions, users, who.User, options, now, ct);
+            await StartSessionAsync(http, sessions, users, who.User, options, audit, now, ct);
         }
 
         return Results.Ok(new { recoveryCodes = codes });
@@ -396,6 +423,7 @@ public static class AdminAuthEndpoints
         IAdminUserStore users,
         AdminAuthOptions options,
         TimeProvider time,
+        AuditLogService audit,
         CancellationToken ct)
     {
         var admin = AdminContext.Of(http);
@@ -418,10 +446,12 @@ public static class AdminAuthEndpoints
                 await users.RecordFailureAsync(admin.User.Id, options.LockoutThreshold, options.Lockout, now, ct);
             }
 
+            await audit.WriteAsync(http, AuditActions.TotpDisableFailed, false, admin.User, detail: "bad-password");
             return Results.Json(new { error = "パスワードが違います。" }, statusCode: StatusCodes.Status403Forbidden);
         }
 
         await users.DisableTotpAsync(admin.User.Id, ct);
+        await audit.WriteAsync(http, AuditActions.TotpDisabled, true, admin.User);
         return Results.NoContent();
     }
 
@@ -434,6 +464,7 @@ public static class AdminAuthEndpoints
         IAdminUserStore users,
         AdminUser user,
         AdminAuthOptions options,
+        AuditLogService audit,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -441,6 +472,7 @@ public static class AdminAuthEndpoints
         AdminSessionGuard.SetCookie(http, AdminSessionGuard.SessionCookie, sessionId, options.SessionLifetime);
         await users.RecordSuccessAsync(user.Id, now, ct);
         await sessions.DeleteExpiredAsync(now, ct);
+        await audit.WriteAsync(http, AuditActions.LoginSucceeded, true, user);
     }
 
     /// <summary>手元の cookie のセッション（ログイン済み・途中のどちらも）を、**サーバ側で**捨てる。cookie の扱いは呼び出し側が決める。</summary>
@@ -508,14 +540,18 @@ public static class AdminAuthEndpoints
         IAdminSessionStore sessions,
         IAdminUserStore users,
         AdminAuthOptions options,
+        AuditLogService audit,
+        string action,
         AdminUser user,
         string pendingId,
         DateTimeOffset now,
         CancellationToken ct)
     {
         var failure = await users.RecordFailureAsync(user.Id, options.LockoutThreshold, options.Lockout, now, ct);
+        await audit.WriteAsync(http, action, false, user);
         if (failure.LockedUntil is not null)
         {
+            await audit.WriteAsync(http, AuditActions.LoginLocked, false, user);
             await sessions.DeleteAsync(pendingId, ct);
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
         }

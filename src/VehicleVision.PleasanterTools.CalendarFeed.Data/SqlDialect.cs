@@ -27,6 +27,20 @@ public static partial class SqlDialect
             : IdentifierPattern().Replace(sql, match => Quote(provider, match.Groups[1].Value));
     }
 
+    /// <summary>
+    /// <c>ORDER BY</c> を含む SELECT の末尾へ、件数の上限を付ける（<paramref name="limit"/> は数値なので文字列連結で安全）。
+    /// SQL Server は <c>OFFSET … FETCH</c>（<c>ORDER BY</c> が要る）、他は <c>LIMIT</c>。
+    /// </summary>
+    public static string Limit(DatabaseProvider provider, string sql, int limit)
+    {
+        ArgumentNullException.ThrowIfNull(sql);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+
+        return provider is DatabaseProvider.SqlServer
+            ? $"{sql} OFFSET 0 ROWS FETCH NEXT {limit} ROWS ONLY"
+            : $"{sql} LIMIT {limit}";
+    }
+
     /// <summary>識別子を引用する。</summary>
     public static string Quote(DatabaseProvider provider, string identifier) => provider switch
     {

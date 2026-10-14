@@ -44,7 +44,8 @@ internal sealed class TestApp : IDisposable
         string? twoFactor = null,
         bool setUpAdmin = true,
         string? existingDb = null,
-        string? secretKeyValue = null)
+        string? secretKeyValue = null,
+        string? retentionDays = null)
     {
         _ownsDb = existingDb is null;
         _db = existingDb ?? Path.Combine(Path.GetTempPath(), $"calendarfeed-{Guid.NewGuid():N}.db");
@@ -72,6 +73,11 @@ internal sealed class TestApp : IDisposable
                 if (secretKey)
                 {
                     settings[AppSettings.SecretKey] = SecretKeyValue;
+                }
+
+                if (retentionDays is not null)
+                {
+                    settings[AppSettings.AuditLogRetentionDays] = retentionDays;
                 }
 
                 if (twoFactor is not null)
@@ -109,6 +115,9 @@ internal sealed class TestApp : IDisposable
 
     /// <summary>ログインしていない利用者（ブラウザ）。呼ぶたびに別の cookie の入れ物になる。</summary>
     public HttpClient Client() => _factory.CreateClient();
+
+    /// <summary>アプリ内のサービス（監査ログの保管先などを直接読むため）。</summary>
+    public T Service<T>() where T : notnull => _factory.Services.GetRequiredService<T>();
 
     /// <summary>
     /// ログイン済みの管理者。**最初の管理者を作ってログインする**（2 要素が要らない構成）。同じ入れ物を使い回す。
