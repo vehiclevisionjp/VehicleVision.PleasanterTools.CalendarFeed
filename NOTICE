@@ -39,6 +39,11 @@ Copyright (C) PMC Co.,Ltd.
     （Azure Communication Services の送信経路。**マネージド ID で通る**）
   Azure.Identity 1.21.0 / MIT / https://github.com/Azure/azure-sdk-for-net
     （マネージド ID から資格情報を取る。Azure.Core などを推移的に伴う。同リポジトリの MIT）
+  ITfoxtec.Identity.Saml2 4.21.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+  ITfoxtec.Identity.Saml2.MvcCore 4.21.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+    （SAML 2.0 の SP。Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-14。
+      **System.Security.Cryptography.Xml は 10.0.13 以上のランタイムで動かすこと**（10.0.12 以前に高い重大度の勧告がある）。
+      テストプロジェクトは 10.0.13 を明示している）
   Otp.NET 1.4.1 / MIT / https://github.com/kspearrin/Otp.NET
     （管理者の TOTP（RFC 6238）。Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-13）
   Microsoft.Extensions.DependencyInjection 10.0.13 / MIT

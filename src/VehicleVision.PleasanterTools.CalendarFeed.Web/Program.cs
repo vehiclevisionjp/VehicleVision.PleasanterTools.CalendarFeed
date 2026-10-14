@@ -78,6 +78,7 @@ builder.Services.AddSingleton<AuditLogService>();
 builder.Services.AddSingleton<AuditLogRetentionService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditLogRetentionService>());
 builder.Services.AddSingleton<AdminSessionFilter>();
+builder.Services.AddSingleton<SamlAuthenticator>();
 
 // **購読 URL の総当たりを遅くする。** トークンは 256 bit なので当たらないが、無駄な負荷も止める
 builder.Services.AddRateLimiter(o =>
@@ -226,6 +227,7 @@ app.MapAdminFeeds();
 app.MapAdminAudit();
 app.MapAdminUsers();
 app.MapAdminSettings();
+app.MapAdminSaml();
 app.MapAdminUi();
 
 app.Run();

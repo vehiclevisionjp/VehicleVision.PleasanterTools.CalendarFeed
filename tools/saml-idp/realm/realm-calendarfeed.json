@@ -1,0 +1,100 @@
+{
+  "realm": "calendarfeed",
+  "enabled": true,
+  "displayName": "CalendarFeed 検証用 IdP",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "users": [
+    {
+      "username": "admin@example.jp",
+      "email": "admin@example.jp",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "検証",
+      "lastName": "管理者",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "idp-test-password"
+        }
+      ]
+    },
+    {
+      "username": "stranger@example.jp",
+      "email": "stranger@example.jp",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "未登録",
+      "lastName": "利用者",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "idp-test-password"
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "https://localhost:8443/admin/api/saml/metadata",
+      "name": "カレンダー購読フィードの管理画面",
+      "protocol": "saml",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "frontchannelLogout": true,
+      "redirectUris": [
+        "https://localhost:8443/admin/api/saml/acs",
+        "https://localhost:8443/admin/api/saml/slo"
+      ],
+      "adminUrl": "https://localhost:8443/admin/api/saml/acs",
+      "baseUrl": "https://localhost:8443/admin/",
+      "attributes": {
+        "saml.server.signature": "true",
+        "saml.assertion.signature": "true",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.client.signature": "false",
+        "saml.authnstatement": "true",
+        "saml.force.post.binding": "true",
+        "saml_name_id_format": "email",
+        "saml_force_name_id_format": "true",
+        "saml_single_logout_service_url_redirect": "https://localhost:8443/admin/api/saml/slo",
+        "saml_single_logout_service_url_post": "https://localhost:8443/admin/api/saml/slo"
+      }
+    }
+  ],
+  "components": {
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "name": "rsa-pinned-for-test",
+        "providerId": "rsa",
+        "subComponents": {},
+        "config": {
+          "privateKey": [
+            "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDFaF2Bk88oso/N3K1wzCwP966u+DaEdtCVLvnrMd69o/O4ACN629JVV/RyQbB4ur0cbbWoM2q8S8MB50cwAWX+VT6g4qR9o0X6OFaqBrXylTeIs72IzNcb6t+wiXGcOH9qYLvsVH7ISAZDcUwY4bxc/9Xl9yfFCKnCFh1DU/1IBIwiGRlSlqcIvGo6scdf+dyAfbAdy2baMLNTIrkHY1BWVviD/jjLOSQOUj9p6IE6rE4+nD9z1AcLDoMcwU1y4PncjwNRczV6xQWxHg/0ho/H2CXvGhhiC6mFuYdP2oaw6xhurBPhdc19k6FYwhTFaJieHwxG9Y0XfZXjTu0Hj+ftAgMBAAECggEAA2eCwIEcpnZsQnMwaB/G3SbUhvhWDSZbZhpsSiEPChtkty/RbNH6Ds/rsd8hVioQqG4/64mpD1w8t0pJkP6R+rcPoG8Ojr6De20AGZu9N+5Y1qB65hWnDZ7MT4541hl0IRDpmYn15Pa3abxV2p8x92Y2Ex3Jb5cJqASa0C/UacSA5M43gMJmlrsBupvv7oK5HfPHs8qPJbX4w/qJu/4eSE2tYCGaMDgexM68n5+iIJD0KOr/oBBiuNgBvkM/xrQEzEgMkYVQo15Y1CLB0haydtgIQYCiSAHN3NBURihw0Xz07yDS3KsQm+K3CTE4P5Po4ZNhWOxUBxyDuYrvzIThhQKBgQD+07Qeym1Cap7b7bn/c0OUaDMVFvHlYOQjO/Jq+BF3jOizZZ5fFekFnw/iMi4bhLc6EYAfZ/DvFxATdwADBlx9C0Gn9j8KkwxOYFy2eI1KgOvtaARK3NhhcQ1jnH7onx+4kWLa6+Qp7vCvDx69KTMhG7xUG8nyioAvoGZ/LjZAgwKBgQDGUP801zCP/KlAvZKuUX72Q05abtkz2ytLSducRCzF5B9hv1Yg9oXZdNpMjj3UKA3Ujm1oyW1P8Hn6EuN8FdtDQv+yy5+tiVDuM8+J8l2f5NKaTbZ93uDcqpPiFYAuarozOROtlyGitSkDEf604xH7dDE42O47IugCRHrEUT7qzwKBgQC2gjWtH9olCWwBpD/kv08ViZOcdTSGzmBXA+ZZypXoA9neMte8zlp4ljWwEbSILQN16XbUB4O+Gcx/xGkTwYiYXmmFvI3mKu9Taxy765d2VuOiwy7f11B6aZfnUfxq6xyy+h3NIcnmZqWnG7MuU8W03sKBku2OcrfgZIdEa3qbtQKBgQCJGyRlZsSnN1nYbXfEVol9PikkcnBt3n9/DK/syGFf6wgbLwofve/p2FS4CrsKOyrcoh9YC7IsSyg5UOe/OOkfBmn7NbXOZxnxpRY927cIvU0w6rtZKEazqKaW7qBw9s6GbVaCc/MIJ1EUU1ORwU8EVl9VWvzRG5/lOWza3wStlwKBgE30MHBjJ0z3cY7uSHaiX+aOAv7Msb9LGJt9jvMn9G8+Dj89T3Y9pIMn8p8/X2tg6uQcsa1tzKvJYYv3LU9/DUCSPzhg3UAzsq95ypd2T7PzOKWeXoj6AwuUpjc21IKu27YPxwwPtBH8F3NLo0a7HsH4GWH2qQOwv9k30u9ZCmqx"
+          ],
+          "certificate": [
+            "MIIDIzCCAgugAwIBAgIUHy3DB8BizZXAJOsyFseVAeZnRj0wDQYJKoZIhvcNAQELBQAwITEfMB0GA1UEAwwWcXVlc3Rpb25uYWlyZS10ZXN0LWlkcDAeFw0yNjA5MDkwMTQ1MjhaFw0zNjA5MDYwMTQ1MjhaMCExHzAdBgNVBAMMFnF1ZXN0aW9ubmFpcmUtdGVzdC1pZHAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDFaF2Bk88oso/N3K1wzCwP966u+DaEdtCVLvnrMd69o/O4ACN629JVV/RyQbB4ur0cbbWoM2q8S8MB50cwAWX+VT6g4qR9o0X6OFaqBrXylTeIs72IzNcb6t+wiXGcOH9qYLvsVH7ISAZDcUwY4bxc/9Xl9yfFCKnCFh1DU/1IBIwiGRlSlqcIvGo6scdf+dyAfbAdy2baMLNTIrkHY1BWVviD/jjLOSQOUj9p6IE6rE4+nD9z1AcLDoMcwU1y4PncjwNRczV6xQWxHg/0ho/H2CXvGhhiC6mFuYdP2oaw6xhurBPhdc19k6FYwhTFaJieHwxG9Y0XfZXjTu0Hj+ftAgMBAAGjUzBRMB0GA1UdDgQWBBRCA/z/eFTDiZzm1jN6SaPJxau2OjAfBgNVHSMEGDAWgBRCA/z/eFTDiZzm1jN6SaPJxau2OjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQBAWlKIbpNJEwOYHnvZthwm86wJWFBLaxX3TffpAjhxxGoixlFK28UjomkukSf8JJiyts/BXI/n8OsXHXSlqOqRvnxPufMwbm6NDlo8q2sPNYwk7acF97o7kPkq+9MqR1CHmeJDpDTh138dh/FKaQFi7GPUXzvIXyO6KHZKlnMapIOo3sS4L6xr13ViobgRX1XFq9tIob5rW8aRptKcW3BIWqTknd0zJbTi4QNIjWq6MO0QmDkhDqdM1gtw4AO+EuMNVLkBLdGiUnKkiEaXLHVdkppUW6nHg0PKpOhgAiQmzrU4BOiFJCj712FrfotJhKQdhD9TsCyaokoZudUhXNwF"
+          ],
+          "active": [
+            "true"
+          ],
+          "enabled": [
+            "true"
+          ],
+          "algorithm": [
+            "RS256"
+          ],
+          "priority": [
+            "200"
+          ],
+          "keyUse": [
+            "SIG"
+          ]
+        }
+      }
+    ]
+  }
+}

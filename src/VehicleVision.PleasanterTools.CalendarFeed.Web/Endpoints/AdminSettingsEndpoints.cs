@@ -126,6 +126,7 @@ public static class AdminSettingsEndpoints
             d.Minimum,
             d.Maximum,
             d.MaximumLength,
+            d.Multiline,
             d.AllowedValues,
             value = d.IsSecret ? null : snapshot[d.Key],
             hasValue = snapshot[d.Key].Length > 0,

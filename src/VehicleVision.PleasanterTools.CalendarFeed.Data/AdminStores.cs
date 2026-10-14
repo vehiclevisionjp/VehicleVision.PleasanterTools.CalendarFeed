@@ -425,15 +425,17 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         DateTimeOffset now,
         CancellationToken cancellationToken = default,
         string? ipAddress = null,
-        string? userAgent = null)
+        string? userAgent = null,
+        SamlSessionKeys? samlKeys = null)
     {
         var sessionId = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
         await using var connection = connections.Create();
         await connection.ExecuteAsync(new CommandDefinition(
-            Sql("INSERT INTO [AdminSessions] ([Id], [UserId], [Kind], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent]) "
-                + "VALUES (@Id, @UserId, @Kind, @CreatedAt, @ExpiresAt, @IpAddress, @UserAgent)"),
+            Sql("INSERT INTO [AdminSessions] ([Id], [UserId], [Kind], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent], "
+                + "[SamlNameId], [SamlSessionIndex]) "
+                + "VALUES (@Id, @UserId, @Kind, @CreatedAt, @ExpiresAt, @IpAddress, @UserAgent, @SamlNameId, @SamlSessionIndex)"),
             new
             {
                 Id = IdHash(sessionId),
@@ -443,12 +445,34 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
                 ExpiresAt = DbTime.Format(now + lifetime),
                 IpAddress = AuditText.Safe(ipAddress, 45),
                 UserAgent = AuditText.Safe(userAgent, 200),
+                SamlNameId = AuditText.Safe(samlKeys?.NameId, 256),
+                SamlSessionIndex = AuditText.Safe(samlKeys?.SessionIndex, 256),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return sessionId;
     }
 
     public string HandleOf(string sessionId) => IdHash(sessionId);
+
+    public async Task<int> DeleteBySamlKeysAsync(string nameId, string? sessionIndex, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        return await connection.ExecuteAsync(new CommandDefinition(
+            string.IsNullOrEmpty(sessionIndex)
+                ? Sql("DELETE FROM [AdminSessions] WHERE [SamlNameId] = @NameId")
+                : Sql("DELETE FROM [AdminSessions] WHERE [SamlNameId] = @NameId AND [SamlSessionIndex] = @SessionIndex"),
+            new { NameId = nameId, SessionIndex = sessionIndex },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task<SamlSessionKeys?> GetSamlKeysAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var row = await connection.QuerySingleOrDefaultAsync<(string? NameId, string? SessionIndex)?>(new CommandDefinition(
+            Sql("SELECT [SamlNameId], [SamlSessionIndex] FROM [AdminSessions] WHERE [Id] = @Id"),
+            new { Id = IdHash(sessionId) }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return row is { NameId: { Length: > 0 } nameId } r ? new SamlSessionKeys(nameId, r.SessionIndex) : null;
+    }
 
     public async Task<IReadOnlyList<AdminSessionInfo>> ListForUserAsync(
         string userId, DateTimeOffset now, CancellationToken cancellationToken = default)

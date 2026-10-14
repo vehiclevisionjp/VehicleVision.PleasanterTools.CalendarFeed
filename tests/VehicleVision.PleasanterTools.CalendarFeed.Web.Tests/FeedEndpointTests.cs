@@ -145,6 +145,9 @@ internal sealed class TestApp : IDisposable
     /// <summary>ログインしていない利用者（ブラウザ）。呼ぶたびに別の cookie の入れ物になる。</summary>
     public HttpClient Client() => _factory.CreateClient();
 
+    /// <summary>リダイレクトを辿らず、cookie も自動では扱わないクライアント（SAML の往復を 1 手ずつ検証する）。</summary>
+    public HttpClient RawClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+
     /// <summary>アプリ内のサービス（監査ログの保管先などを直接読むため）。</summary>
     public T Service<T>() where T : notnull => _factory.Services.GetRequiredService<T>();
 

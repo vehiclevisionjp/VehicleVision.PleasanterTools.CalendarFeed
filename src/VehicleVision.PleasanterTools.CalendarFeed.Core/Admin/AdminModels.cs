@@ -83,6 +83,9 @@ public enum AdminSessionKind
     Session,
 }
 
+/// <summary>SAML で入ったセッションが持つ、単一ログアウトに要る値（IdP が付けた NameID とセッション索引）。</summary>
+public sealed record SamlSessionKeys(string NameId, string? SessionIndex);
+
 /// <summary>サーバ側のセッション（DB には ID のハッシュだけを持つ）。</summary>
 public sealed record AdminSession(string UserId, AdminSessionKind Kind, DateTimeOffset ExpiresAt);
 
@@ -195,7 +198,17 @@ public interface IAdminSessionStore
         DateTimeOffset now,
         CancellationToken cancellationToken = default,
         string? ipAddress = null,
-        string? userAgent = null);
+        string? userAgent = null,
+        SamlSessionKeys? samlKeys = null);
+
+    /// <summary>SAML で入ったセッションの単一ログアウトの鍵。SAML で入っていない・無いセッションは <c>null</c>。</summary>
+    Task<SamlSessionKeys?> GetSamlKeysAsync(string sessionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// IdP からの単一ログアウトで、その NameID（とセッション索引）のセッションをすべて捨てる。捨てた件数を返す。
+    /// IdP からの他サイト POST では cookie が届かないので、cookie ではなく鍵で探す。
+    /// </summary>
+    Task<int> DeleteBySamlKeysAsync(string nameId, string? sessionIndex, CancellationToken cancellationToken = default);
 
     /// <summary>セッション ID から端末を指す識別子を作る（一覧に出してよい値。cookie の現物は作れない）。</summary>
     string HandleOf(string sessionId);

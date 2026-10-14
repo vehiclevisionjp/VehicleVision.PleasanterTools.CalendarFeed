@@ -1,0 +1,35 @@
+# SAML のログインを手元で通すためだけの IdP（Keycloak。Apache-2.0）。Issue #28。
+#
+#   docker compose -f tools/saml-idp/docker-compose.yml up -d --wait
+#
+# **本アプリのイメージへ同梱せず、別プロセスとして立てる。**
+# ⚠️ **realm に検証用の鍵・証明書・利用者を焼き込んである。すべて公開された固定値。本番へ持ち込まないこと**
+# （tools/saml-idp/realm/realm-calendarfeed.json）。
+# Keycloak のログインの途中を保つ cookie は Secure 付きなので、**HTTPS で立てる**（tools/saml-idp/tls は検証用の自己署名）。
+name: calendarfeed-saml-idp
+
+services:
+  saml-idp:
+    image: quay.io/keycloak/keycloak:26.7.3
+    command:
+      - start-dev
+      - --import-realm
+      - --https-certificate-file=/opt/keycloak/conf/tls/cert.pem
+      - --https-certificate-key-file=/opt/keycloak/conf/tls/key.pem
+    environment:
+      TZ: Asia/Tokyo
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: idp-test-admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${DEV_SAML_IDP_PORT:-8543}:8443"
+    volumes:
+      - ./realm:/opt/keycloak/data/import:ro
+      - ./tls:/opt/keycloak/conf/tls:ro
+    healthcheck:
+      # TLS を有効にすると管理ポートも https になり、イメージに curl が無いので、待ち受けているかだけを見る
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8443"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
