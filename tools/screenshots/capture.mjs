@@ -243,6 +243,11 @@ try {
         CALENDARFEED_SAML_SINGLESIGNONURL: 'https://idp.example.com/realms/calendarfeed/protocol/saml',
         CALENDARFEED_SAML_IDPCERTIFICATE: `-----BEGIN CERTIFICATE-----\n${idpCertificate}\n-----END CERTIFICATE-----`,
         CALENDARFEED_SAML_BUTTONLABEL: '社内アカウント（SAML）でログイン',
+        // Pleasanter のログイン（接続先は偽の Pleasanter。画面を撮るだけで、ログインは試さない）
+        CALENDARFEED_PLEASANTERSSO_ENABLED: 'true',
+        CALENDARFEED_PLEASANTERSSO_INTERNALBASEURL: `http://localhost:${FAKE_PLEASANTER_PORT}`,
+        CALENDARFEED_PLEASANTERSSO_LOGINURL: '/users/login',
+        CALENDARFEED_PLEASANTERSSO_LOGOUTURL: '/users/logout',
       },
     },
   });
@@ -280,6 +285,7 @@ try {
   await page.selectOption('select.lang', 'ja');
   await page.click('nav button:has-text("設定")');
   await page.waitForSelector('text=SP のメタデータ URL');
+  await page.waitForSelector('text=接続を試す');
   await shot(page, '設定-SAML');
 
   await browser.close();

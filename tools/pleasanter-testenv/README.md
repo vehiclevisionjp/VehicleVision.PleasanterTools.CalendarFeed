@@ -43,6 +43,26 @@ docker compose down -v                                  # 後片付け（DB ご�
   （`_documents/実機検証結果.md` 1 章）
 - `Full-Text Search is not installed` は SQL Server コンテナに全文検索が無いため。**検証には影響しない**
 
+## Pleasanter のログインでの管理画面（SSO）
+
+実機の Pleasanter で、`POST /api/users/get`（`Own`）への cookie の転送・本人の結び付け・所属の判定・再検証を通す（Issue #28）。
+
+```bash
+# 1. 上の手順で Pleasanter を起こし、01_apikey.sql に加えて 02_sso_users.sql を流す（sso-e2e-plain など。組織 5051 に所属）
+docker compose cp seed/02_sso_users.sql db:/tmp/
+docker compose exec -T db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Calendarfeed#Test1' -C -b -i /tmp/02_sso_users.sql
+docker compose restart pleasanter
+
+# 2. 本アプリを http://localhost:5099 で起こし（Pleasanter の URL と API キーは環境変数で渡す）、最初の管理者を sso-e2e-plain で作る
+#    パスワードは sso_roundtrip.py の APP_PASSWORD
+
+# 3. 通す（再検証の間隔を 1 分にして、Pleasanter でのログアウト後に落ちるまで待つので 1 分余りかかる）
+python sso_roundtrip.py
+```
+
+**本アプリと Pleasanter を同じホスト名（localhost）で動かす**（ポートは cookie に影響しない）。`02_sso_users.sql` は検証環境専用の利用者とパスワードを作る。
+**自動登録と所属**・**2 要素の途中**・**API 利用が禁止されたとき**などの細かい分岐は、`Web.Tests` の `PleasanterSsoTests`（偽の Pleasanter）が見る。
+
 ## アプリの DB の結合テスト（4 RDBMS）
 
 `profile: rdbms` の PostgreSQL と MySQL を起動し、SQL Server は上の `db` に `calendarfeed` データベースを作って使う。
