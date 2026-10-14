@@ -23,6 +23,7 @@ public static class AppSettingGroups
     public const string Security = "security";
     public const string Mail = "mail";
     public const string Saml = "saml";
+    public const string PleasanterSso = "pleasanterSso";
 }
 
 /// <summary>画面から検証に落ちた設定。メッセージはそのまま利用者へ返す。</summary>
@@ -159,6 +160,18 @@ public static class AppSettingDefinitions
     public const string SamlLoginIdClaim = "CALENDARFEED_SAML_LOGINIDCLAIM";
     public const string SamlButtonLabel = "CALENDARFEED_SAML_BUTTONLABEL";
     public const string SamlSingleLogoutUrl = "CALENDARFEED_SAML_SINGLELOGOUTURL";
+    public const string PleasanterSsoEnabled = "CALENDARFEED_PLEASANTERSSO_ENABLED";
+    public const string PleasanterSsoInternalBaseUrl = "CALENDARFEED_PLEASANTERSSO_INTERNALBASEURL";
+    public const string PleasanterSsoLoginUrl = "CALENDARFEED_PLEASANTERSSO_LOGINURL";
+    public const string PleasanterSsoLogoutUrl = "CALENDARFEED_PLEASANTERSSO_LOGOUTURL";
+    public const string PleasanterSsoCookieNames = "CALENDARFEED_PLEASANTERSSO_COOKIENAMES";
+    public const string PleasanterSsoAllowedDeptIds = "CALENDARFEED_PLEASANTERSSO_ALLOWEDDEPTIDS";
+    public const string PleasanterSsoAllowedGroupIds = "CALENDARFEED_PLEASANTERSSO_ALLOWEDGROUPIDS";
+    public const string PleasanterSsoUnknownUser = "CALENDARFEED_PLEASANTERSSO_UNKNOWNUSER";
+    public const string PleasanterSsoRegisterRole = "CALENDARFEED_PLEASANTERSSO_REGISTERROLE";
+    public const string PleasanterSsoRevalidateMinutes = "CALENDARFEED_PLEASANTERSSO_REVALIDATEMINUTES";
+    public const string PleasanterSsoTimeoutSeconds = "CALENDARFEED_PLEASANTERSSO_TIMEOUTSECONDS";
+    public const string PleasanterSsoButtonLabel = "CALENDARFEED_PLEASANTERSSO_BUTTONLABEL";
 
     private static readonly string[] TwoFactorModes = ["required", "optional", "disabled"];
 
@@ -211,6 +224,18 @@ public static class AppSettingDefinitions
         new(SamlLoginIdClaim, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "ログイン ID にする属性の名前", MaximumLength: 500),
         new(SamlButtonLabel, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "ログイン画面の釦の文字", MaximumLength: 100),
         new(SamlSingleLogoutUrl, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "IdP の単一ログアウト URL", MaximumLength: 2000, StringNormalizer: v => Url(v, requireHttps: false)),
+        new(PleasanterSsoEnabled, AppSettingGroups.PleasanterSso, AppSettingValueType.Boolean, "false", "Pleasanter のログインを有効にする"),
+        new(PleasanterSsoInternalBaseUrl, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "本アプリから Pleasanter へ問い合わせる URL（サーバ間）", MaximumLength: 2000),
+        new(PleasanterSsoLoginUrl, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "Pleasanter のログイン画面の URL", MaximumLength: 2000),
+        new(PleasanterSsoLogoutUrl, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "Pleasanter のログアウト画面の URL", MaximumLength: 2000),
+        new(PleasanterSsoCookieNames, AppSettingGroups.PleasanterSso, AppSettingValueType.String, ".AspNetCore.Cookies,Pleasanter_SessionGuid", "Pleasanter へ転送する cookie の名前（前方一致）", MaximumLength: 500),
+        new(PleasanterSsoAllowedDeptIds, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "許可する組織の ID", MaximumLength: 1024),
+        new(PleasanterSsoAllowedGroupIds, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "許可するグループの ID", MaximumLength: 1024),
+        new(PleasanterSsoUnknownUser, AppSettingGroups.PleasanterSso, AppSettingValueType.String, "Reject", "本アプリに居ない利用者の扱い", AllowedValues: ["Reject", "Register"]),
+        new(PleasanterSsoRegisterRole, AppSettingGroups.PleasanterSso, AppSettingValueType.String, AdminRoles.Editor, "自動で作る利用者の役割", AllowedValues: AdminRoles.All),
+        new(PleasanterSsoRevalidateMinutes, AppSettingGroups.PleasanterSso, AppSettingValueType.Integer, "5", "Pleasanter へ確かめ直す間隔（分）", Minimum: 1, Maximum: 60),
+        new(PleasanterSsoTimeoutSeconds, AppSettingGroups.PleasanterSso, AppSettingValueType.Integer, "5", "Pleasanter への問い合わせの待ち時間（秒）", Minimum: 1, Maximum: 30),
+        new(PleasanterSsoButtonLabel, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "ログイン画面の釦の文字", MaximumLength: 100),
     ];
 
     /// <summary>キーで引く。</summary>
@@ -224,6 +249,7 @@ public static class AppSettingDefinitions
     public static void ValidateCombination(IReadOnlyDictionary<string, string> values)
     {
         ValidateSaml(values);
+        ValidatePleasanterSso(values);
         if (!bool.Parse(values[MailEnabled]))
         {
             return;
@@ -256,6 +282,19 @@ public static class AppSettingDefinitions
         try
         {
             _ = Services.SamlOptions.FromValues(key => values.TryGetValue(key, out var v) ? v : null);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new AppSettingValidationException(ex.Message);
+        }
+    }
+
+    /// <summary>Pleasanter のログインを有効にするなら、必要な設定がそろっていること。</summary>
+    private static void ValidatePleasanterSso(IReadOnlyDictionary<string, string> values)
+    {
+        try
+        {
+            _ = Services.PleasanterSsoOptions.FromValues(key => values.TryGetValue(key, out var v) ? v : null);
         }
         catch (InvalidOperationException ex)
         {

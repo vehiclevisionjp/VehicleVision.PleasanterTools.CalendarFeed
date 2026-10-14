@@ -426,16 +426,19 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         CancellationToken cancellationToken = default,
         string? ipAddress = null,
         string? userAgent = null,
-        SamlSessionKeys? samlKeys = null)
+        SessionSso? sso = null)
     {
+        var samlKeys = sso?.Saml;
+        var pleasanter = sso?.Pleasanter;
         var sessionId = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
         await using var connection = connections.Create();
         await connection.ExecuteAsync(new CommandDefinition(
             Sql("INSERT INTO [AdminSessions] ([Id], [UserId], [Kind], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent], "
-                + "[SamlNameId], [SamlSessionIndex]) "
-                + "VALUES (@Id, @UserId, @Kind, @CreatedAt, @ExpiresAt, @IpAddress, @UserAgent, @SamlNameId, @SamlSessionIndex)"),
+                + "[SamlNameId], [SamlSessionIndex], [PleasanterTenantId], [PleasanterUserId], [PleasanterVerifiedAt]) "
+                + "VALUES (@Id, @UserId, @Kind, @CreatedAt, @ExpiresAt, @IpAddress, @UserAgent, @SamlNameId, @SamlSessionIndex, "
+                + "@PleasanterTenantId, @PleasanterUserId, @PleasanterVerifiedAt)"),
             new
             {
                 Id = IdHash(sessionId),
@@ -447,6 +450,9 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
                 UserAgent = AuditText.Safe(userAgent, 200),
                 SamlNameId = AuditText.Safe(samlKeys?.NameId, 256),
                 SamlSessionIndex = AuditText.Safe(samlKeys?.SessionIndex, 256),
+                PleasanterTenantId = pleasanter?.TenantId,
+                PleasanterUserId = pleasanter?.UserId,
+                PleasanterVerifiedAt = pleasanter is null ? null : DbTime.Format(pleasanter.VerifiedAt),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return sessionId;
@@ -462,6 +468,36 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
                 ? Sql("DELETE FROM [AdminSessions] WHERE [SamlNameId] = @NameId")
                 : Sql("DELETE FROM [AdminSessions] WHERE [SamlNameId] = @NameId AND [SamlSessionIndex] = @SessionIndex"),
             new { NameId = nameId, SessionIndex = sessionIndex },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+    }
+
+    public async Task<SessionSso?> GetSsoAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        var row = await connection.QuerySingleOrDefaultAsync<(string? NameId, string? SessionIndex, int? TenantId, int? UserId, string? VerifiedAt)?>(
+            new CommandDefinition(
+                Sql("SELECT [SamlNameId], [SamlSessionIndex], [PleasanterTenantId], [PleasanterUserId], [PleasanterVerifiedAt] "
+                    + "FROM [AdminSessions] WHERE [Id] = @Id"),
+                new { Id = IdHash(sessionId) }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if (row is not { } r)
+        {
+            return null;
+        }
+
+        var saml = r.NameId is { Length: > 0 } nameId ? new SamlSessionKeys(nameId, r.SessionIndex) : null;
+        var pleasanter = ToPleasanterKeys(r.TenantId, r.UserId, r.VerifiedAt);
+        return saml is null && pleasanter is null ? null : new SessionSso(saml, pleasanter);
+    }
+
+    private static PleasanterSsoKeys? ToPleasanterKeys(int? tenantId, int? userId, string? verifiedAt) =>
+        tenantId is { } t && userId is { } u && DbTime.Parse(verifiedAt) is { } v ? new PleasanterSsoKeys(t, u, v) : null;
+
+    public async Task TouchPleasanterVerifiedAsync(string sessionId, DateTimeOffset verifiedAt, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [AdminSessions] SET [PleasanterVerifiedAt] = @VerifiedAt WHERE [Id] = @Id"),
+            new { Id = IdHash(sessionId), VerifiedAt = DbTime.Format(verifiedAt) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -501,14 +537,15 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         string sessionId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         await using var connection = connections.Create();
-        var row = await connection.QuerySingleOrDefaultAsync<(string UserId, string Kind, string ExpiresAt)?>(
+        var row = await connection.QuerySingleOrDefaultAsync<(string UserId, string Kind, string ExpiresAt, int? TenantId, int? PleasanterUserId, string? VerifiedAt)?>(
             new CommandDefinition(
-                Sql("SELECT [UserId], [Kind], [ExpiresAt] FROM [AdminSessions] WHERE [Id] = @Id AND [ExpiresAt] > @Now"),
+                Sql("SELECT [UserId], [Kind], [ExpiresAt], [PleasanterTenantId], [PleasanterUserId], [PleasanterVerifiedAt] "
+                    + "FROM [AdminSessions] WHERE [Id] = @Id AND [ExpiresAt] > @Now"),
                 new { Id = IdHash(sessionId), Now = DbTime.Format(now) },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return row is { } r && Enum.TryParse<AdminSessionKind>(r.Kind, out var kind)
-            ? new AdminSession(r.UserId, kind, DbTime.Parse(r.ExpiresAt)!.Value)
+            ? new AdminSession(r.UserId, kind, DbTime.Parse(r.ExpiresAt)!.Value, ToPleasanterKeys(r.TenantId, r.PleasanterUserId, r.VerifiedAt))
             : null;
     }
 

@@ -23,6 +23,25 @@ export interface Status {
   twoFactor: TwoFactorMode;
   /** SAML ログインが有効か（認証前に見える値だけ）。 */
   saml: { enabled: boolean; buttonLabel: string | null };
+  /** Pleasanter のログイン（認証前に見える値だけ）。 */
+  pleasanterSso: PleasanterSsoStatus;
+}
+
+export interface PleasanterSsoStatus {
+  enabled: boolean;
+  /** 別のウィンドウで開く Pleasanter のログイン画面。 */
+  loginUrl: string | null;
+  /** 本アプリのログアウトの後に開く Pleasanter のログアウト画面。 */
+  logoutUrl: string | null;
+  buttonLabel: string | null;
+}
+
+export interface PleasanterSsoTest {
+  status: 'Authenticated' | 'Unauthenticated' | 'NotAllowed' | 'UpstreamError';
+  reason: string;
+  loginId?: string;
+  name?: string | null;
+  registered?: boolean;
 }
 
 export interface Me {
@@ -37,6 +56,8 @@ export interface Me {
   recoveryCodesLeft: number;
   /** SAML で入ったセッションか（ログアウトは IdP へも頼む経路を通す）。 */
   viaSaml: boolean;
+  /** Pleasanter で入ったセッションか（ログアウトの後に Pleasanter のログアウト画面を開く）。 */
+  viaPleasanterSso: boolean;
 }
 
 /** ログイン・招待の受け取りの次の段階。 */
@@ -138,7 +159,7 @@ export type SettingType = 'String' | 'Boolean' | 'Integer';
 
 export interface Setting {
   key: string;
-  group: 'service' | 'pleasanter' | 'feed' | 'security' | 'mail' | 'saml';
+  group: 'service' | 'pleasanter' | 'feed' | 'security' | 'mail' | 'saml' | 'pleasanterSso';
   type: SettingType;
   isSecret: boolean;
   isFixed: boolean;

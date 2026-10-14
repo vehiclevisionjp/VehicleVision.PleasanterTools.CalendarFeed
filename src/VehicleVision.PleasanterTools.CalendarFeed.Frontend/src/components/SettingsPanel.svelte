@@ -3,7 +3,7 @@
   import { errorText } from '../lib/errors';
   import { t } from '../lib/i18n/state.svelte';
   import type { MessageKey } from '../lib/i18n/messages';
-  import type { MailStatus, Setting } from '../lib/types';
+  import type { MailStatus, PleasanterSsoTest, Setting } from '../lib/types';
   import CopyField from './CopyField.svelte';
   import Notice from './Notice.svelte';
 
@@ -14,6 +14,7 @@
     { id: 'security', title: 'groupSecurity' },
     { id: 'mail', title: 'groupMail' },
     { id: 'saml', title: 'groupSaml' },
+    { id: 'pleasanterSso', title: 'groupPleasanterSso' },
   ];
 
 
@@ -99,6 +100,39 @@
     mail = status.ok ? status.value : null;
   }
 
+  let ssoTest = $state<PleasanterSsoTest | null>(null);
+
+  async function testSso(): Promise<void> {
+    flash = '';
+    error = '';
+    ssoTest = null;
+    const result = await api.pleasanterSsoTest();
+    if (!result.ok) {
+      error = result.status === 400 && result.message ? result.message : errorText(result);
+      return;
+    }
+
+    ssoTest = result.value;
+  }
+
+  const ssoTestText = $derived.by(() => {
+    if (ssoTest === null) return '';
+    switch (ssoTest.status) {
+      case 'Authenticated':
+        return t('pleasanterSsoTestAuthenticated', {
+          name: ssoTest.name ?? '',
+          loginId: ssoTest.loginId ?? '',
+          registered: ssoTest.registered ? t('pleasanterSsoRegistered') : t('pleasanterSsoNotRegistered'),
+        });
+      case 'Unauthenticated':
+        return t('pleasanterSsoTestUnauthenticated');
+      case 'NotAllowed':
+        return t('pleasanterSsoTestNotAllowed');
+      default:
+        return t('pleasanterSsoTestError', { reason: ssoTest.reason });
+    }
+  });
+
   async function testMail(): Promise<void> {
     flash = '';
     error = '';
@@ -144,6 +178,16 @@
           </div>
           <p class="muted small">{t('samlHttpsNote')}</p>
           <p class="muted small">{t('samlDisabledHint')}</p>
+        {/if}
+
+        {#if group.id === 'pleasanterSso'}
+          <p class="muted">{t('pleasanterSsoLead')}</p>
+          <p class="muted small">{t('pleasanterSsoSameHostNote')}</p>
+          <p class="muted small">{t('pleasanterSsoTestHint')}</p>
+          <p>
+            <button class="btn" type="button" onclick={testSso}>{t('pleasanterSsoTest')}</button>
+          </p>
+          {#if ssoTest}<Notice kind={ssoTest.status === 'Authenticated' ? 'ok' : 'error'}>{ssoTestText}</Notice>{/if}
         {/if}
 
         {#if group.id === 'mail'}

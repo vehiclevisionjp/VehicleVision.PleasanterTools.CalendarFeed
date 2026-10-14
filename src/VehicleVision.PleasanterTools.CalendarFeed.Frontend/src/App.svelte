@@ -2,7 +2,7 @@
   import { api } from './lib/api';
   import { resolveLanguage, t } from './lib/i18n/state.svelte';
   import type { MessageKey } from './lib/i18n/messages';
-  import type { Me, Permission, Step } from './lib/types';
+  import type { Me, Permission, PleasanterSsoStatus, Step } from './lib/types';
   import AccountPanel from './components/AccountPanel.svelte';
   import AuditLogList from './components/AuditLogList.svelte';
   import EnrollPanel from './components/EnrollPanel.svelte';
@@ -23,6 +23,7 @@
   let phase = $state<Phase>('loading');
   let me = $state<Me | null>(null);
   let saml = $state<{ enabled: boolean; buttonLabel: string | null }>({ enabled: false, buttonLabel: null });
+  let pleasanterSso = $state<PleasanterSsoStatus>({ enabled: false, loginUrl: null, logoutUrl: null, buttonLabel: null });
   let tab = $state<Tab>('feeds');
   const inviteToken = new URLSearchParams(location.search).get('token') ?? '';
 
@@ -70,7 +71,10 @@
     }
 
     const status = await api.status();
-    if (status.ok) saml = status.value.saml;
+    if (status.ok) {
+      saml = status.value.saml;
+      pleasanterSso = status.value.pleasanterSso;
+    }
     if (status.ok && status.value.setupRequired) {
       phase = 'setup';
       return;
@@ -97,9 +101,13 @@
       return;
     }
 
+    const viaPleasanter = me?.viaPleasanterSso ?? false;
     await api.logout();
     me = null;
     phase = 'login';
+
+    // Pleasanter で入ったセッションは、Pleasanter のログアウト画面があれば、そこへ進む（Pleasanter に残ったログインで、すぐ入り直せてしまわないように）
+    if (viaPleasanter && pleasanterSso.logoutUrl) location.assign(pleasanterSso.logoutUrl);
   }
 
   $effect(() => {
@@ -117,7 +125,7 @@
 {:else if phase === 'setup'}
   <SetupPanel ondone={() => onStep('done')} />
 {:else if phase === 'login'}
-  <LoginPanel onstep={onStep} {saml} />
+  <LoginPanel onstep={onStep} {saml} {pleasanterSso} />
 {:else if phase === 'totp'}
   <TotpPanel ondone={() => onStep('done')} oncancel={() => (phase = 'login')} />
 {:else if phase === 'enroll'}

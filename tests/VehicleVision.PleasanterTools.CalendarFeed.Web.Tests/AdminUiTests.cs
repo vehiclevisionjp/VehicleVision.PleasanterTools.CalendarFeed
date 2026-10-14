@@ -36,7 +36,8 @@ public sealed class AdminUiTests : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType!.MediaType);
-        Assert.Contains("<title>admin</title>", await response.Content.ReadAsStringAsync());
+        // 組み立て済みの管理画面が wwwroot にある環境（静的 Web アセットの一覧に載る）では、そちらの入口が返る。どちらでも HTML の入口であればよい
+        Assert.Contains("<!doctype html>", await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

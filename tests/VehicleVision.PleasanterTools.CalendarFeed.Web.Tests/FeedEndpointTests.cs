@@ -50,7 +50,8 @@ internal sealed class TestApp : IDisposable
         string? retentionDays = null,
         bool mail = false,
         string? forwardedNetworks = null,
-        string? webRoot = null)
+        string? webRoot = null,
+        Dictionary<string, string?>? extraSettings = null)
     {
         _ownsDb = existingDb is null;
         _db = existingDb ?? Path.Combine(Path.GetTempPath(), $"calendarfeed-{Guid.NewGuid():N}.db");
@@ -104,6 +105,11 @@ internal sealed class TestApp : IDisposable
                     settings[AppSettings.AdminTwoFactor] = twoFactor;
                 }
 
+                foreach (var (key, value) in extraSettings ?? [])
+                {
+                    settings[key] = value;
+                }
+
                 config.AddInMemoryCollection(settings);
             });
             if (webRoot is not null)
@@ -115,6 +121,8 @@ internal sealed class TestApp : IDisposable
             {
                 services.AddHttpClient<Pleasanter.PleasanterClient>()
                     .ConfigurePrimaryHttpMessageHandler(() => Pleasanter);
+                services.AddHttpClient(Web.Services.PleasanterSessionVerifier.HttpClientName)
+                    .ConfigurePrimaryHttpMessageHandler(() => PleasanterSso);
                 services.AddSingleton<TimeProvider>(Time);
                 services.AddSingleton<IMailTransport>(MailTransport);
                 services.AddSingleton<IStartupFilter, RemoteIpStartupFilter>();
@@ -125,6 +133,9 @@ internal sealed class TestApp : IDisposable
     }
 
     public FakePleasanter Pleasanter { get; } = new();
+
+    /// <summary>Pleasanter のログインで入る機能が問い合わせる、Pleasanter の利用者・グループ・セッションの API。</summary>
+    public FakePleasanterSso PleasanterSso { get; } = new();
 
     public ManualTime Time { get; } = new();
 

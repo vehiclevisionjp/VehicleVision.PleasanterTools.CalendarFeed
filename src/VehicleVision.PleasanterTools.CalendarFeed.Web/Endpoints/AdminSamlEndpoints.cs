@@ -198,7 +198,7 @@ public static class AdminSamlEndpoints
 
             // 登録済みの 2 要素は省かせない。必須で未登録なら登録させる。それ以外はそのまま入れる
             var step = await AdminAuthEndpoints.SignInAsync(
-                http, sessions, users, user, config.AdminAuth, audit, time.GetUtcNow(), ct, ReadSessionKeys(response.ClaimsIdentity));
+                http, sessions, users, user, config.AdminAuth, audit, time.GetUtcNow(), ct, new SessionSso(ReadSessionKeys(response.ClaimsIdentity)));
             _ = step;
             return Results.Redirect(relay.ReturnUrl);
         }).RequireRateLimiting("adminLogin");

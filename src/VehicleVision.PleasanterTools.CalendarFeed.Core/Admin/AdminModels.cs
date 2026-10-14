@@ -86,8 +86,15 @@ public enum AdminSessionKind
 /// <summary>SAML で入ったセッションが持つ、単一ログアウトに要る値（IdP が付けた NameID とセッション索引）。</summary>
 public sealed record SamlSessionKeys(string NameId, string? SessionIndex);
 
+/// <summary>Pleasanter のログインで入ったセッションが持つ、再検証に要る値（Pleasanter のテナント・利用者と、最後に確かめた時刻）。</summary>
+public sealed record PleasanterSsoKeys(int TenantId, int UserId, DateTimeOffset VerifiedAt);
+
+/// <summary>外部のログインで入ったセッションが持つ値。2 要素の途中からログイン後へ<b>そのまま引き継ぐ</b>。</summary>
+public sealed record SessionSso(SamlSessionKeys? Saml = null, PleasanterSsoKeys? Pleasanter = null);
+
 /// <summary>サーバ側のセッション（DB には ID のハッシュだけを持つ）。</summary>
-public sealed record AdminSession(string UserId, AdminSessionKind Kind, DateTimeOffset ExpiresAt);
+public sealed record AdminSession(
+    string UserId, AdminSessionKind Kind, DateTimeOffset ExpiresAt, PleasanterSsoKeys? Pleasanter = null);
 
 /// <summary>ログイン失敗の記録の結果。</summary>
 /// <param name="FailedCount">いまの連続失敗の回数（締め出したら 0 に戻す）。</param>
@@ -199,7 +206,13 @@ public interface IAdminSessionStore
         CancellationToken cancellationToken = default,
         string? ipAddress = null,
         string? userAgent = null,
-        SamlSessionKeys? samlKeys = null);
+        SessionSso? sso = null);
+
+    /// <summary>外部のログイン（SAML・Pleasanter）で入ったセッションが持つ値。どちらでもなければ <c>null</c>。</summary>
+    Task<SessionSso?> GetSsoAsync(string sessionId, CancellationToken cancellationToken = default);
+
+    /// <summary>Pleasanter に最後に確かめた時刻を更新する。</summary>
+    Task TouchPleasanterVerifiedAsync(string sessionId, DateTimeOffset verifiedAt, CancellationToken cancellationToken = default);
 
     /// <summary>SAML で入ったセッションの単一ログアウトの鍵。SAML で入っていない・無いセッションは <c>null</c>。</summary>
     Task<SamlSessionKeys?> GetSamlKeysAsync(string sessionId, CancellationToken cancellationToken = default);

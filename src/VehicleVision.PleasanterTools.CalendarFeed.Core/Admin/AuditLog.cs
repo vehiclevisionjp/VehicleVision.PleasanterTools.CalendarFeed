@@ -17,6 +17,8 @@ public static class AuditActions
     public const string Logout = "logout";
     public const string SamlLoginFailed = "login.saml_failed";
     public const string SamlRegistered = "user.saml_registered";
+    public const string PleasanterSsoFailed = "login.pleasanter_sso_failed";
+    public const string PleasanterSsoRegistered = "user.pleasanter_sso_registered";
     public const string PasswordChanged = "password.changed";
     public const string PasswordChangeFailed = "password.change_failed";
     public const string TotpEnrolled = "totp.enrolled";
