@@ -47,11 +47,11 @@ public sealed class TextTemplateTests
     [InlineData("{Class A}")]
     [InlineData("{Title; DROP}")]
     public void 不正なテンプレートはFormatException(string template) =>
-        Assert.Throws<FormatException>(() => TextTemplate.Parse(template));
+        Assert.ThrowsAny<FormatException>(() => TextTemplate.Parse(template));
 
     [Fact]
     public void 長すぎるテンプレートは弾く() =>
-        Assert.Throws<FormatException>(() => TextTemplate.Parse(new string('a', TextTemplate.MaxLength + 1)));
+        Assert.ThrowsAny<FormatException>(() => TextTemplate.Parse(new string('a', TextTemplate.MaxLength + 1)));
 
     [Fact]
     public void 前後の空白は落とし値が空でも崩れない()

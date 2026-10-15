@@ -60,7 +60,8 @@ public static class AdminSettingsEndpoints
             }
             catch (AppSettingValidationException ex)
             {
-                return Results.BadRequest(new { error = ex.Message });
+                // 鍵と埋め込みの値から、要求の言語で返す（Message は日本語。ログ用）
+                return ApiError.Of(StatusCodes.Status400BadRequest, ex.MessageKey, ex.Args);
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains(UnconfiguredSecretProtector.SettingName, StringComparison.Ordinal))
             {

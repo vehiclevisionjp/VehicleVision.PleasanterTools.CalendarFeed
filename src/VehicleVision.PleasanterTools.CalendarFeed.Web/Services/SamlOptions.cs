@@ -1,3 +1,4 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using System.Collections.Immutable;
 using System.IdentityModel.Selectors;
 using System.Security.Cryptography;
@@ -140,15 +141,13 @@ public sealed class SamlOptions
 
         if (certificates.IsEmpty)
         {
-            throw new InvalidOperationException(
-                $"{IdpCertificateKey} が要ります。IdP の署名証明書（PEM か base64）を入れてください。");
+            throw new SettingException(ServerMessageKeys.SamlCertificateRequired, [IdpCertificateKey]);
         }
 
         if (!Uri.TryCreate(singleSignOnUrl, UriKind.Absolute, out var ssoUri)
             || (ssoUri.Scheme != Uri.UriSchemeHttps && ssoUri.Scheme != Uri.UriSchemeHttp))
         {
-            throw new InvalidOperationException(
-                $"{SingleSignOnUrlKey} は http(s) の絶対 URL で書いてください: {singleSignOnUrl}");
+            throw new SettingException(ServerMessageKeys.SettingAbsoluteUrlInvalid, [SingleSignOnUrlKey, singleSignOnUrl]);
         }
 
         // **単一ログアウトは任意**（Issue #191）。**未設定でも SAML は使える**
@@ -159,8 +158,7 @@ public sealed class SamlOptions
             && (!Uri.TryCreate(singleLogoutUrl, UriKind.Absolute, out sloUri)
                 || (sloUri.Scheme != Uri.UriSchemeHttps && sloUri.Scheme != Uri.UriSchemeHttp)))
         {
-            throw new InvalidOperationException(
-                $"{SingleLogoutUrlKey} は http(s) の絶対 URL で書いてください: {singleLogoutUrl}");
+            throw new SettingException(ServerMessageKeys.SettingAbsoluteUrlInvalid, [SingleLogoutUrlKey, singleLogoutUrl]);
         }
 
         var loginIdSource = ParseEnum<SamlLoginIdSource>(valueOf(LoginIdSourceKey), LoginIdSourceKey)
@@ -169,8 +167,7 @@ public sealed class SamlOptions
 
         if (loginIdSource == SamlLoginIdSource.Claim && loginIdClaim.Length == 0)
         {
-            throw new InvalidOperationException(
-                $"{LoginIdSourceKey}=Claim のときは {LoginIdClaimKey} が要ります。");
+            throw new SettingException(ServerMessageKeys.SamlLoginIdClaimRequired, [LoginIdSourceKey, LoginIdClaimKey]);
         }
 
         return new SamlOptions
@@ -240,7 +237,7 @@ public sealed class SamlOptions
     {
         if (value.Length == 0)
         {
-            throw new InvalidOperationException($"{EnabledKey} を有効にしたときは {key} が要ります。");
+            throw new SettingException(ServerMessageKeys.SettingRequiredWhenEnabled, [EnabledKey, key]);
         }
     }
 
@@ -254,8 +251,7 @@ public sealed class SamlOptions
         }
 
         return AdminRoles.All.FirstOrDefault(r => string.Equals(r, trimmed, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException(
-                $"{RegisterRoleKey} に知らない値が入っています: {trimmed}（使えるのは {string.Join(" / ", AdminRoles.All)}）");
+            ?? throw new SettingException(ServerMessageKeys.SettingUnknownValue, [RegisterRoleKey, trimmed, string.Join(" / ", AdminRoles.All)]);
     }
 
     private static string Trim(string? value) => value?.Trim() ?? string.Empty;
@@ -276,9 +272,7 @@ public sealed class SamlOptions
         if (!Enum.TryParse<TEnum>(trimmed, ignoreCase: true, out var parsed)
             || !Enum.IsDefined(parsed))
         {
-            throw new InvalidOperationException(
-                $"{key} に知らない値が入っています: {trimmed}"
-                + $"（使えるのは {string.Join(" / ", Enum.GetNames<TEnum>())}）");
+            throw new SettingException(ServerMessageKeys.SettingUnknownValue, [key, trimmed, string.Join(" / ", Enum.GetNames<TEnum>())]);
         }
 
         return parsed;
@@ -326,8 +320,7 @@ public sealed class SamlOptions
             var endMarker = pem.IndexOf("-----END", begin, StringComparison.Ordinal);
             if (endMarker < 0)
             {
-                throw new InvalidOperationException(
-                    $"{IdpCertificateKey} の PEM が途中で終わっています。");
+                throw new SettingException(ServerMessageKeys.SamlCertificatePemIncomplete, [IdpCertificateKey]);
             }
 
             var end = pem.IndexOf("-----", endMarker + "-----END".Length, StringComparison.Ordinal);
@@ -339,8 +332,7 @@ public sealed class SamlOptions
             }
             catch (Exception exception) when (exception is ArgumentException or CryptographicException)
             {
-                throw new InvalidOperationException(
-                    $"{IdpCertificateKey} の PEM を読めませんでした。", exception);
+                throw new SettingException(ServerMessageKeys.SamlCertificatePemUnreadable, [IdpCertificateKey], exception);
             }
 
             index = begin + length;
@@ -348,8 +340,7 @@ public sealed class SamlOptions
 
         if (builder.Count == 0)
         {
-            throw new InvalidOperationException(
-                $"{IdpCertificateKey} に証明書が見つかりませんでした。");
+            throw new SettingException(ServerMessageKeys.SamlCertificateNotFound, [IdpCertificateKey]);
         }
 
         return builder.ToImmutable();
@@ -364,10 +355,7 @@ public sealed class SamlOptions
         }
         catch (Exception exception) when (exception is FormatException or CryptographicException)
         {
-            throw new InvalidOperationException(
-                $"{IdpCertificateKey} を証明書として読めませんでした。"
-                + "PEM か、DER を base64 にしたものを入れてください。",
-                exception);
+            throw new SettingException(ServerMessageKeys.SamlCertificateUnreadable, [IdpCertificateKey], exception);
         }
     }
 }

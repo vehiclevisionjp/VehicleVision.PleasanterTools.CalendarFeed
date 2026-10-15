@@ -1,3 +1,4 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using System.Collections.Frozen;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
@@ -147,7 +148,7 @@ public sealed class AppSettingsProvider(
             {
                 if (!AppSettingDefinitions.ByKey.TryGetValue(key, out var definition))
                 {
-                    throw new AppSettingValidationException($"管理対象ではない設定です: {key}");
+                    throw new AppSettingValidationException(ServerMessageKeys.SettingNotManaged, key);
                 }
 
                 if (requested is null)
@@ -155,7 +156,7 @@ public sealed class AppSettingsProvider(
                     // 既定へ戻す（保管した値を消す）。外部設定で固定されたものは戻せない
                     if (current.FixedKeys.Contains(key))
                     {
-                        throw new AppSettingValidationException($"{definition.Label}は外部設定で固定されているため、画面から変更できません。");
+                        throw new AppSettingValidationException(ServerMessageKeys.SettingFixedExternally, key);
                     }
 
                     toReset.Add(key);
@@ -176,7 +177,7 @@ public sealed class AppSettingsProvider(
                         continue;
                     }
 
-                    throw new AppSettingValidationException($"{definition.Label}は外部設定で固定されているため、画面から変更できません。");
+                    throw new AppSettingValidationException(ServerMessageKeys.SettingFixedExternally, key);
                 }
 
                 toSave[key] = value;
