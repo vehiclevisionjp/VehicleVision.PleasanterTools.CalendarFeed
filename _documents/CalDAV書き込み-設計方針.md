@@ -46,7 +46,8 @@ flowchart LR
 
 - `OPTIONS`: `DAV: 1, calendar-access`（4.2 / 5.1.1）。**`calendar-auto-schedule` は広告しない**
   （RFC 6638 2 章。スケジューリングを持たないサーバは広告しなくてよい）
-- `PROPFIND`（カレンダーのコレクションと各予定）: `resourcetype`（`collection` と `calendar`）、`getetag`、`supported-calendar-component-set`（`VEVENT` のみ）
+- `PROPFIND`（カレンダーのコレクションと各予定）: `resourcetype`（`collection` と `calendar`）、`getetag`、
+  `supported-calendar-component-set`（`VEVENT` のみ）
 - `REPORT`: **`calendar-query` と `calendar-multiget`**（RFC 4791 7.8 / 7.9。クライアントが使う）。
   `free-busy-query` は対象外とする（RFC は必須としているため、**未対応であることを制約として明記**する）
 - `GET`: 1 件の `.ics`（読み取りと同じ変換）
@@ -71,7 +72,8 @@ flowchart LR
 
 ### 対応外の内容
 
-- **繰り返し**（`RRULE` / `RDATE` / `EXRULE` / `EXDATE` / `RECURRENCE-ID`）→ **403**（RFC 4791 の `valid-calendar-object-resource` / `supported-calendar-component` 事前条件に準じ、
+- **繰り返し**（`RRULE` / `RDATE` / `EXRULE` / `EXDATE` / `RECURRENCE-ID`）→ **403**
+  （RFC 4791 の `valid-calendar-object-resource` / `supported-calendar-component` 事前条件に準じ、
   応答本文へ理由を入れる）。**データを壊さないため。**
 - `VALARM`・`ATTENDEE`・`ORGANIZER` など → **無視して保存**。次回の同期で、クライアント側から消える可能性があることを運用手順書で案内する
 - `VTODO` / `VJOURNAL` → 403（`supported-calendar-component-set` が `VEVENT` のみ）
