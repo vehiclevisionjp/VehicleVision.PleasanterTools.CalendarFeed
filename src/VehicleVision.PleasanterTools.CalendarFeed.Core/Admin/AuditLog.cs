@@ -41,6 +41,7 @@ public static class AuditActions
     public const string UserTotpReset = "user.totp_reset";
     public const string UserSessionsRevoked = "user.sessions_revoked";
     public const string SessionRevoked = "session.revoked";
+    public const string UserSessionRevoked = "user.session_revoked";
     public const string SessionsRevokedOthers = "session.revoked_others";
 }
 

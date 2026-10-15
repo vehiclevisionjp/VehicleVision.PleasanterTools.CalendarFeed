@@ -41,6 +41,8 @@ public static class AdminUserEndpoints
             SetDisabled(id, false, http, store, invitations, sessions, audit, ct)).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.UsersWrite));
         users.MapPut("/{id}/role", SetRole).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.UsersWrite));
         users.MapPost("/{id}/totp/reset", ResetTotp).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.UsersResetTwoFactor));
+        users.MapGet("/{id}/sessions", UserSessions).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.UsersRead));
+        users.MapDelete("/{id}/sessions/{handle}", RevokeUserSession).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.UsersWrite));
         users.MapDelete("/{id}/sessions", RevokeSessions).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.UsersWrite));
 
         // ---- 招待の受け取り（認証なし。パスワードを自分で決める） --------------------------
@@ -372,7 +374,47 @@ public static class AdminUserEndpoints
             s.ExpiresAt,
             s.IpAddress,
             s.UserAgent,
+            via = s.Via,
         }));
+    }
+
+    /// <summary>管理者が見る、利用者のログイン中の端末（入った方式つき。セッション ID の現物は出さない）。</summary>
+    private static async Task<IResult> UserSessions(
+        string id, IAdminUserStore store, IAdminSessionStore sessions, TimeProvider time, CancellationToken ct)
+    {
+        if (await store.FindByIdAsync(id, ct) is null)
+        {
+            return NotFound();
+        }
+
+        return Results.Ok((await sessions.ListForUserAsync(id, time.GetUtcNow(), ct)).Select(s => new
+        {
+            s.Handle,
+            s.CreatedAt,
+            s.ExpiresAt,
+            s.IpAddress,
+            s.UserAgent,
+            via = s.Via,
+        }));
+    }
+
+    /// <summary>利用者の端末を 1 つだけ失効させる。自分の端末は、自分の画面から。</summary>
+    private static async Task<IResult> RevokeUserSession(
+        string id, string handle, HttpContext http, IAdminUserStore store, IAdminSessionStore sessions, AuditLogService audit, CancellationToken ct)
+    {
+        var self = AdminContext.Of(http).User;
+        if (id == self.Id)
+        {
+            return Bad("自分の端末は、自分の画面（/admin/api/me/sessions）から失効させてください。");
+        }
+
+        if (await store.FindByIdAsync(id, ct) is null || !await sessions.DeleteByHandleAsync(id, handle, ct))
+        {
+            return NotFound();
+        }
+
+        await audit.WriteAsync(http, AuditActions.UserSessionRevoked, true, self, targetType: "AdminUser", targetId: id);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> RevokeMySession(

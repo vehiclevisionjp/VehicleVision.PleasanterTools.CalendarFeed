@@ -153,7 +153,12 @@ export interface SessionInfo {
   expiresAt: string;
   ipAddress: string | null;
   userAgent: string | null;
+  /** 入った方式（表示用）。 */
+  via: 'password' | 'saml' | 'pleasanter';
 }
+
+/** 管理者が見る、利用者のログイン中の端末（自分の一覧との違いは、いまの端末の印が無いこと）。 */
+export type UserSessionInfo = Omit<SessionInfo, 'isCurrent'>;
 
 export type SettingType = 'String' | 'Boolean' | 'Integer';
 

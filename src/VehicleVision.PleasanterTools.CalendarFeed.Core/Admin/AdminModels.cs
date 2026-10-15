@@ -71,7 +71,16 @@ public sealed record AdminSessionInfo(
     DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt,
     string? IpAddress,
-    string? UserAgent);
+    string? UserAgent,
+    string Via = SessionVia.Password);
+
+/// <summary>セッションに入った方式（表示用。認可には使わない）。</summary>
+public static class SessionVia
+{
+    public const string Password = "password";
+    public const string Saml = "saml";
+    public const string Pleasanter = "pleasanter";
+}
 
 /// <summary>サーバ側セッションの段階。</summary>
 public enum AdminSessionKind

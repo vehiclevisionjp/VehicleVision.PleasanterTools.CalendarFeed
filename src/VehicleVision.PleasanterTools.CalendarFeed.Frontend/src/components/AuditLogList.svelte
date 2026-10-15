@@ -2,6 +2,7 @@
   import { api } from '../lib/api';
   import { errorText } from '../lib/errors';
   import { dt, t } from '../lib/i18n/state.svelte';
+  import type { MessageKey } from '../lib/i18n/messages';
   import type { AuditEntry } from '../lib/types';
   import Notice from './Notice.svelte';
 
@@ -12,11 +13,17 @@
     'login.locked',
     'login.totp_failed',
     'login.recovery_used',
+    'login.recovery_failed',
+    'login.saml_failed',
+    'login.pleasanter_sso_failed',
     'logout',
     'admin.setup',
     'password.changed',
+    'password.change_failed',
     'totp.enrolled',
+    'totp.enroll_failed',
     'totp.disabled',
+    'totp.disable_failed',
     'feed.created',
     'feed.updated',
     'feed.token_rotated',
@@ -30,9 +37,36 @@
     'user.role_changed',
     'user.totp_reset',
     'user.sessions_revoked',
+    'user.session_revoked',
+    'user.saml_registered',
+    'user.pleasanter_sso_registered',
+    'session.revoked',
+    'session.revoked_others',
     'settings.updated',
     'settings.mail_test',
   ];
+
+  /** 失敗の理由（サーバが `Detail` に入れる印）を、画面の言語で補う。知らない印は、そのまま出す。 */
+  const REASONS: Record<string, MessageKey> = {
+    'bad-password': 'auditReasonBadPassword',
+    'bad-current-password': 'auditReasonBadPassword',
+    locked: 'auditReasonLocked',
+    disabled: 'auditReasonDisabled',
+    'unknown-user': 'auditReasonUnknownUser',
+    'no-relay': 'auditReasonNoRelay',
+    'invalid-response': 'auditReasonInvalidResponse',
+    'destination-mismatch': 'auditReasonInvalidResponse',
+    'in-response-to-mismatch': 'auditReasonInvalidResponse',
+    'no-login-id': 'auditReasonNoLoginId',
+    'membership-not-configured': 'auditReasonMembershipNotConfigured',
+    'membership-not-allowed': 'auditReasonNotAllowed',
+  };
+
+  function reasonText(detail: string | null): string {
+    if (!detail) return '';
+    const key = REASONS[detail] ?? (detail.startsWith('idp-status=') ? 'auditReasonIdpStatus' : detail.startsWith('upstream-error:') ? 'auditReasonUpstream' : null);
+    return key ? t(key) : '';
+  }
 
   const PAGE = 50;
 
@@ -106,7 +140,10 @@
             <td data-label={t('auditResult')}><span class="badge {entry.succeeded ? 'ok' : 'bad'}">{entry.succeeded ? t('resultSuccess') : t('resultFailure')}</span></td>
             <td data-label={t('auditWho')}>{entry.loginId ?? ''}</td>
             <td class="small" data-label={t('auditTarget')}>{#if entry.targetType}{entry.targetType} <span class="mono">{entry.targetId?.slice(0, 8) ?? ''}</span>{/if}</td>
-            <td class="small mono" data-label={t('auditDetail')}>{entry.detail ?? ''}</td>
+            <td class="small" data-label={t('auditDetail')}>
+              <span class="mono">{entry.detail ?? ''}</span>
+              {#if reasonText(entry.detail)}<div class="muted">{reasonText(entry.detail)}</div>{/if}
+            </td>
             <td class="small mono" data-label={t('auditIp')}>{entry.ipAddress ?? ''}</td>
           </tr>
         {/each}

@@ -1,4 +1,5 @@
 import type {
+  UserSessionInfo,
   PleasanterSsoTest,
   AdminUser,
   AuditEntry,
@@ -116,6 +117,8 @@ export const api = {
   mailStatus: () => get<MailStatus>('/mail/status'),
   settings: () => get<{ settings: Setting[] }>('/settings/'),
   saveSettings: (values: Record<string, string | null>) => put<{ settings: Setting[] }>('/settings/', { values }),
+  userSessions: (id: string) => get<UserSessionInfo[]>(`/users/${enc(id)}/sessions`),
+  revokeUserSession: (id: string, handle: string) => del<void>(`/users/${enc(id)}/sessions/${enc(handle)}`),
   pleasanterSsoCheck: () => post<{ status: 'unauthenticated' } | { status: 'signedIn'; next: Step }>('/pleasanter-sso/check'),
   pleasanterSsoTest: () => post<PleasanterSsoTest>('/pleasanter-sso/test'),
   testMail: () => post<{ queued: boolean; reason: string | null }>('/settings/mail/test'),
