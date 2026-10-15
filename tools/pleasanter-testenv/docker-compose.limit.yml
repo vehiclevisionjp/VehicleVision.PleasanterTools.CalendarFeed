@@ -1,0 +1,10 @@
+# API の回数制限（Api.json の LimitPerSite）を、検証のために小さくする上書き（Issue #69）。
+#
+#   docker compose -f docker-compose.yml -f docker-compose.limit.yml up -d --wait db codedefiner pleasanter
+#   docker compose -f docker-compose.yml -f docker-compose.limit.yml run --rm verify python limit.py
+#
+# **検証環境専用。** 1 つのサイトへ 1 日 5 回までにする（既定は 0＝無制限）。
+services:
+  pleasanter:
+    volumes:
+      - ./Parameters/Api.limit.json:/app/App_Data/Parameters/Api.json:ro
