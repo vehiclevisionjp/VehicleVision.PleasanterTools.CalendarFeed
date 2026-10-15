@@ -1,0 +1,46 @@
+# 端から端まで通す試験を「回さなくてよい」と報告するだけのワークフロー。
+#
+# ⚠️ **必須チェックを paths で絞ると、条件に当たらない PR では永久に Pending になる。**
+# GitHub は「paths で起動しなかったワークフロー」のチェックを未完了のまま残すので、
+# **ドキュメントだけの PR がマージできなくなる。**
+#
+# **そこで、e2e.yml と同じジョブ名を、反対の条件で成功させる。**
+# どちらか一方だけが起動するので、チェック名は常に 1 回だけ報告される。
+# （Questionnaire の e2e-skip.yml に倣った）
+#
+# ⚠️ **e2e.yml の paths を変えたら、こちらの paths-ignore も同じ内容へ揃えること。**
+# 片方だけ直すと、両方起動する（二重に報告される）か、どちらも起動しない（Pending で止まる）。
+# **e2e.yml のジョブを足したら、こちらにも同名のジョブを足すこと。**
+name: 端から端まで通す試験（対象外）
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths-ignore:
+      - "src/**"
+      - "tests/**"
+      - "tools/**"
+      - "Directory.Build.props"
+      - "global.json"
+      - ".github/workflows/e2e.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pleasanter:
+    # **e2e.yml のジョブ名と 1 文字も違えないこと。** 必須チェックは名前で照合する
+    name: 端から端まで通す試験（Pleasanter）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 回さない理由を残す
+        # **コンソールへ出す文字列は英語**（Azure の Kudu で日本語が化けるため。規約の例外）
+        run: echo "No runtime code changed in this pull request. Skipping the end-to-end suite."
+
+  saml:
+    name: 端から端まで通す試験（SAML）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 回さない理由を残す
+        run: echo "No runtime code changed in this pull request. Skipping the end-to-end suite."

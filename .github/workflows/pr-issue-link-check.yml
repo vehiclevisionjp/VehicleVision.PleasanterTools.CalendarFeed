@@ -1,0 +1,97 @@
+# PR 本文の Issue 紐付けを見る
+#
+# ■ 何のためか
+#   規約は「**PR 本文に `Closes #N` を書くこと**」と決めている
+#   （`.github/copilot-instructions.md` の「必ず守る規約」3）。
+#   書き忘れると、Issue が閉じられずに残り、何が終わっていて何が残っているかが
+#   分からなくなる。
+#
+# ■ **止めない**
+#   紐付く Issue が無い PR は実際にある（誤字直しなど）。
+#   **必須チェックにはせず、コメントで気付かせるだけにする。**
+#   規約違反でマージを塞ぐと、本質でないところで作業が止まる。
+#
+# ■ `edited` を拾う
+#   本文へ後から書き足したときに、コメントを直せるようにするため。
+#
+# ■ PR のコードは実行しない
+#   見るのは本文だけ。チェックアウトもしない。
+
+name: PR の Issue 紐付け
+
+on:
+  pull_request:
+    types: [opened, edited, ready_for_review, synchronize]
+    branches:
+      - develop
+      - master
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: pr-issue-link-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Issue と紐付いているか
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 紐付けを確かめてコメントする
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const body = context.payload.pull_request.body ?? '';
+
+            // GitHub が Issue を自動で閉じる書き方
+            // <https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue>
+            // （2026-08-19 参照）
+            const pattern = /\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#\d+/i;
+            const linked = pattern.test(body);
+
+            const marker = '<!-- pr-issue-link-check -->';
+            const message = linked
+              ? `${marker}\n✅ Issue との紐付け（\`Closes #N\`）を確認しました。`
+              : `${marker}\n⚠️ **PR 本文に \`Closes #N\` が見つかりません。**\n\n`
+                + '規約では PR と Issue を必ず紐付けることになっています'
+                + '（`.github/copilot-instructions.md` の「必ず守る規約」3）。\n\n'
+                + '**マージ時に Issue が自動で閉じられ、何が終わって何が残っているかを追えます。**\n\n'
+                + '紐付く Issue が無い PR であれば、このコメントは無視して構いません。';
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+
+            const existing = comments.find((comment) => (comment.body ?? '').includes(marker));
+
+            // **同じ内容なら触らない。** 通知を無駄に飛ばさない
+            if (existing !== undefined) {
+              if (existing.body === message) {
+                return;
+              }
+
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: message,
+              });
+              return;
+            }
+
+            // **紐付いているだけの PR に、わざわざコメントを足さない**
+            if (linked) {
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: message,
+            });
