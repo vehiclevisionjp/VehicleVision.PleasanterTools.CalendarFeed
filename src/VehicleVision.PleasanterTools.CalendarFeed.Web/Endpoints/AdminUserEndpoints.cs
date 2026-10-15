@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
@@ -21,9 +23,12 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Endpoints;
 /// </remarks>
 public static class AdminUserEndpoints
 {
+    /// <summary>すでに言語ごとに組み立てた文言で返す。</summary>
     private static IResult Bad(string error) => Results.Json(new { error }, statusCode: StatusCodes.Status400BadRequest);
 
-    private static IResult NotFound() => Results.Json(new { error = "管理者が見つかりません。" }, statusCode: StatusCodes.Status404NotFound);
+    private static IResult BadKey(string key, params object[] args) => ApiError.Of(StatusCodes.Status400BadRequest, key, args);
+
+    private static IResult NotFound() => ApiError.Of(StatusCodes.Status404NotFound, ServerMessageKeys.AdminUserNotFound);
 
     /// <summary>管理者の管理・招待の受け取り・自分の端末・メールの送信状況の入口を登録する。</summary>
     public static void MapAdminUsers(this WebApplication app)
@@ -50,7 +55,7 @@ public static class AdminUserEndpoints
         invitations.AddEndpointFilter(async (context, next) =>
             AdminSessionGuard.IsSameOrigin(context.HttpContext)
                 ? await next(context)
-                : Results.Json(new { error = "別のサイトからの要求は受け付けません。" }, statusCode: StatusCodes.Status403Forbidden));
+                : ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.CrossSiteRejected));
         // **トークンの総当たりも、ログインと同じ枠で遅くする**
         invitations.MapPost("/accept", AcceptInvitation).RequireAdminLoginRateLimit();
 
@@ -117,14 +122,14 @@ public static class AdminUserEndpoints
         AuditLogService audit,
         CancellationToken ct)
     {
-        if (AdminAuthEndpoints.ValidateLoginId(request.LoginId) is { } loginIdError)
+        if (AdminAuthEndpoints.ValidateLoginId(request.LoginId, RequestLanguage.Of(http)) is { } loginIdError)
         {
             return Bad(loginIdError);
         }
 
         if (!AdminRoles.IsValid(request.Role))
         {
-            return Bad($"役割は {string.Join(" / ", AdminRoles.All)} のいずれかで指定してください。");
+            return BadKey(ServerMessageKeys.RoleNotSupported, string.Join(" / ", AdminRoles.All));
         }
 
         var actor = AdminContext.Of(http).User;
@@ -135,7 +140,7 @@ public static class AdminUserEndpoints
             request.LoginId!, PasswordHasher.Hash(Guid.NewGuid().ToString()), request.Role!, request.Language ?? actor.Language, now, ct);
         if (created is null)
         {
-            return Results.Json(new { error = "そのログイン ID はすでにあります。" }, statusCode: StatusCodes.Status409Conflict);
+            return ApiError.Of(StatusCodes.Status409Conflict, ServerMessageKeys.DuplicateLoginId);
         }
 
         await audit.WriteAsync(http, AuditActions.UserInvited, true, actor, targetType: "AdminUser", targetId: created.Id, detail: $"role={request.Role}");
@@ -164,7 +169,7 @@ public static class AdminUserEndpoints
         // 止めた相手を呼び戻さない。先に有効へ戻すこと
         if (target.IsDisabled)
         {
-            return Bad("無効化されている管理者へは招待を出せません。先に有効へ戻してください。");
+            return BadKey(ServerMessageKeys.InviteDisabledUser);
         }
 
         var actor = AdminContext.Of(http).User;
@@ -214,7 +219,7 @@ public static class AdminUserEndpoints
         // 自分は止めさせない。手が滑ったときに自分では戻せない
         if (disabled && id == self.Id)
         {
-            return Bad("自分自身は無効化できません。");
+            return BadKey(ServerMessageKeys.SelfDisableNotAllowed);
         }
 
         if (Reject(await store.SetDisabledAsync(id, disabled, ct)) is { } rejected)
@@ -239,13 +244,13 @@ public static class AdminUserEndpoints
         var self = AdminContext.Of(http).User;
         if (!AdminRoles.IsValid(request.Role))
         {
-            return Bad($"役割は {string.Join(" / ", AdminRoles.All)} のいずれかで指定してください。");
+            return BadKey(ServerMessageKeys.RoleNotSupported, string.Join(" / ", AdminRoles.All));
         }
 
         // 自分の役割は変えさせない。降ろした瞬間に戻す権限を失う
         if (id == self.Id)
         {
-            return Bad("自分自身の役割は変えられません。");
+            return BadKey(ServerMessageKeys.SelfRoleChangeNotAllowed);
         }
 
         if (Reject(await store.SetRoleAsync(id, request.Role!, ct)) is { } rejected)
@@ -263,7 +268,7 @@ public static class AdminUserEndpoints
         var self = AdminContext.Of(http).User;
         if (id == self.Id)
         {
-            return Bad("自分の 2 要素は、自分の画面（/admin/api/me/totp/disable）から解除してください。");
+            return BadKey(ServerMessageKeys.SelfTotpResetNotAllowed);
         }
 
         if (await store.FindByIdAsync(id, ct) is null)
@@ -285,7 +290,7 @@ public static class AdminUserEndpoints
         var self = AdminContext.Of(http).User;
         if (id == self.Id)
         {
-            return Bad("自分の端末は、自分の画面（/admin/api/me/sessions）から失効させてください。");
+            return BadKey(ServerMessageKeys.SelfSessionRevokeNotAllowed);
         }
 
         if (await store.FindByIdAsync(id, ct) is null)
@@ -301,9 +306,7 @@ public static class AdminUserEndpoints
     private static IResult? Reject(AdminChangeResult result) => result switch
     {
         AdminChangeResult.NotFound => NotFound(),
-        AdminChangeResult.LastAdministrator => Results.Json(
-            new { error = "有効な管理者（Administrator）が 1 人も居なくなるため、できません。先に別の管理者を用意してください。" },
-            statusCode: StatusCodes.Status409Conflict),
+        AdminChangeResult.LastAdministrator => ApiError.Of(StatusCodes.Status409Conflict, ServerMessageKeys.LastAdministrator),
         _ => null,
     };
 
@@ -334,7 +337,7 @@ public static class AdminUserEndpoints
 
         // **条件を満たさないパスワードは、招待を使い切る前に断る**（使い切ってから断ると、招待が死んで受け取れなくなる）。
         // 最初の管理者・パスワード変更と同じ判定を通す（ここだけ緩いと、そこが一番弱い所になる）
-        if (options.PasswordPolicy.Validate(user.LoginId, request.Password ?? "", user.Language) is { } problem)
+        if (options.PasswordPolicy.Validate(user.LoginId, request.Password ?? "", RequestLanguage.Of(http) ?? user.Language) is { } problem)
         {
             return Bad(problem);
         }
@@ -356,8 +359,7 @@ public static class AdminUserEndpoints
     }
 
     private static IResult InvitationInvalid() =>
-        Results.Json(new { error = "この招待は使えません（期限切れ・受け取り済み・取り消された可能性があります）。招待した管理者に出し直しを頼んでください。" },
-            statusCode: StatusCodes.Status404NotFound);
+        ApiError.Of(StatusCodes.Status404NotFound, ServerMessageKeys.InvitationInvalid);
 
     // ---- 自分の端末 ------------------------------------------------------------------
 
@@ -405,7 +407,7 @@ public static class AdminUserEndpoints
         var self = AdminContext.Of(http).User;
         if (id == self.Id)
         {
-            return Bad("自分の端末は、自分の画面（/admin/api/me/sessions）から失効させてください。");
+            return BadKey(ServerMessageKeys.SelfSessionRevokeNotAllowed);
         }
 
         if (await store.FindByIdAsync(id, ct) is null || !await sessions.DeleteByHandleAsync(id, handle, ct))
@@ -423,7 +425,7 @@ public static class AdminUserEndpoints
         var admin = AdminContext.Of(http);
         if (!await sessions.DeleteByHandleAsync(admin.User.Id, handle, ct))
         {
-            return Results.Json(new { error = "その端末は見つかりません。" }, statusCode: StatusCodes.Status404NotFound);
+            return ApiError.Of(StatusCodes.Status404NotFound, ServerMessageKeys.SessionNotFound);
         }
 
         await audit.WriteAsync(http, AuditActions.SessionRevoked, true, admin.User);

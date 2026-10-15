@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using System.Text.RegularExpressions;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
@@ -33,20 +35,20 @@ public static class AdminFeedEndpoints
             AuditLogService audit,
             CancellationToken ct) =>
         {
-            if (request.Validate() is { } error)
+            if (request.Validate(RequestLanguage.Of(http)) is { } error)
             {
                 return Results.BadRequest(new { error });
             }
 
             if (!string.IsNullOrEmpty(request.ApiKey) && !protector.IsConfigured)
             {
-                return Results.BadRequest(new { error = $"API キーを保管するには {UnconfiguredSecretProtector.SettingName} の設定が要ります。" });
+                return ApiError.Of(StatusCodes.Status400BadRequest, ServerMessageKeys.ApiKeyNeedsSecretKey, UnconfiguredSecretProtector.SettingName);
             }
 
             // API キーが無いフィードは、全フィード共通の既定があるときだけ動く
             if (string.IsNullOrEmpty(request.ApiKey) && string.IsNullOrEmpty(pleasanter.ApiKey))
             {
-                return Results.BadRequest(new { error = "ApiKey を指定してください（全フィード共通の既定の API キーも未設定です）。" });
+                return ApiError.Of(StatusCodes.Status400BadRequest, ServerMessageKeys.ApiKeyRequired);
             }
 
             var (feed, token) = await feeds.CreateAsync(
@@ -74,7 +76,7 @@ public static class AdminFeedEndpoints
             AuditLogService audit,
             CancellationToken ct) =>
         {
-            if (request.Validate() is { } error)
+            if (request.Validate(RequestLanguage.Of(http)) is { } error)
             {
                 return Results.BadRequest(new { error });
             }
@@ -141,14 +143,14 @@ public static class AdminFeedEndpoints
             AuditLogService audit,
             CancellationToken ct) =>
         {
-            if (request.Validate() is { } error)
+            if (request.Validate(RequestLanguage.Of(http)) is { } error)
             {
                 return Results.BadRequest(new { error });
             }
 
             if (!protector.IsConfigured)
             {
-                return Results.BadRequest(new { error = $"API キーを保管するには {UnconfiguredSecretProtector.SettingName} の設定が要ります。" });
+                return ApiError.Of(StatusCodes.Status400BadRequest, ServerMessageKeys.ApiKeyNeedsSecretKey, UnconfiguredSecretProtector.SettingName);
             }
 
             if (!await feeds.SetApiKeyAsync(id, request.ApiKey, request.ApiKeyUserTimeZoneId, ct))
@@ -198,16 +200,16 @@ public sealed record CreateFeedRequest(
     private static readonly Regex ColumnName = new("^[A-Za-z][A-Za-z0-9_]{0,63}$", RegexOptions.Compiled);
 
     /// <summary>入力を検証する。問題があれば理由を返す。</summary>
-    public string? Validate()
+    public string? Validate(string? language = null)
     {
         if (string.IsNullOrWhiteSpace(Name) || Name.Length > 200)
         {
-            return "Name は 1〜200 文字で指定してください。";
+            return ServerMessages.Get(ServerMessageKeys.FeedNameInvalid, language);
         }
 
         if (SiteId <= 0)
         {
-            return "SiteId は 1 以上で指定してください。";
+            return ServerMessages.Get(ServerMessageKeys.FeedSiteIdInvalid, language);
         }
 
         if (Mapping?.Validate() is { } mappingError)
@@ -218,21 +220,21 @@ public sealed record CreateFeedRequest(
         if (Filters is { } f
             && (f.Count > 20 || f.Keys.Any(k => !ColumnName.IsMatch(k)) || f.Values.Any(v => v.Length > 500)))
         {
-            return "Filters は 20 件まで、列名は英数字と _ 、値は 500 文字までです。";
+            return ServerMessages.Get(ServerMessageKeys.FeedFiltersInvalid, language);
         }
 
         if (ApiKey is not null && (ApiKey.Length is 0 or > 512 || ApiKey.Any(char.IsControl)))
         {
-            return "ApiKey は 1〜512 文字（制御文字なし）で指定してください。";
+            return ServerMessages.Get(ServerMessageKeys.FeedApiKeyInvalid, language);
         }
 
         if (SetApiKeyRequest.InvalidTimeZone(ApiKeyUserTimeZoneId))
         {
-            return "ApiKeyUserTimeZoneId に、このサーバが解決できないタイムゾーン ID が指定されています。";
+            return ServerMessages.Get(ServerMessageKeys.FeedTimeZoneInvalid, language);
         }
 
         return Language is not null && !FeedLanguages.IsSupported(Language)
-            ? $"Language は {string.Join(" / ", FeedLanguages.Supported)} のいずれかで指定してください。"
+            ? ServerMessages.Get(ServerMessageKeys.FeedLanguageInvalid, language, string.Join(" / ", FeedLanguages.Supported))
             : null;
     }
 }
@@ -247,22 +249,22 @@ public sealed record UpdateFeedRequest(
     string? Language = null)
 {
     /// <summary>入力を検証する（作成と同じ条件）。問題があれば理由を返す。</summary>
-    public string? Validate() => new CreateFeedRequest(Name, SiteId, Mapping, Filters, null, ApiKeyUserTimeZoneId, Language).Validate();
+    public string? Validate(string? language = null) => new CreateFeedRequest(Name, SiteId, Mapping, Filters, null, ApiKeyUserTimeZoneId, Language).Validate(language);
 }
 
 /// <summary>API キーの差し替えの要求。</summary>
 public sealed record SetApiKeyRequest(string ApiKey, string? ApiKeyUserTimeZoneId = null)
 {
     /// <summary>入力を検証する。問題があれば理由を返す。</summary>
-    public string? Validate()
+    public string? Validate(string? language = null)
     {
         if (string.IsNullOrEmpty(ApiKey) || ApiKey.Length > 512 || ApiKey.Any(char.IsControl))
         {
-            return "ApiKey は 1〜512 文字（制御文字なし）で指定してください。";
+            return ServerMessages.Get(ServerMessageKeys.FeedApiKeyInvalid, language);
         }
 
         return InvalidTimeZone(ApiKeyUserTimeZoneId)
-            ? "ApiKeyUserTimeZoneId に、このサーバが解決できないタイムゾーン ID が指定されています。"
+            ? ServerMessages.Get(ServerMessageKeys.FeedTimeZoneInvalid, language)
             : null;
     }
 

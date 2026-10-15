@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using System.Security.Claims;
 using ITfoxtec.Identity.Saml2;
 using ITfoxtec.Identity.Saml2.Claims;
@@ -76,7 +78,7 @@ public static class AdminSamlEndpoints
             if (!protection.IsConfigured)
             {
                 // 相関 cookie を暗号化する鍵（CALENDARFEED_SECRET_KEY）が要る。複数台・再起動でも読めるよう、ASP.NET の既定の鍵束は使わない
-                return Results.Problem("SAML ログインには秘密の鍵（CALENDARFEED_SECRET_KEY）の設定が要ります。", statusCode: StatusCodes.Status503ServiceUnavailable);
+                return Results.Problem(ServerMessages.Get(ServerMessageKeys.SamlNeedsSecretKey, RequestLanguage.Of(http), UnconfiguredSecretProtector.SettingName), statusCode: StatusCodes.Status503ServiceUnavailable);
             }
 
             var request = new Saml2AuthnRequest(options.ToSaml2Configuration())

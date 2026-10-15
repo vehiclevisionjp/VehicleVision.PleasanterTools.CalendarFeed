@@ -1,3 +1,4 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
@@ -62,17 +63,17 @@ public sealed record AdminPasswordPolicy(
     {
         if (string.IsNullOrEmpty(password) || password.Length < MinimumLength)
         {
-            return $"パスワードは {MinimumLength} 文字以上にしてください。";
+            return ServerMessages.Get(ServerMessageKeys.PasswordTooShort, language, MinimumLength);
         }
 
         if (password.Length > MaximumLength)
         {
-            return $"パスワードは {MaximumLength} 文字以下にしてください。";
+            return ServerMessages.Get(ServerMessageKeys.PasswordTooLong, language, MaximumLength);
         }
 
         if (!AllowSameAsLoginId && string.Equals(password, loginId, StringComparison.OrdinalIgnoreCase))
         {
-            return "パスワードにログイン ID と同じものは使えません。";
+            return ServerMessages.Get(ServerMessageKeys.PasswordSameAsLoginId, language);
         }
 
         foreach (var (regex, rule) in _compiled)
@@ -80,7 +81,7 @@ public sealed record AdminPasswordPolicy(
             if (!regex.IsMatch(password))
             {
                 // **文言を書き忘れても、通ってしまわないようにする。** 条件には合っていないのだから、何かは返す
-                return MessageOf(rule, language) ?? "パスワードが条件を満たしていません。";
+                return MessageOf(rule, language) ?? ServerMessages.Get(ServerMessageKeys.PasswordPolicyMismatch, language);
             }
         }
 

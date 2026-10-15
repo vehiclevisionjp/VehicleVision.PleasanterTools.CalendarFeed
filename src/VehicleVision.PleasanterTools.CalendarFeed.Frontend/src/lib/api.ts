@@ -1,3 +1,4 @@
+import { language } from './i18n/state.svelte';
 import type {
   UserSessionInfo,
   PleasanterSsoTest,
@@ -28,7 +29,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<Re
       method,
       // 認証は cookie（HttpOnly・SameSite=Strict）。必ず送る
       credentials: 'same-origin',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      // サーバが返す文言の言語は、画面で選んだ言語で決める（ブラウザの言語設定ではない）
+      headers: body === undefined ? { 'Accept-Language': language() } : { 'Content-Type': 'application/json', 'Accept-Language': language() },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
