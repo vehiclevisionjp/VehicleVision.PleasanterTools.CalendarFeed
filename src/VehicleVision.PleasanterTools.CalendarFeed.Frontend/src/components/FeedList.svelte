@@ -113,7 +113,7 @@
 <div class="page-head">
   <h1>{t('feedsTitle')}</h1>
   <div class="toolbar">
-    <button class="btn" type="button" onclick={load}>{t('refresh')}</button>
+    <button class="btn" type="button" onclick={load}><span class="material-icons" aria-hidden="true">refresh</span>{t('refresh')}</button>
     {#if canWrite}<button class="btn primary" type="button" onclick={() => (editor = { feed: null })}>{t('feedNew')}</button>{/if}
   </div>
 </div>
