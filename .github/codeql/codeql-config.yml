@@ -1,0 +1,23 @@
+name: "VehicleVision.PleasanterTools.CalendarFeed CodeQL 設定"
+
+# 参照した一次情報（2026-08-19 参照）
+#   - config-file / queries / paths-ignore の書き方
+#     https://docs.github.com/en/code-security/reference/code-scanning/workflow-configuration-options
+
+# **security-extended を使う。** 既定スイート（security）より検出範囲が広い。
+# 品質クエリ（code-quality）は入れない。保守性の指摘まで Security タブへ流すと
+# 「脆弱性の一覧」として読めなくなるため。
+queries:
+  - uses: security-extended
+
+paths-ignore:
+  # ビルド成果物。配布物でもレビュー対象でもない
+  - "**/bin/**"
+  - "**/obj/**"
+  - "**/node_modules/**"
+  - "src/VehicleVision.PleasanterTools.CalendarFeed.Web/wwwroot/**"
+  # **Pleasanter 本体（AGPL v3）は解析しない。** 参照専用のサブモジュールであり、
+  # 本アプリの成果物でもない（_reference/README.md）。
+  # ワークフロー側で submodules: false にしているため通常は空だが、
+  # 取得された場合に備えて明示する
+  - "_reference/**"

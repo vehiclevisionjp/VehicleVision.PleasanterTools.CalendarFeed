@@ -1,0 +1,247 @@
+# CodeQL による静的解析（C# と TypeScript）。
+#
+# **advanced setup（このファイル）で回す。** GitHub 管理の default setup は
+# 実行契機もクエリスイートも制御できず、_documents/ブランチ運用方針.md の
+# 「CI の実行条件」と食い違うため使わない。
+#
+# ⚠️ **リポジトリで GitHub Advanced Security（Code Security）が有効でないと動かない。**
+#    本リポジトリは internal のため、無効のままだと analyze の SARIF 送信が
+#    「Advanced Security must be enabled for this repository to use code scanning.」
+#    で失敗する（実測: GET /repos/.../code-scanning/alerts が HTTP 403、2026-08-19）。
+#    設定はリポジトリの Settings から行う。
+#    **整うまでは preflight ジョブが解析を飛ばす。** 全ブランチの push で回す設定のため、
+#    そのまま失敗させると「CI が赤いのが普通」の状態を作ってしまう。
+#    飛ばしたことは ::warning:: とジョブ要約に残す（黙って緑にしない）。
+#
+# ⚠️ **アラート本文（クエリの説明）は日本語にできない。** CodeQL のクエリと解説は
+#    GitHub 提供のクエリパックに英語で埋め込まれており、こちら側で差し替える口が無い。
+#    本ワークフローが出力する要約（下の「読み方を日本語で残す」ステップ）と
+#    ここのコメント・ジョブ名は日本語で書く。
+#
+# ⚠️ **.svelte は解析されない。** CodeQL の JavaScript/TypeScript 抽出器が扱うのは
+#    .js / .jsx / .mjs / .es / .es6 / .htm / .html / .xhtm / .xhtml / .vue / .hbs /
+#    .ejs / .njk / .json / .yaml / .yml / .raml / .xml で、.svelte は含まれない
+#    （https://codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/
+#    2026-08-19 参照）。**画面の実装を .svelte へ寄せるほど、この解析の守備範囲は狭くなる。**
+#    ロジックは .ts 側へ置くこと。
+#
+# **必須ステータスチェックにはしない。** 新たに公開された脆弱性で既存コードが
+# 赤くなると、その修正 PR 自体がマージできなくなる。判断材料であって門番ではない
+# （_documents/ブランチ運用方針.md「必須ステータスチェック」）。
+#
+# 参照した一次情報（いずれも 2026-08-19 参照）
+#   - languages の値（csharp / javascript-typescript）と build-mode（none/autobuild/manual）
+#     https://docs.github.com/en/code-security/reference/code-scanning/workflow-configuration-options
+#   - C# は build-mode: none も使えるが、精度は実ビルドに劣る
+#     https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/manage-your-configuration/codeql-for-compiled-languages
+#   - github/codeql-action は v4 が最新のサポート版（v4 / v3 がサポート対象）
+#     https://github.com/github/codeql-action/blob/main/README.md
+#   - actions/checkout v7 / actions/setup-dotnet v6 / actions/setup-node v7 は
+#     .github/workflows/ci.yml と同じ版に揃えた（勝手に上げない）
+name: CodeQL
+
+on:
+  # **全ブランチへの push で回す。** ci.yml と同じ契機にそろえる
+  # （_documents/ブランチ運用方針.md「CI の実行条件」）。
+  # タグの push では回さない（branches だけを書いた push はタグで発火しない）
+  push:
+    branches:
+      - "**"
+  # **週次でも回す。** コードが変わらなくても、クエリパックの更新で
+  # 新しい指摘が出ることがある。毎週月曜 05:17 JST（日曜 20:17 UTC）
+  schedule:
+    - cron: "17 20 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# **既定は読み取りだけ。** SARIF の送信に要る権限はジョブ側で足す
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  CODEQL_CONFIG_FILE: ./.github/codeql/codeql-config.yml
+
+jobs:
+  preflight:
+    name: CodeQL 前提の確認
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      security-events: read
+    outputs:
+      advanced_security: ${{ steps.check.outputs.advanced_security }}
+    steps:
+      - name: 解析結果を送れる状態かを確かめる
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # **送れない状態のまま解析すると、最後の送信で必ず失敗する。**
+        # 全ブランチの push で回す設定なので、そのままだと毎回赤くなり
+        # 「CI が赤いのが普通」の状態を作ってしまう。先に確かめて、
+        # 駄目なら解析を飛ばし、何をすればよいかを日本語で残す
+        run: |
+          set -uo pipefail
+
+          enabled=true
+          if ! out="$(gh api "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?per_page=1" 2>&1)"; then
+              case "$out" in
+                  *"must be enabled"*)
+                      enabled=false
+                      ;;
+                  *)
+                      # **想定外の失敗では止めない。** 権限や一時的な障害で
+                      # 解析を飛ばすと、気付かないうちに検査が消える。
+                      # 送れるものとみなして進め、本当に駄目なら解析ジョブが落ちる
+                      echo "::warning::前提を確認できなかった。解析を続ける"
+                      echo "$out"
+                      ;;
+              esac
+          fi
+
+          echo "advanced_security=$enabled" >> "$GITHUB_OUTPUT"
+
+          if [ "$enabled" = "false" ]; then
+              echo "::warning::前提が整っていないため CodeQL 解析を飛ばした"
+              {
+                  echo "## CodeQL 解析を飛ばした"
+                  echo
+                  echo "**このリポジトリでは、まだ解析結果を受け取れる状態になっていない。**"
+                  echo "設定はリポジトリの Settings から行う。"
+                  echo "手順は _documents/ブランチ運用方針.md の「CodeQL」を参照。"
+                  echo
+                  echo "⚠️ **整えるまで、このリポジトリのコードは静的解析されていない。**"
+              } >> "$GITHUB_STEP_SUMMARY"
+          else
+              echo "OK   解析結果を送れる状態になっている"
+          fi
+
+  analyze-csharp:
+    name: CodeQL 解析（C#）
+    needs: preflight
+    if: needs.preflight.outputs.advanced_security == 'true'
+    runs-on: ubuntu-latest
+    # 実ビルドを伴う。ci.yml のビルドと単体テストが数分で終わる規模のため 30 分で足りる
+    timeout-minutes: 30
+    permissions:
+      # SARIF の送信に要る
+      security-events: write
+      contents: read
+      # private / internal リポジトリでは、実行情報の読み取りに要る
+      actions: read
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          # **_reference（Pleasanter 本体・AGPL v3）は取得しない。**
+          # 解析対象ではない
+          submodules: false
+
+      - name: .NET SDK を用意する
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: 依存を復元する
+        # **CodeQL の初期化より前に済ませる。** build-mode: manual では
+        # init と analyze の間のビルドがトレースされる。復元まで巻き込むと
+        # 解析に無関係な処理を追わせることになる
+        run: dotnet restore VehicleVision.PleasanterTools.CalendarFeed.slnx
+
+      - name: CodeQL を初期化する
+        uses: github/codeql-action/init@v4
+        with:
+          languages: csharp
+          # **build-mode: none（ビルド無し）を採らない。** 本リポジトリは
+          # SDK スタイルかつ Linux でそのままビルドできるため、実ビルドを
+          # トレースさせた方が精度が高い。autobuild ではなく manual にしたのは、
+          # ソリューションが .slnx で autobuild が拾える保証が無いため
+          build-mode: manual
+          config-file: ${{ env.CODEQL_CONFIG_FILE }}
+
+      - name: ビルドする
+        # ci.yml と同じ構成でビルドする。Directory.Build.props で
+        # TreatWarningsAsErrors=true のため、警告が出た時点で落ちる
+        run: >-
+          dotnet build VehicleVision.PleasanterTools.CalendarFeed.slnx
+          --no-restore -c Release
+
+      - name: CodeQL 解析を実行する
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:csharp"
+
+  analyze-typescript:
+    name: CodeQL 解析（TypeScript）
+    needs: preflight
+    if: needs.preflight.outputs.advanced_security == 'true'
+    runs-on: ubuntu-latest
+    # ビルドを伴わない。フロントエンドは数ファイルの規模
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: CodeQL を初期化する
+        uses: github/codeql-action/init@v4
+        with:
+          # **javascript-typescript の 1 つだけを指定する。**
+          # javascript / typescript は同じ抽出器の別名であり、併記しても解析は 1 回
+          languages: javascript-typescript
+          build-mode: none
+          config-file: ${{ env.CODEQL_CONFIG_FILE }}
+
+      - name: CodeQL 解析を実行する
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:javascript-typescript"
+
+  summary:
+    name: CodeQL の読み方
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # 解析が落ちても読み方は出す
+    if: always()
+    needs:
+      - preflight
+      - analyze-csharp
+      - analyze-typescript
+    steps:
+      - name: 読み方を日本語で残す
+        # **アラート本文は英語のまま出る**（クエリパックが GitHub 提供のため）。
+        # 何をどう扱うかだけでも日本語で残しておく
+        run: |
+          {
+              echo "## CodeQL の結果の読み方"
+              echo
+              echo "- 指摘は **Security タブ > Code scanning** に出る。ここのログには出ない"
+              echo "- **アラートの題名と解説は英語**。CodeQL のクエリと解説文は GitHub 提供の"
+              echo "  クエリパックに埋め込まれており、日本語へ差し替える口が無い"
+              echo "- 対処は次のいずれか。**放置しないこと**"
+              echo "    1. 直す（原則こちら）"
+              echo "    2. 誤検出なら、Security タブで \`False positive\` として却下し、理由を日本語で書く"
+              echo "    3. 設計上そうしている場合は \`Used in tests\` などの区分で却下し、理由を日本語で書く"
+              echo "- **クエリスイートは security-extended**（.github/codeql/codeql-config.yml）"
+              echo "- **\`.svelte\` は解析されない。** ロジックは \`.ts\` 側へ置くこと"
+              echo
+              echo "| 解析 | 結果 |"
+              echo "| --- | --- |"
+              echo "| 前提の確認 | ${{ needs.preflight.result }} |"
+              echo "| C# | ${{ needs.analyze-csharp.result }} |"
+              echo "| TypeScript | ${{ needs.analyze-typescript.result }} |"
+              echo
+              echo "**\`skipped\` は「検査していない」という意味。**"
+              echo "緑に見えても、解析されていないことがある"
+          } >> "$GITHUB_STEP_SUMMARY"

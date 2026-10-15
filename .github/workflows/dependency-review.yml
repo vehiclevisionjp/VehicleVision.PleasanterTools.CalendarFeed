@@ -1,0 +1,75 @@
+# PR で入る依存を見る
+#
+# ■ 何を見るか
+#   1. **既知の脆弱性**（moderate 以上で落とす）
+#   2. **ライセンス**（コピーレフトを弾く）
+#
+# ■ ライセンスを見るのがここでは特に重要
+#   本製品はデュアルライセンス（AGPL ＋ 商用）である。
+#   **コピーレフトの依存が 1 つ入ると、商用ライセンスで提供できなくなる**
+#   （`LICENSING.md`、規約 7）。
+#   `NOTICE` への追記は人が行う約束だが、**約束は忘れられる。** ここで機械が見る。
+#
+# ■ dependency-audit.yml との違い
+#   あちらは既にある依存を定期的に見る（週次・全ブランチ）。
+#   **こちらは「これから入るもの」を PR の時点で止める。**
+#   入ってから気付くと、消すには使っている所を書き直すことになる。
+#
+# ■ 必須チェックにしていない
+#   新しい脆弱性が公表されると、**こちらのコードが変わらなくても赤くなる。**
+#   必須にすると、その修正 PR 自体がマージできなくなる
+#   （`_documents/ブランチ運用方針.md`）。
+
+name: 依存の確認
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - master
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: dependency-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: 入ってくる依存を見る
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 取り出す
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: 脆弱性とライセンスを見る
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: moderate
+          # **コピーレフトを弾く。** 入ると商用ライセンスで提供できなくなる。
+          #
+          # 許可の一覧ではなく拒否の一覧にしてあるのは、
+          # **許可の一覧だと `0BSD` や `ISC` のような無害なものまで落ちて
+          # 赤いのが当たり前になる**ため。
+          #
+          # **例外を通したいときは、ここから外す前に LICENSING.md で判断すること。**
+          deny-licenses: >-
+            GPL-1.0-only, GPL-1.0-or-later,
+            GPL-2.0-only, GPL-2.0-or-later,
+            GPL-3.0-only, GPL-3.0-or-later,
+            AGPL-1.0-only, AGPL-1.0-or-later,
+            AGPL-3.0-only, AGPL-3.0-or-later,
+            LGPL-2.0-only, LGPL-2.0-or-later,
+            LGPL-2.1-only, LGPL-2.1-or-later,
+            LGPL-3.0-only, LGPL-3.0-or-later,
+            MPL-1.1, MPL-2.0,
+            EPL-1.0, EPL-2.0,
+            CDDL-1.0, CDDL-1.1,
+            SSPL-1.0, BUSL-1.1,
+            CC-BY-NC-4.0, CC-BY-NC-SA-4.0
+          comment-summary-in-pr: always

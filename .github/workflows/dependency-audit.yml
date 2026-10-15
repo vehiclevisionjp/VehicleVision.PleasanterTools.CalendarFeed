@@ -1,0 +1,125 @@
+# 依存（NuGet / npm）に既知の脆弱性が無いかを検査する。
+#
+# **週次でも回す。** 脆弱性はこちらのコードが変わらなくても増える。push 契機だけだと、
+# 「最後に触った日から一度も検査していない」状態が延々と続く。
+#
+# **必須ステータスチェックにはしない。** 新たに公開された脆弱性で赤くなったとき、
+# その修正 PR 自体がマージできなくなる。更新の PR は Dependabot が出す
+# （.github/dependabot.yml）ので、ここは気付くための仕掛けとして扱う
+# （_documents/ブランチ運用方針.md「必須ステータスチェック」）。
+#
+# **actions/dependency-review-action は使わない。** GitHub の依存関係グラフを前提にした
+# action で、internal リポジトリでは Advanced Security の有効化が要る。
+# 本リポジトリでは無効のため（GET /repos/.../dependency-graph/sbom が HTTP 404、
+# 2026-08-19 実測）、GitHub の機能に依らない `dotnet list package --vulnerable` と
+# `npm audit` で見る。こちらは有効化の状態に関係なく必ず動く。
+#
+# 参照した一次情報（いずれも 2026-08-19 参照）
+#   - dotnet package list の --vulnerable / --include-transitive / --format json
+#     https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-package-list
+#   - actions/checkout v7 / actions/setup-dotnet v6 / actions/setup-node v7 は
+#     .github/workflows/ci.yml と同じ版に揃えた（勝手に上げない）
+name: 依存の脆弱性検査
+
+on:
+  # ci.yml と同じ契機（全ブランチへの push）。タグの push では回さない
+  push:
+    branches:
+      - "**"
+  # 毎週月曜 09:30 JST（月曜 00:30 UTC）。Dependabot の巡回（月曜 09:00 JST）の直後
+  schedule:
+    - cron: "30 0 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  nuget-audit:
+    name: NuGet 依存の脆弱性検査
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: .NET SDK を用意する
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: 脆弱性を検査する
+        # ⚠️ **`dotnet list package --vulnerable` は見つけても終了コード 0 を返す。**
+        #    そのままステップにすると永遠に緑になるため、JSON を読んで落とす
+        #    スクリプトを通す（scripts/nuget-vulnerable-check.sh の冒頭に実測を記録）
+        run: bash ./scripts/nuget-vulnerable-check.sh vulnerable.json
+
+      - name: 検査結果を残す
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: NuGet 脆弱性検査結果
+          path: vulnerable.json
+          if-no-files-found: ignore
+
+  npm-audit:
+    name: npm 依存の脆弱性検査
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/VehicleVision.PleasanterTools.CalendarFeed.Frontend
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: Node を用意する
+        uses: actions/setup-node@v7
+        with:
+          # ci.yml と同じ（Dockerfile の node:24-alpine に合わせてある）
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: >-
+            src/VehicleVision.PleasanterTools.CalendarFeed.Frontend/package-lock.json
+
+      - name: 依存を導入する
+        # **--ignore-scripts を付ける。** 検査のためだけの導入で、
+        # 依存側のインストールスクリプトを走らせる必要が無い
+        run: npm ci --ignore-scripts
+
+      - name: 脆弱性を検査する
+        # **npm audit は moderate 以上が残っていれば 0 以外で終わる。**
+        # NuGet 側と違い、こちらは終了コードをそのまま使える
+        run: npm audit --audit-level=moderate
+
+      - name: パッケージの署名を検証する
+        # レジストリ上の成果物が差し替えられていないかを見る
+        run: npm audit signatures
+
+  notice-consistency:
+    name: NOTICE と依存の整合検査
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: NOTICE の依存一覧を実物と突き合わせる
+        # **リリース時に気付くのでは遅い。** 依存を足した push の時点で落とす
+        # （_documents/リリース手順書.md「リリース前の確認」の自動化）
+        run: bash ./scripts/notice-check.sh
