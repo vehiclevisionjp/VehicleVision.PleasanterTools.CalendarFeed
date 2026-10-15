@@ -109,7 +109,7 @@ public sealed class AppSettingsTests : IDisposable
 
         var changed = await PutAsync(admin, new Dictionary<string, string?> { ["CALENDARFEED_PUBLIC_BASEURL"] = "https://other.test" });
         Assert.Equal(HttpStatusCode.BadRequest, changed.StatusCode);
-        Assert.Contains("外部設定で固定", (await changed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
+        Assert.Contains("fixed by external configuration", (await changed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString());
 
         Assert.Equal(HttpStatusCode.OK, (await PutAsync(admin, new Dictionary<string, string?> { ["CALENDARFEED_PUBLIC_BASEURL"] = "http://feed.test" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await PutAsync(admin, new Dictionary<string, string?> { ["CALENDARFEED_PUBLIC_BASEURL"] = null })).StatusCode);

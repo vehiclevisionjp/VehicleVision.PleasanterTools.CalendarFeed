@@ -1,3 +1,4 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using System.Globalization;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Feeds;
@@ -119,14 +120,14 @@ public sealed class FeedMapping
     }
 
     /// <summary>入力を検証する。問題があれば理由を、無ければ <c>null</c> を返す。</summary>
-    public string? Validate()
+    public string? Validate(string? language = null)
     {
         if (SummaryTemplate is null && !FeedColumns.IsText(SummaryColumn))
         {
-            return $"SummaryColumn に指定できない列です: {SummaryColumn}";
+            return ServerMessages.Get(ServerMessageKeys.MappingSummaryColumnInvalid, language, SummaryColumn);
         }
 
-        if (ValidateDateColumn(nameof(StartColumn), StartColumn, StartFormat) is { } startError)
+        if (ValidateDateColumn(nameof(StartColumn), StartColumn, StartFormat, language) is { } startError)
         {
             return startError;
         }
@@ -135,10 +136,10 @@ public sealed class FeedMapping
         {
             if (EndFormat is not null)
             {
-                return "EndColumn が無いときは EndFormat を指定できません。";
+                return ServerMessages.Get(ServerMessageKeys.MappingEndFormatWithoutEnd, language);
             }
         }
-        else if (ValidateDateColumn(nameof(EndColumn), EndColumn, EndFormat) is { } endError)
+        else if (ValidateDateColumn(nameof(EndColumn), EndColumn, EndFormat, language) is { } endError)
         {
             return endError;
         }
@@ -151,48 +152,47 @@ public sealed class FeedMapping
         {
             if (column is not null && !FeedColumns.IsText(column))
             {
-                return $"{name} に指定できない列です: {column}";
+                return ServerMessages.Get(ServerMessageKeys.MappingColumnInvalid, language, name, column);
             }
         }
 
         if (DefaultDurationMinutes is < 1 or > 1440)
         {
-            return "DefaultDurationMinutes は 1〜1440 で指定してください。";
+            return ServerMessages.Get(ServerMessageKeys.MappingDurationInvalid, language);
         }
 
-        return ValidateFormats();
+        return ValidateFormats(language);
     }
 
     /// <summary>開始・終了の列と書式の組み合わせを検証する。</summary>
-    private static string? ValidateDateColumn(string name, string column, string? format)
+    private static string? ValidateDateColumn(string name, string column, string? format, string? language)
     {
         if (FeedColumns.IsDate(column))
         {
             return format is null
                 ? null
-                : $"{name} は日付の列なので書式は要りません（文字の列に日付が入っているときだけ指定します）: {column}";
+                : ServerMessages.Get(ServerMessageKeys.MappingDateColumnNoFormat, language, name, column);
         }
 
         if (!FeedColumns.IsParsableText(column))
         {
-            return $"{name} は日付の列（StartTime / CompletionTime / DateA〜DateZ / Date001〜Date100 など）か、"
-                + $"日付が文字で入っている列（Class* / Description* / Title / Body）を指定してください: {column}";
+            return ServerMessages.Get(ServerMessageKeys.MappingDateColumnKind, language, name, column);
         }
 
         if (format is null)
         {
-            return $"{name} に文字の列を指定するときは、日付の書式（{name.Replace("Column", "Format", StringComparison.Ordinal)}）が要ります: {column}";
+            return ServerMessages.Get(ServerMessageKeys.MappingTextColumnNeedsFormat, language, name, name.Replace("Column", "Format", StringComparison.Ordinal), column);
         }
 
-        return TryParseFormat(format) is { } error ? $"{name.Replace("Column", "Format", StringComparison.Ordinal)}: {error}" : null;
+        return TryParseFormat(format, language) is { } error ? $"{name.Replace("Column", "Format", StringComparison.Ordinal)}: {error}" : null;
     }
 
     /// <summary>日付を読む書式として使えるか。**整形してから同じ書式で読み戻せること**を確かめる。</summary>
-    public static string? TryParseFormat(string format)
+    public static string? TryParseFormat(string format, string? language = null)
     {
         if (string.IsNullOrWhiteSpace(format) || format.Length > 100 || format.Any(char.IsControl))
         {
-            return "書式は 1〜100 文字（制御文字なし）で指定してください。";
+            return ServerMessages.Get(ServerMessageKeys.MappingFormatLengthInvalid, language);
         }
 
         try
@@ -206,32 +206,32 @@ public sealed class FeedMapping
             };
             return samples.All(sample => DateTime.TryParseExact(sample.ToString(format, CultureInfo.InvariantCulture), format, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
                 ? null
-                : $"書式「{format}」は、日付を読む書式として使えません（整形した値を同じ書式で読み戻せません）。";
+                : ServerMessages.Get(ServerMessageKeys.MappingDateFormatNotRoundTrip, language, format);
         }
         catch (FormatException)
         {
-            return $"書式「{format}」は、日付の書式として使えません。";
+            return ServerMessages.Get(ServerMessageKeys.MappingDateFormatUnusable, language, format);
         }
     }
 
     /// <summary>書式の指定を検証する（必須の有無・書式として使えるか）。</summary>
-    private string? ValidateFormats()
+    private string? ValidateFormats(string? language)
     {
         if (Formats is { } formats)
         {
             if (formats.Count > 50)
             {
-                return "Formats は 50 件までです。";
+                return ServerMessages.Get(ServerMessageKeys.MappingFormatsTooMany, language);
             }
 
             foreach (var (column, format) in formats)
             {
                 if (!FeedColumns.NeedsFormat(column))
                 {
-                    return $"Formats に指定できるのは日付・数値の列だけです: {column}";
+                    return ServerMessages.Get(ServerMessageKeys.MappingFormatsOnlyDateNumber, language, column);
                 }
 
-                if (TryFormat(column, format) is { } error)
+                if (TryFormat(column, format, language) is { } error)
                 {
                     return $"Formats[{column}]: {error}";
                 }
@@ -246,21 +246,21 @@ public sealed class FeedMapping
             {
                 parts = TextTemplate.Parse(SummaryTemplate);
             }
-            catch (FormatException ex)
+            catch (TemplateFormatException ex)
             {
-                return $"SummaryTemplate: {ex.Message}";
+                return $"SummaryTemplate: {ServerMessages.Get(ex.MessageKey, language, ex.Args)}";
             }
 
             if (parts.All(p => p.Column is null))
             {
-                return "SummaryTemplate に列が 1 つもありません（{列名} で指定します）。";
+                return ServerMessages.Get(ServerMessageKeys.MappingSummaryTemplateNoColumns, language);
             }
 
             foreach (var part in parts.Where(p => p.Column is not null))
             {
                 if (!FeedColumns.IsText(part.Column!))
                 {
-                    return $"SummaryTemplate に指定できない列です: {part.Column}";
+                    return ServerMessages.Get(ServerMessageKeys.MappingSummaryTemplateColumnInvalid, language, part.Column!);
                 }
 
                 if (!FeedColumns.NeedsFormat(part.Column!))
@@ -271,18 +271,18 @@ public sealed class FeedMapping
                 var format = part.Format ?? Formats?.GetValueOrDefault(part.Column!);
                 if (format is null)
                 {
-                    return $"SummaryTemplate: 日付・数値の列には書式が要ります（{{{part.Column}:書式}} か Formats）: {part.Column}";
+                    return ServerMessages.Get(ServerMessageKeys.MappingSummaryTemplateNeedsFormat, language, part.Column!);
                 }
 
-                if (TryFormat(part.Column!, format) is { } error)
+                if (TryFormat(part.Column!, format, language) is { } error)
                 {
-                    return $"SummaryTemplate の {{{part.Column}:{format}}}: {error}";
+                    return ServerMessages.Get(ServerMessageKeys.MappingSummaryTemplateFormatError, language, part.Column!, format, error);
                 }
             }
         }
         else if (FeedColumns.NeedsFormat(SummaryColumn) && Formats?.ContainsKey(SummaryColumn) != true)
         {
-            return $"SummaryColumn に日付・数値の列を指定するときは、Formats に書式が要ります: {SummaryColumn}";
+            return ServerMessages.Get(ServerMessageKeys.MappingSummaryColumnNeedsFormat, language, SummaryColumn);
         }
 
         foreach (var (name, column) in new[]
@@ -293,7 +293,7 @@ public sealed class FeedMapping
         {
             if (column is not null && FeedColumns.NeedsFormat(column) && Formats?.ContainsKey(column) != true)
             {
-                return $"{name} に日付・数値の列を指定するときは、Formats に書式が要ります: {column}";
+                return ServerMessages.Get(ServerMessageKeys.MappingColumnNeedsFormat, language, name, column);
             }
         }
 
@@ -304,11 +304,11 @@ public sealed class FeedMapping
     /// <remarks>
     /// 日付と数値で使える書式が違う。**カルチャはインバリアント**（書式文字列の解釈を環境に依存させない）。
     /// </remarks>
-    public static string? TryFormat(string column, string format)
+    public static string? TryFormat(string column, string format, string? language = null)
     {
         if (string.IsNullOrWhiteSpace(format) || format.Length > 100 || format.Any(char.IsControl))
         {
-            return "書式は 1〜100 文字（制御文字なし）で指定してください。";
+            return ServerMessages.Get(ServerMessageKeys.MappingFormatLengthInvalid, language);
         }
 
         try
@@ -320,7 +320,7 @@ public sealed class FeedMapping
         }
         catch (FormatException)
         {
-            return $"書式「{format}」は、{(FeedColumns.IsNumber(column) ? "数値" : "日付")}の書式として使えません。";
+            return ServerMessages.Get(FeedColumns.IsNumber(column) ? ServerMessageKeys.MappingNumberFormatUnusable : ServerMessageKeys.MappingDateFormatUnusable, language, format);
         }
     }
 }

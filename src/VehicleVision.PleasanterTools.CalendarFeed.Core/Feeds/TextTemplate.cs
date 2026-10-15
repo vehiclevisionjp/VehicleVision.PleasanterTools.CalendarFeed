@@ -1,3 +1,4 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -34,7 +35,7 @@ public static partial class TextTemplate
         ArgumentNullException.ThrowIfNull(template);
         if (template.Length > MaxLength)
         {
-            throw new FormatException($"テンプレートは {MaxLength} 文字までです。");
+            throw new TemplateFormatException(ServerMessageKeys.TemplateTooLong, MaxLength);
         }
 
         var parts = new List<Part>();
@@ -58,7 +59,7 @@ public static partial class TextTemplate
                         var close = template.IndexOf('}', i + 1);
                         if (close < 0)
                         {
-                            throw new FormatException("「{」が閉じていません。波括弧そのものは「{{」と書きます。");
+                            throw new TemplateFormatException(ServerMessageKeys.TemplateBraceUnclosed);
                         }
 
                         if (literal.Length > 0)
@@ -73,12 +74,12 @@ public static partial class TextTemplate
                         var format = colon < 0 ? null : body[(colon + 1)..];
                         if (!ColumnName().IsMatch(column))
                         {
-                            throw new FormatException($"列名が不正です: 「{column}」");
+                            throw new TemplateFormatException(ServerMessageKeys.TemplateColumnInvalid, column);
                         }
 
                         if (format is { Length: 0 })
                         {
-                            throw new FormatException($"書式が空です: 「{column}:」");
+                            throw new TemplateFormatException(ServerMessageKeys.TemplateFormatEmpty, column);
                         }
 
                         parts.Add(new Part(null, column, format));
@@ -87,7 +88,7 @@ public static partial class TextTemplate
                     }
 
                 case '}':
-                    throw new FormatException("「}」だけがあります。波括弧そのものは「}}」と書きます。");
+                    throw new TemplateFormatException(ServerMessageKeys.TemplateBraceStray);
                 default:
                     literal.Append(c);
                     break;

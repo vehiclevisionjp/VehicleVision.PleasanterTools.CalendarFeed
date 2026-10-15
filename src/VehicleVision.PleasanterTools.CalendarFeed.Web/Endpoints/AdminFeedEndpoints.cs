@@ -212,7 +212,7 @@ public sealed record CreateFeedRequest(
             return ServerMessages.Get(ServerMessageKeys.FeedSiteIdInvalid, language);
         }
 
-        if (Mapping?.Validate() is { } mappingError)
+        if (Mapping?.Validate(language) is { } mappingError)
         {
             return mappingError;
         }

@@ -1,3 +1,4 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using System.Collections.Immutable;
 using System.Globalization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
@@ -175,14 +176,12 @@ public sealed class PleasanterSsoOptions
         {
             if (internalUri is null)
             {
-                throw new InvalidOperationException(
-                    $"{EnabledKey} を有効にしたときは {InternalBaseUrlKey} が要ります。");
+                throw new SettingException(ServerMessageKeys.SettingRequiredWhenEnabled, [EnabledKey, InternalBaseUrlKey]);
             }
 
             if (loginUrl.Length == 0)
             {
-                throw new InvalidOperationException(
-                    $"{EnabledKey} を有効にしたときは {LoginUrlKey} が要ります。");
+                throw new SettingException(ServerMessageKeys.SettingRequiredWhenEnabled, [EnabledKey, LoginUrlKey]);
             }
         }
 
@@ -217,8 +216,7 @@ public sealed class PleasanterSsoOptions
         {
             if (!part.All(IsCookieNameCharacter))
             {
-                throw new InvalidOperationException(
-                    $"{CookieNamesKey} に cookie の名前として使えない文字があります: {part}");
+                throw new SettingException(ServerMessageKeys.SsoCookieNameInvalidChars, [CookieNamesKey, part]);
             }
 
             // **本アプリの cookie と前方一致で重なる指定は受け付けない。**
@@ -226,8 +224,7 @@ public sealed class PleasanterSsoOptions
             if (part.StartsWith(OwnCookiePrefix, StringComparison.OrdinalIgnoreCase)
                 || OwnCookiePrefix.StartsWith(part, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException(
-                    $"{CookieNamesKey} に本アプリの cookie（{OwnCookiePrefix} で始まる名前）と重なる指定があります: {part}");
+                throw new SettingException(ServerMessageKeys.SsoCookieNameOverlapsOwn, [CookieNamesKey, OwnCookiePrefix, part]);
             }
 
             if (!builder.Contains(part, StringComparer.Ordinal))
@@ -238,7 +235,7 @@ public sealed class PleasanterSsoOptions
 
         if (builder.Count == 0)
         {
-            throw new InvalidOperationException($"{CookieNamesKey} に転送する cookie の名前がありません。");
+            throw new SettingException(ServerMessageKeys.SsoCookieNamesEmpty, [CookieNamesKey]);
         }
 
         return builder.ToImmutable();
@@ -263,8 +260,7 @@ public sealed class PleasanterSsoOptions
             || !string.IsNullOrEmpty(uri.Fragment)
             || !string.IsNullOrEmpty(uri.UserInfo))
         {
-            throw new InvalidOperationException(
-                $"{InternalBaseUrlKey} は http(s) の絶対 URL で書いてください（問い合わせ文字列・資格情報は不可）: {value}");
+            throw new SettingException(ServerMessageKeys.SsoInternalUrlInvalid, [InternalBaseUrlKey, value]);
         }
 
         // **末尾を / にそろえる。** 相対の結合で最後の区切りが落ちないように
@@ -286,8 +282,7 @@ public sealed class PleasanterSsoOptions
                 || value.StartsWith("/\\", StringComparison.Ordinal)
                 || value.Any(char.IsControl))
             {
-                throw new InvalidOperationException(
-                    $"{key} は / で始まる同じホストのパスか、http(s) の絶対 URL で書いてください: {value}");
+                throw new SettingException(ServerMessageKeys.SsoBrowserUrlInvalid, [key, value]);
             }
 
             return;
@@ -296,8 +291,7 @@ public sealed class PleasanterSsoOptions
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
         {
-            throw new InvalidOperationException(
-                $"{key} は / で始まる同じホストのパスか、http(s) の絶対 URL で書いてください: {value}");
+            throw new SettingException(ServerMessageKeys.SsoBrowserUrlInvalid, [key, value]);
         }
     }
 
@@ -312,7 +306,7 @@ public sealed class PleasanterSsoOptions
         var parts = raw.Split([',', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (raw.Length > 1024 || parts.Length is 0 or > 64)
         {
-            throw new InvalidOperationException($"{key} は正の ID を 64 件以内、1024 文字以内で指定してください。");
+            throw new SettingException(ServerMessageKeys.SsoIdListTooLong, [key]);
         }
 
         var ids = ImmutableArray.CreateBuilder<int>();
@@ -320,7 +314,7 @@ public sealed class PleasanterSsoOptions
         {
             if (!int.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0)
             {
-                throw new InvalidOperationException($"{key} は正の ID をカンマか改行で区切って指定してください。");
+                throw new SettingException(ServerMessageKeys.SsoIdListInvalid, [key]);
             }
 
             if (!ids.Contains(id))
@@ -344,7 +338,7 @@ public sealed class PleasanterSsoOptions
 
         if (!bool.TryParse(trimmed, out var parsed))
         {
-            throw new InvalidOperationException($"{key} は true か false で指定してください: {trimmed}");
+            throw new SettingException(ServerMessageKeys.SettingBooleanValueInvalid, [key, trimmed]);
         }
 
         return parsed;
@@ -362,8 +356,7 @@ public sealed class PleasanterSsoOptions
             || parsed < minimum
             || parsed > maximum)
         {
-            throw new InvalidOperationException(
-                $"{key} は {minimum} 以上 {maximum} 以下の整数で指定してください: {trimmed}");
+            throw new SettingException(ServerMessageKeys.SettingIntegerRangeInvalid, [key, minimum, maximum, trimmed]);
         }
 
         return parsed;
@@ -379,8 +372,7 @@ public sealed class PleasanterSsoOptions
         }
 
         return AdminRoles.All.FirstOrDefault(role => string.Equals(role, trimmed, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException(
-                $"{RegisterRoleKey} に知らない値が入っています: {trimmed}（使えるのは {string.Join(" / ", AdminRoles.All)}）");
+            ?? throw new SettingException(ServerMessageKeys.SettingUnknownValue, [RegisterRoleKey, trimmed, string.Join(" / ", AdminRoles.All)]);
     }
 
     /// <summary>知らない値は例外にする。**書き間違いを黙って既定へ落とさない。**</summary>
@@ -397,9 +389,7 @@ public sealed class PleasanterSsoOptions
             || !Enum.IsDefined(parsed)
             || int.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
         {
-            throw new InvalidOperationException(
-                $"{key} に知らない値が入っています: {trimmed}"
-                + $"（使えるのは {string.Join(" / ", Enum.GetNames<TEnum>())}）");
+            throw new SettingException(ServerMessageKeys.SettingUnknownValue, [key, trimmed, string.Join(" / ", Enum.GetNames<TEnum>())]);
         }
 
         return parsed;
