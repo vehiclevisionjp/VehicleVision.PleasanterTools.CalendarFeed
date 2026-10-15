@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
@@ -18,20 +20,18 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Endpoints;
 /// </remarks>
 public static class AdminAuthEndpoints
 {
-    private static readonly object Generic = new
-    {
-        error = "ログイン ID またはパスワードが違います。何度も失敗した場合は、しばらく待ってからやり直してください。",
-    };
-
     /// <summary>端末の一覧に出す接続元（表示用。認可には使わない）。</summary>
     internal static string? Ip(HttpContext http) => http.Connection.RemoteIpAddress?.ToString();
 
     /// <summary>端末の一覧に出す User-Agent（表示用。長さは保管側で切る）。</summary>
     internal static string? UserAgentOf(HttpContext http) => http.Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null;
 
-    private static IResult Unauthorized() => Results.Json(Generic, statusCode: StatusCodes.Status401Unauthorized);
+    private static IResult Unauthorized() => ApiError.Of(StatusCodes.Status401Unauthorized, ServerMessageKeys.InvalidCredentials);
 
+    /// <summary>すでに言語ごとに組み立てた文言（パスワードの条件など）で返す。</summary>
     private static IResult Bad(string error) => Results.Json(new { error }, statusCode: StatusCodes.Status400BadRequest);
+
+    private static IResult BadKey(string key, params object[] args) => ApiError.Of(StatusCodes.Status400BadRequest, key, args);
 
     /// <summary>管理者認証の入口を登録する。</summary>
     public static void MapAdminAuth(this WebApplication app)
@@ -42,7 +42,7 @@ public static class AdminAuthEndpoints
         group.AddEndpointFilter(async (context, next) =>
             AdminSessionGuard.IsSameOrigin(context.HttpContext)
                 ? await next(context)
-                : Results.Json(new { error = "別のサイトからの要求は受け付けません。" }, statusCode: StatusCodes.Status403Forbidden));
+                : ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.CrossSiteRejected));
 
         // ログイン画面が出し分けに使う（認証前に見える値だけ。SAML の釦の有無と文字）
         group.MapGet("/status", async (IAdminUserStore users, AdminAuthOptions options, RuntimeSettings settings, CancellationToken ct) =>
@@ -93,12 +93,12 @@ public static class AdminAuthEndpoints
         ILogger<SetupRequest> logger,
         CancellationToken ct)
     {
-        if (ValidateLoginId(request.LoginId) is { } loginIdError)
+        if (ValidateLoginId(request.LoginId, RequestLanguage.Of(http)) is { } loginIdError)
         {
             return Bad(loginIdError);
         }
 
-        if (options.PasswordPolicy.Validate(request.LoginId!.Trim(), request.Password ?? "", request.Language) is { } passwordError)
+        if (options.PasswordPolicy.Validate(request.LoginId!.Trim(), request.Password ?? "", RequestLanguage.Of(http) ?? request.Language) is { } passwordError)
         {
             return Bad(passwordError);
         }
@@ -108,7 +108,7 @@ public static class AdminAuthEndpoints
             request.LoginId!, PasswordHasher.Hash(request.Password!), request.Language ?? "ja", ct);
         if (admin is null)
         {
-            return Results.Json(new { error = "最初の管理者はすでに作られています。" }, statusCode: StatusCodes.Status409Conflict);
+            return ApiError.Of(StatusCodes.Status409Conflict, ServerMessageKeys.AdministratorAlreadyExists);
         }
 
         logger.LogInformation("最初の管理者を作成しました（{UserId}）", admin.Id);
@@ -379,11 +379,11 @@ public static class AdminAuthEndpoints
             }
 
             await audit.WriteAsync(http, AuditActions.PasswordChangeFailed, false, admin.User, detail: "bad-current-password");
-            return Results.Json(new { error = "現在のパスワードが違います。" }, statusCode: StatusCodes.Status403Forbidden);
+            return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.CurrentPasswordRejected);
         }
 
         // **最初の管理者と同じ条件を通す**（片方だけ緩いと、そこが一番弱い所になる）
-        if (options.PasswordPolicy.Validate(admin.User.LoginId, request.NewPassword ?? "", admin.User.Language) is { } error)
+        if (options.PasswordPolicy.Validate(admin.User.LoginId, request.NewPassword ?? "", RequestLanguage.Of(http) ?? admin.User.Language) is { } error)
         {
             return Bad(error);
         }
@@ -409,12 +409,12 @@ public static class AdminAuthEndpoints
         // **無効では登録の口を閉じる**（画面から隠すだけでは、API を直接叩かれたときに通ってしまう）
         if (options.TwoFactor == TwoFactorMode.Disabled)
         {
-            return Results.Json(new { error = "2 要素は無効に設定されています。" }, statusCode: StatusCodes.Status403Forbidden);
+            return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.TwoFactorDisabled);
         }
 
         if (await ResolveForEnrollmentAsync(http, sessions, users, options, time.GetUtcNow(), ct) is not { } who)
         {
-            return Results.Json(new { error = "ログインが必要です。" }, statusCode: StatusCodes.Status401Unauthorized);
+            return ApiError.Of(StatusCodes.Status401Unauthorized, ServerMessageKeys.LoginRequired);
         }
 
         var secret = TotpService.GenerateSecret();
@@ -435,24 +435,24 @@ public static class AdminAuthEndpoints
         var now = time.GetUtcNow();
         if (options.TwoFactor == TwoFactorMode.Disabled)
         {
-            return Results.Json(new { error = "2 要素は無効に設定されています。" }, statusCode: StatusCodes.Status403Forbidden);
+            return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.TwoFactorDisabled);
         }
 
         if (await ResolveForEnrollmentAsync(http, sessions, users, options, now, ct) is not { } who)
         {
-            return Results.Json(new { error = "ログインが必要です。" }, statusCode: StatusCodes.Status401Unauthorized);
+            return ApiError.Of(StatusCodes.Status401Unauthorized, ServerMessageKeys.LoginRequired);
         }
 
         if (await users.GetTotpPendingAsync(who.User.Id, ct) is not { } secret)
         {
-            return Bad("先に登録を始めてください（/admin/api/me/totp/begin）。");
+            return BadKey(ServerMessageKeys.EnrollmentBeginRequired);
         }
 
         if (!TotpService.Verify(secret, request.Code ?? "", now.UtcDateTime, out var step))
         {
             await users.RecordFailureAsync(who.User.Id, options.LockoutThreshold, options.Lockout, now, ct);
             await audit.WriteAsync(http, AuditActions.TotpEnrollFailed, false, who.User);
-            return Bad("数字が違います。認証アプリに表示されている 6 桁を入力してください。");
+            return BadKey(ServerMessageKeys.TotpCodeMismatch);
         }
 
         // **登録し直すと前の復旧コードは消える。** 復旧コードは、ここで 1 度だけ見せる
@@ -487,7 +487,7 @@ public static class AdminAuthEndpoints
         // **必須では自分で解除できない**
         if (options.TwoFactor == TwoFactorMode.Required)
         {
-            return Results.Json(new { error = "2 要素は必須に設定されているため、解除できません。" }, statusCode: StatusCodes.Status403Forbidden);
+            return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.TwoFactorRequired);
         }
 
         // パスワードの再確認つき（乗っ取られた端末から保護を外されない）
@@ -502,7 +502,7 @@ public static class AdminAuthEndpoints
             }
 
             await audit.WriteAsync(http, AuditActions.TotpDisableFailed, false, admin.User, detail: "bad-password");
-            return Results.Json(new { error = "パスワードが違います。" }, statusCode: StatusCodes.Status403Forbidden);
+            return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.PasswordRejected);
         }
 
         await users.DisableTotpAsync(admin.User.Id, ct);
@@ -614,11 +614,11 @@ public static class AdminAuthEndpoints
         }
     }
 
-    internal static string? ValidateLoginId(string? loginId)
+    internal static string? ValidateLoginId(string? loginId, string? language = null)
     {
         var trimmed = loginId?.Trim();
         return string.IsNullOrEmpty(trimmed) || trimmed.Length > 100 || trimmed.Any(char.IsControl)
-            ? "ログイン ID は 1〜100 文字（制御文字なし）で指定してください。"
+            ? ServerMessages.Get(ServerMessageKeys.LoginIdInvalid, language)
             : null;
     }
 }

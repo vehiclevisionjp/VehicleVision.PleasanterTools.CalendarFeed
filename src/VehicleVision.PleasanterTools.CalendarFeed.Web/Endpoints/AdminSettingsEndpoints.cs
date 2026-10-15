@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using System.Net.Mail;
 using System.Security.Cryptography;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
@@ -42,7 +44,7 @@ public static class AdminSettingsEndpoints
         {
             if (request.Values is not { Count: > 0 })
             {
-                return Results.BadRequest(new { error = "values に、変える設定を指定してください。" });
+                return ApiError.Of(StatusCodes.Status400BadRequest, ServerMessageKeys.SettingsValuesRequired);
             }
 
             try
@@ -63,7 +65,7 @@ public static class AdminSettingsEndpoints
             catch (InvalidOperationException ex) when (ex.Message.Contains(UnconfiguredSecretProtector.SettingName, StringComparison.Ordinal))
             {
                 // 秘密を保管するには、秘密の鍵が要る
-                return Results.BadRequest(new { error = $"秘密の設定を保管するには {UnconfiguredSecretProtector.SettingName} の設定が要ります。" });
+                return ApiError.Of(StatusCodes.Status400BadRequest, ServerMessageKeys.SecretSettingNeedsSecretKey, UnconfiguredSecretProtector.SettingName);
             }
         });
 

@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 
@@ -52,7 +54,7 @@ public sealed class RequirePermissionFilter(string permission) : IEndpointFilter
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
         AdminPermissions.Has(AdminContext.Of(context.HttpContext).User.Role, permission)
             ? await next(context).ConfigureAwait(false)
-            : Results.Json(new { error = $"この操作には権限（{permission}）が要ります。" }, statusCode: StatusCodes.Status403Forbidden);
+            : ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.PermissionRequired, permission);
 
     /// <summary>エンドポイントへ付けるフィルタを作る。</summary>
     public static RequirePermissionFilter Of(string permission) => new(permission);

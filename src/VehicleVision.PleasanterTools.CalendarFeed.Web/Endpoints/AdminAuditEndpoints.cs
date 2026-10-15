@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using System.Globalization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
@@ -31,7 +33,7 @@ public static class AdminAuditEndpoints
                 if (!DateTimeOffset.TryParse(
                         before, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed))
                 {
-                    return Results.BadRequest(new { error = "before は日時（ISO 8601）で指定してください。" });
+                    return ApiError.Of(StatusCodes.Status400BadRequest, ServerMessageKeys.AuditBeforeInvalid);
                 }
 
                 beforeTime = parsed;

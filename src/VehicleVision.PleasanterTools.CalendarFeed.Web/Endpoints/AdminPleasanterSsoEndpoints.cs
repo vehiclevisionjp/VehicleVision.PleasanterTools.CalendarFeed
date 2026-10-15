@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
@@ -48,7 +50,7 @@ public static class AdminPleasanterSsoEndpoints
         {
             if (!AdminSessionGuard.IsSameOrigin(http))
             {
-                return Results.Json(new { error = "別のサイトからの要求は受け付けません。" }, statusCode: StatusCodes.Status403Forbidden);
+                return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.CrossSiteRejected);
             }
 
             var config = settings.Current;

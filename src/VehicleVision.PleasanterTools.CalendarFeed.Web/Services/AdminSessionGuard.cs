@@ -1,3 +1,5 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Localization;
+using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
@@ -98,7 +100,7 @@ public sealed class AdminSessionFilter(
 
         if (!AdminSessionGuard.IsSameOrigin(http))
         {
-            return Results.Json(new { error = "別のサイトからの要求は受け付けません。" }, statusCode: StatusCodes.Status403Forbidden);
+            return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.CrossSiteRejected);
         }
 
         // **2 要素の途中（Pending）では何も操作させない。** 見るのは Session だけ
@@ -107,7 +109,7 @@ public sealed class AdminSessionFilter(
             || await sessions.FindAsync(sessionId, time.GetUtcNow(), http.RequestAborted).ConfigureAwait(false) is not { Kind: AdminSessionKind.Session } session
             || await users.FindByIdAsync(session.UserId, http.RequestAborted).ConfigureAwait(false) is not { IsDisabled: false } user)
         {
-            return Results.Json(new { error = "ログインが必要です。" }, statusCode: StatusCodes.Status401Unauthorized);
+            return ApiError.Of(StatusCodes.Status401Unauthorized, ServerMessageKeys.LoginRequired);
         }
 
         // Pleasanter のログインで入ったセッションは、一定間隔で Pleasanter に確かめ直す（ログアウト・別人・所属の変更を、ここで受け止める）
@@ -116,11 +118,11 @@ public sealed class AdminSessionFilter(
             case PleasanterSsoRevalidation.Rejected:
                 await sessions.DeleteAsync(sessionId, http.RequestAborted).ConfigureAwait(false);
                 AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
-                return Results.Json(new { error = "ログインが必要です。" }, statusCode: StatusCodes.Status401Unauthorized);
+                return ApiError.Of(StatusCodes.Status401Unauthorized, ServerMessageKeys.LoginRequired);
             case PleasanterSsoRevalidation.UpstreamError:
                 await sessions.DeleteAsync(sessionId, http.RequestAborted).ConfigureAwait(false);
                 AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
-                return Results.Json(new { error = "Pleasanter に確かめられなかったため、ログインを終了しました。しばらくしてからやり直してください。" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+                return ApiError.Of(StatusCodes.Status503ServiceUnavailable, ServerMessageKeys.UpstreamSessionEnded);
         }
 
         http.Items[AdminContext.ItemKey] = new AdminContext(user, sessionId, AdminSessionKind.Session);
