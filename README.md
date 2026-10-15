@@ -13,7 +13,9 @@ Outlook / Google カレンダー / Apple カレンダーの「URL から購読�
 
 ## 状態
 
-**足場（v0.1.0）。** 購読エンドポイント・管理 API・**管理者認証（ログイン ID ＋ パスワード ＋ TOTP）** が動く。**管理画面（UI）は未実装。**
+**v0.x（1.0.0 未満は互換を保証しない）。** 購読エンドポイント・**管理画面（Svelte。7 言語）**・管理 API・**管理者の認証と管理**
+（パスワード ＋ TOTP、5 つの役割、招待メール、端末の管理、監査ログ）・**アプリケーション設定の画面編集**・**SAML 2.0 / Pleasanter のログイン（任意）**・
+**取得失敗のメール通知（任意）**・複数台での運用が動く。機能の一覧は [`_documents/機能一覧.md`](_documents/機能一覧.md)。
 
 ## 使い方
 
@@ -63,7 +65,16 @@ curl -b jar -X POST $B/admin/api/feeds -H "Content-Type: application/json" \
 | `POST /admin/api/feeds` | ログイン済み | フィードの作成 |
 | `POST /admin/api/feeds/{id}/rotate` | ログイン済み | トークンの作り直し（旧トークンは即失効） |
 | `PUT /admin/api/feeds/{id}/apikey` | ログイン済み | API キー（と利用者のタイムゾーン）の差し替え |
+| `PUT /admin/api/feeds/{id}` | ログイン済み | フィードの編集（購読 URL と API キーは変わらない） |
 | `DELETE /admin/api/feeds/{id}` | ログイン済み | フィードの失効 |
+| `GET/POST/PUT … /admin/api/users` | `users.read` / `users.write` | 管理者の一覧・招待・役割・無効化・2 要素の解除・端末の失効（**運用手順書の「管理者の管理」**） |
+| `GET /admin/api/me/sessions/` ほか | ログイン済み | 自分の端末の一覧（入った方式つき）・失効 |
+| `GET /admin/api/audit-logs/` | `audit.read` | 監査ログ |
+| `GET/PUT /admin/api/settings/` | `settings.manage` | アプリケーション設定の編集（外部設定が優先。秘密は返さない） |
+| `/admin/api/saml/*` | なし（有効なときだけ） | SAML 2.0 のログイン（メタデータ・開始・ACS・単一ログアウト） |
+| `POST /admin/api/pleasanter-sso/check` | なし（有効なときだけ） | Pleasanter のログインで入る（Pleasanter の cookie を転送して本人を確かめる） |
+
+管理画面は `/admin/`（ブラウザ）。上の API は管理画面が使うもので、cookie ＋ 状態を変える要求は同じサイトからのものだけ受ける。
 
 ## 対応する RDBMS
 
@@ -85,6 +96,9 @@ npm ci && npm test && npm run build
 
 管理画面の画面の写しは [`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md)（[`tools/screenshots`](tools/screenshots/README.md) で撮り直せる）。
 
+**実機（Pleasanter・Keycloak）での通し**は CI の「端から端まで通す試験」（`.github/workflows/e2e.yml`）で回す。手元でも
+`tools/pleasanter-testenv/sso_roundtrip.py`（Pleasanter のログイン）・`tools/saml-idp/e2e.py`（SAML）で通せる。
+
 **4 種の RDBMS の結合テスト**は、検証環境（`tools/pleasanter-testenv`）の PostgreSQL・MySQL・SQL Server に当てる。
 **接続文字列の環境変数を設定しないと、SQLite 以外は何も流れずに緑になる**ので、`CALENDARFEED_REQUIRE_ALL_RDBMS=1` で
 未設定を失敗にできる（CI は必ずこれを立てる）。手順は [`tools/pleasanter-testenv/README.md`](tools/pleasanter-testenv/README.md)。
@@ -93,7 +107,9 @@ npm ci && npm test && npm run build
 | --- | --- |
 | [`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) | 設計 |
 | [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md) | 導入・日常運用・更新・困ったとき（鍵を失ったとき、プロキシのログ） |
-| [`_documents/実機検証結果.md`](_documents/実機検証結果.md) | 実機で確かめた Pleasanter の挙動 |
+| [`_documents/機能一覧.md`](_documents/機能一覧.md) | 機能・方式・設定・関連 Issue |
+| [`_documents/実機検証結果.md`](_documents/実機検証結果.md) | 実機（Pleasanter・Keycloak）で確かめた挙動 |
+| [`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md) | 管理画面の画面の写し |
 | `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用**）。[README](_reference/README.md) |
 | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | 開発規約（単一の参照元）。Claude Code は [`CLAUDE.md`](CLAUDE.md) から辿る |
 

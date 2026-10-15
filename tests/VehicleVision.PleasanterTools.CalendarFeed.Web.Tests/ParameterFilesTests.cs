@@ -38,6 +38,30 @@ public sealed class ParameterFilesTests : IDisposable
     }
 
     [Fact]
+    public void 失敗の通知の設定も_ファイルのキーを写す()
+    {
+        Write("Feed.json", """{ "FailureNotify": true, "FailureNotifyThreshold": 5, "FailureNotifyRepeatHours": 12 }""");
+
+        var config = Build();
+
+        Assert.Equal("True", config[AppSettingDefinitions.FeedFailureNotify]);
+        Assert.Equal("5", config[AppSettingDefinitions.FeedFailureNotifyThreshold]);
+        Assert.Equal("12", config[AppSettingDefinitions.FeedFailureNotifyRepeatHours]);
+    }
+
+    [Fact]
+    public void SAMLとPleasanterのログインの設定は_環境変数と同じ正式名のキーをファイルへそのまま書ける()
+    {
+        // 別名の写しが無い設定（SAML・Pleasanter のログイン）は、正式名を書けばよい（README に書いてある）
+        Write("Service.json", """{ "CALENDARFEED_SAML_ENABLED": "true", "CALENDARFEED_PLEASANTERSSO_LOGINURL": "/users/login" }""");
+
+        var config = Build();
+
+        Assert.Equal("true", config["CALENDARFEED_SAML_ENABLED"]);
+        Assert.Equal("/users/login", config["CALENDARFEED_PLEASANTERSSO_LOGINURL"]);
+    }
+
+    [Fact]
     public void 優先順位はlocal_jsonが環境変数より強く環境変数がjsonより強い()
     {
         Write("Pleasanter.json", """{ "BaseUrl": "https://file.test" }""");

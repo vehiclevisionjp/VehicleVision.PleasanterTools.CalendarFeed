@@ -66,6 +66,9 @@ public static class ParameterFiles
             ["CacheSeconds"] = AppSettings.FeedCacheSeconds,
             ["MaxEvents"] = AppSettings.FeedMaxEvents,
             ["PageSize"] = AppSettings.FeedPageSize,
+            ["FailureNotify"] = AppSettingDefinitions.FeedFailureNotify,
+            ["FailureNotifyThreshold"] = AppSettingDefinitions.FeedFailureNotifyThreshold,
+            ["FailureNotifyRepeatHours"] = AppSettingDefinitions.FeedFailureNotifyRepeatHours,
 
             // Rds.json
             ["Provider"] = AppSettings.DbProvider,
