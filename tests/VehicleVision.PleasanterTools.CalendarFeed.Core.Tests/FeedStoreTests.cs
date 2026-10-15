@@ -36,7 +36,7 @@ public static class TestDatabases
 
     /// <summary>
     /// マイグレーションを当てる。**テストクラスは並列に走り、共有の DB へ同時に当てると「表が既にある」で落ちる**
-    /// （本体のマイグレーションに複数インスタンスの排他が無いことの現れ。方針書 8 章 #5）ので、直列にする。
+    /// ので、プロセスの中でも直列にする（本体は DB の排他ロックで 1 台に絞る: MigrationLock。ここは、その待ちで他のテストを遅らせないための二重の備え）。
     /// </summary>
     public static void Migrate(DatabaseProvider provider, string connectionString)
     {

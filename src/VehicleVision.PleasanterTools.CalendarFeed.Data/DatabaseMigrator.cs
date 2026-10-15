@@ -9,16 +9,25 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Data;
 /// **起動時に自動で当てる**（無効にして手で当てることもできる）。履歴は FluentMigrator の <c>VersionInfo</c> 表に残る。
 /// </para>
 /// <para>
-/// ⚠️ **複数インスタンスの同時起動の排他は無い。** 単一プロセスが既定の前提（方針書 8 章 #5）。
-/// 複数台にするときは、先に 1 台だけで当ててから増やす。
+/// **複数インスタンスを同時に起動しても、当てるのは 1 台だけ**（DB の排他ロック。<see cref="MigrationLock"/>）。
+/// 後から来た台は、先の台が当て終わるまで待ち、当て終わった後は何もしない。
 /// </para>
 /// </remarks>
 public static class DatabaseMigrator
 {
     /// <summary>未適用のマイグレーションをすべて当てる。</summary>
-    public static void Migrate(DatabaseProvider provider, string connectionString)
+    public static void Migrate(DatabaseProvider provider, string connectionString) =>
+        Migrate(provider, connectionString, LockTimeout);
+
+    /// <summary>ロックを待つ長さの既定。マイグレーション自体は短いが、大きい DB の変更を待つことがあるので長めに取る。</summary>
+    public static readonly TimeSpan LockTimeout = TimeSpan.FromMinutes(5);
+
+    /// <summary>未適用のマイグレーションをすべて当てる。当てる間は排他ロックを持ち、<paramref name="lockTimeout"/> 待っても取れなければ <see cref="TimeoutException"/>。</summary>
+    public static void Migrate(DatabaseProvider provider, string connectionString, TimeSpan lockTimeout)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+
+        using var migrationLock = MigrationLock.Acquire(provider, connectionString, lockTimeout);
 
         using var services = new ServiceCollection()
             .AddFluentMigratorCore()

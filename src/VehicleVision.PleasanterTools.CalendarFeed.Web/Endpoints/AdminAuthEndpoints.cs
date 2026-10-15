@@ -66,20 +66,20 @@ public static class AdminAuthEndpoints
         });
 
         // **ログインの試行だけ別枠のレート制限**（全体の枠に紛れさせると総当たりが通る）
-        group.MapPost("/setup", Setup).RequireRateLimiting("adminLogin");
-        group.MapPost("/login", Login).RequireRateLimiting("adminLogin");
-        group.MapPost("/login/totp", LoginTotp).RequireRateLimiting("adminLogin");
-        group.MapPost("/login/recovery", LoginRecovery).RequireRateLimiting("adminLogin");
+        group.MapPost("/setup", Setup).RequireAdminLoginRateLimit();
+        group.MapPost("/login", Login).RequireAdminLoginRateLimit();
+        group.MapPost("/login/totp", LoginTotp).RequireAdminLoginRateLimit();
+        group.MapPost("/login/recovery", LoginRecovery).RequireAdminLoginRateLimit();
         group.MapPost("/logout", Logout);
 
         // 2 要素の登録は、ログイン済み、または「必須で未登録」の Pending から。フィルタを付けずに中で判断する
         group.MapPost("/me/totp/begin", TotpBegin);
-        group.MapPost("/me/totp/complete", TotpComplete).RequireRateLimiting("adminLogin");
+        group.MapPost("/me/totp/complete", TotpComplete).RequireAdminLoginRateLimit();
 
         var me = group.MapGroup("/me").AddEndpointFilter<AdminSessionFilter>();
         me.MapGet("/", Me);
-        me.MapPost("/password", ChangePassword).RequireRateLimiting("adminLogin");
-        me.MapPost("/totp/disable", TotpDisable).RequireRateLimiting("adminLogin");
+        me.MapPost("/password", ChangePassword).RequireAdminLoginRateLimit();
+        me.MapPost("/totp/disable", TotpDisable).RequireAdminLoginRateLimit();
     }
 
     // ---- 最初の管理者 ----------------------------------------------------------------

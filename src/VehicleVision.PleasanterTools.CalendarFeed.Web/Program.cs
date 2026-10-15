@@ -70,6 +70,10 @@ builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 // ---- メール（招待）。送信待ちへ暗号化して積み、アプリの中のワーカーが送る ----------------------
 // **無効（既定）なら何も送らない。** 招待は画面の URL を手で渡す。設定は管理画面から編集できる
 builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
+builder.Services.AddSingleton<IRateLimitStore, RateLimitStore>();
+builder.Services.AddSingleton<SharedRateLimiter>();
+builder.Services.AddSingleton<RateLimitPurgeService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RateLimitPurgeService>());
 builder.Services.AddSingleton<IMailPayloadProtector, MailPayloadProtector>();
 builder.Services.AddSingleton<IMailTransport, ConfiguredMailTransport>();
 builder.Services.AddSingleton<MailSender>();
@@ -100,13 +104,8 @@ builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     // **ログインの試行だけ別枠**（IP ごと 5 分に 10 回）。全体の枠に紛れさせると総当たりが通る
-    o.AddPolicy("adminLogin", http => RateLimitPartition.GetFixedWindowLimiter(
-        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(5) }));
-    // Pleasanter のログインの確認は、画面が待つ間くり返し呼ぶので別枠（ログインの枠を使い切らせない）
-    o.AddPolicy(AdminPleasanterSsoEndpoints.CheckRateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
-        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = AdminPleasanterSsoEndpoints.CheckRequestsPer5Minutes, Window = TimeSpan.FromMinutes(5) }));
+    // **ログインの試行・Pleasanter のログインの確認の枠は、複数台で数えを共有する**（SharedRateLimits。DB の数え。Issue #49）。
+    // ここに残るのは、要求が多く DB への書き込みが重い購読 URL の枠（台ごとの数え）
     o.AddPolicy("feed", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));

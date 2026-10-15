@@ -52,7 +52,7 @@ public static class AdminUserEndpoints
                 ? await next(context)
                 : Results.Json(new { error = "別のサイトからの要求は受け付けません。" }, statusCode: StatusCodes.Status403Forbidden));
         // **トークンの総当たりも、ログインと同じ枠で遅くする**
-        invitations.MapPost("/accept", AcceptInvitation).RequireRateLimiting("adminLogin");
+        invitations.MapPost("/accept", AcceptInvitation).RequireAdminLoginRateLimit();
 
         // ---- 自分の端末（ログイン済みなら役割を問わない） ---------------------------------
         var mySessions = app.MapGroup("/admin/api/me/sessions");

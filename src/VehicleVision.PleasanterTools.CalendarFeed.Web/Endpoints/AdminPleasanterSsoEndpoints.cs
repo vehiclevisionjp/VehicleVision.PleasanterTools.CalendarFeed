@@ -116,7 +116,7 @@ public static class AdminPleasanterSsoEndpoints
                 http, sessions, users, user, config.AdminAuth, audit, now, ct,
                 new SessionSso(Pleasanter: new PleasanterSsoKeys(identity.TenantId, identity.UserId, now)));
             return Results.Ok(new { status = "signedIn", next = step });
-        }).RequireRateLimiting(CheckRateLimitPolicy);
+        }).RequirePleasanterSsoRateLimit();
 
         // ---- 接続の試験 ----------------------------------------------------------
         // 保存済みの設定で（有効にしていなくても）、いまのブラウザの Pleasanter の cookie を使って問い合わせる。
@@ -161,7 +161,7 @@ public static class AdminPleasanterSsoEndpoints
         });
         test.AddEndpointFilter<AdminSessionFilter>();
         test.AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.SettingsManage));
-        test.RequireRateLimiting(CheckRateLimitPolicy);
+        test.RequirePleasanterSsoRateLimit();
     }
 
     /// <summary>確認の入口の本文。中身は使わない（JSON で送らせるためだけにある）。</summary>
