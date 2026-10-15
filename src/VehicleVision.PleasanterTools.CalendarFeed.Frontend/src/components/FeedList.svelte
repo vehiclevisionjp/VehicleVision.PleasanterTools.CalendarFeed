@@ -94,7 +94,7 @@
     await load();
   }
 
-  const statusClass = (s: FetchStatus): string => (s === 'Success' ? 'ok' : s === 'Transient' ? 'warn' : 'bad');
+  const statusClass = (s: FetchStatus): string => (s === 'Success' ? 'ok' : s === 'Transient' || s === 'RateLimited' ? 'warn' : 'bad');
   const statusText = (f: Feed): string => {
     const r = f.lastFetch;
     if (!r) return '';
@@ -103,6 +103,8 @@
         return t('fetchSuccess', { count: r.eventCount ?? 0 });
       case 'Transient':
         return t('fetchTransient');
+      case 'RateLimited':
+        return t('fetchRateLimited');
       case 'Unauthorized':
         return t('fetchUnauthorized');
       case 'KeyError':

@@ -140,6 +140,7 @@ export const es: Record<MessageKey, string> = {
   feedNeverFetched: 'Aún no obtenido',
   fetchSuccess: 'Correcto ({count} eventos)',
   fetchTransient: 'Fallo temporal (debería recuperarse)',
+  fetchRateLimited: 'Se alcanzó el límite de API de Pleasanter (se recupera al cambiar la fecha)',
   fetchUnauthorized: 'Se rechazó la clave de API',
   fetchPermanent: 'No se puede obtener (revise la configuración)',
   fetchKeyError: 'No se puede descifrar la clave de API (regístrela de nuevo)',

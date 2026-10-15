@@ -140,6 +140,7 @@ export const zh: Record<MessageKey, string> = {
   feedNeverFetched: '尚未获取',
   fetchSuccess: '成功（{count} 个事件）',
   fetchTransient: '临时故障（应可恢复）',
+  fetchRateLimited: '已达到 Pleasanter 的 API 次数上限（日期变更后恢复）',
   fetchUnauthorized: 'API 密钥被拒绝',
   fetchPermanent: '无法获取（请检查设置）',
   fetchKeyError: '无法解密 API 密钥（请重新注册）',
