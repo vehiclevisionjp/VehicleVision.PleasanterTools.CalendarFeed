@@ -47,6 +47,7 @@ public static class ServerMessageKeys
     public const string FeedApiKeyInvalid = "feedApiKeyInvalid";
     public const string FeedTimeZoneInvalid = "feedTimeZoneInvalid";
     public const string FeedLanguageInvalid = "feedLanguageInvalid";
+    public const string FeedRangeInvalid = "feedRangeInvalid";
     public const string MappingSummaryColumnInvalid = "mappingSummaryColumnInvalid";
     public const string MappingColumnInvalid = "mappingColumnInvalid";
     public const string MappingDateColumnNoFormat = "mappingDateColumnNoFormat";
@@ -120,7 +121,7 @@ public static class ServerMessageKeys
         InviteDisabledUser, SelfDisableNotAllowed, SelfRoleChangeNotAllowed, SelfTotpResetNotAllowed,
         SelfSessionRevokeNotAllowed, LastAdministrator, InvitationInvalid, SessionNotFound, AuditBeforeInvalid,
         ApiKeyNeedsSecretKey, ApiKeyRequired, SettingsValuesRequired, SecretSettingNeedsSecretKey, SamlNeedsSecretKey,
-        FeedNameInvalid, FeedSiteIdInvalid, FeedFiltersInvalid, FeedApiKeyInvalid, FeedTimeZoneInvalid, FeedLanguageInvalid,
+        FeedRangeInvalid, FeedNameInvalid, FeedSiteIdInvalid, FeedFiltersInvalid, FeedApiKeyInvalid, FeedTimeZoneInvalid, FeedLanguageInvalid,
         MappingSummaryColumnInvalid, MappingColumnInvalid, MappingDateColumnNoFormat, MappingDateColumnKind,
         MappingTextColumnNeedsFormat, MappingDateFormatNotRoundTrip, MappingFormatsOnlyDateNumber, MappingSummaryTemplateColumnInvalid,
         MappingSummaryTemplateNeedsFormat, MappingSummaryTemplateFormatError, MappingSummaryColumnNeedsFormat, MappingColumnNeedsFormat,

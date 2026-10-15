@@ -46,6 +46,7 @@ public static partial class ServerMessages
         [ServerMessageKeys.FeedApiKeyInvalid] = "ApiKey 须为 1 到 512 个字符（不含控制字符）。",
         [ServerMessageKeys.FeedTimeZoneInvalid] = "ApiKeyUserTimeZoneId 是本服务器无法解析的时区 ID。",
         [ServerMessageKeys.FeedLanguageInvalid] = "请将 Language 指定为 {0} 之一。",
+        [ServerMessageKeys.FeedRangeInvalid] = "PastDays 和 FutureDays 须为 0 到 {0}（天）。留空表示不限制。",
         [ServerMessageKeys.SettingBooleanInvalid] = "{0} 须指定为布尔值（true / false）。",
         [ServerMessageKeys.SettingTooLong] = "{0} 最多只能输入 {1} 个字符。",
         [ServerMessageKeys.SettingControlChars] = "{0} 不能包含控制字符。",

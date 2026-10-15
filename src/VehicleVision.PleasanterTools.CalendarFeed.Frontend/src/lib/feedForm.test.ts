@@ -47,6 +47,7 @@ describe('フィードのフォーム', () => {
     hasApiKey: true,
     apiKeyHint: 'abcd',
     lastFetch: null,
+    range: { pastDays: 30, futureDays: null },
   };
 
   it('既存のフィードから作ったフォームを、そのまま送る内容へ戻せる', () => {
@@ -84,3 +85,38 @@ describe('フィードのフォーム', () => {
     expect(toFeedInput({ ...emptyFeedForm('ja'), name: 'a', ...patch })).toBeNull();
   });
 });
+
+describe('表示する期間', () => {
+  const base = { ...emptyFeedForm('ja'), name: 'x', siteId: '1' };
+
+  it('新しいフィードの既定は 過去 365 日・未来は無制限', () => {
+    expect(toFeedInput(base)).toMatchObject({ pastDays: 365, futureDays: null });
+  });
+
+  it('無制限にすると null（開区間）。日数の欄は使わない', () => {
+    expect(toFeedInput({ ...base, pastUnlimited: true, pastDays: 'abc', futureUnlimited: true })).toMatchObject({ pastDays: null, futureDays: null });
+  });
+
+  it('日数は 0〜36500 の整数だけ。範囲外・小数・空は入力の誤り', () => {
+    expect(toFeedInput({ ...base, pastDays: '0' })).toMatchObject({ pastDays: 0 });
+    expect(toFeedInput({ ...base, pastDays: '36500' })).toMatchObject({ pastDays: 36500 });
+    expect(toFeedInput({ ...base, pastDays: '-1' })).toBeNull();
+    expect(toFeedInput({ ...base, pastDays: '36501' })).toBeNull();
+    expect(toFeedInput({ ...base, pastDays: '1.5' })).toBeNull();
+    expect(toFeedInput({ ...base, pastDays: '' })).toBeNull();
+    expect(toFeedInput({ ...base, futureUnlimited: false, futureDays: '' })).toBeNull();
+  });
+
+  it('既存のフィードの期間から、フォームの初期値を作る', () => {
+    const form = formFromFeed({
+      ...(JSON.parse(JSON.stringify({ id: 'f', name: 'n', siteId: 1, mapping: emptyMapping(), filters: {}, createdAt: '', language: 'ja', apiKeyUserTimeZoneId: null, hasApiKey: false, apiKeyHint: null, lastFetch: null })) as Feed),
+      range: { pastDays: null, futureDays: 90 },
+    });
+
+    expect(form).toMatchObject({ pastUnlimited: true, pastDays: '', futureUnlimited: false, futureDays: '90' });
+  });
+});
+
+function emptyMapping(): Feed['mapping'] {
+  return { summaryColumn: 'ItemTitle', summaryTemplate: null, startColumn: 'StartTime', startFormat: null, endColumn: 'CompletionTime', endFormat: null, descriptionColumn: 'Body', locationColumn: null, allDay: 'Auto', defaultDurationMinutes: 60 };
+}

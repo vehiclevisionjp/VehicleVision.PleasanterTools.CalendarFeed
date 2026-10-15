@@ -46,6 +46,7 @@ public static partial class ServerMessages
         [ServerMessageKeys.FeedApiKeyInvalid] = "ApiKey는 1~512자(제어 문자 제외)로 지정해 주세요.",
         [ServerMessageKeys.FeedTimeZoneInvalid] = "ApiKeyUserTimeZoneId에 이 서버가 해석할 수 없는 시간대 ID가 지정되어 있습니다.",
         [ServerMessageKeys.FeedLanguageInvalid] = "Language는 {0} 중 하나로 지정해 주세요.",
+        [ServerMessageKeys.FeedRangeInvalid] = "PastDays와 FutureDays는 0~{0}(일)로 지정하세요. 비우면 제한 없음입니다.",
         [ServerMessageKeys.SettingBooleanInvalid] = "{0}은(는) 참/거짓 값(true / false)으로 지정해 주세요.",
         [ServerMessageKeys.SettingTooLong] = "{0}은(는) {1}자 이내로 입력해 주세요.",
         [ServerMessageKeys.SettingControlChars] = "{0}에는 제어 문자를 사용할 수 없습니다.",

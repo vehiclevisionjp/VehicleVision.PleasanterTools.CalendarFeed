@@ -56,7 +56,7 @@ public static class AdminFeedEndpoints
                 request.SiteId,
                 request.Mapping ?? new FeedMapping(),
                 request.Filters ?? new Dictionary<string, string>(),
-                new FeedAccess(request.ApiKey, request.ApiKeyUserTimeZoneId, FeedLanguages.Normalize(request.Language)),
+                new FeedAccess(request.ApiKey, request.ApiKeyUserTimeZoneId, FeedLanguages.Normalize(request.Language), new FeedRange(request.PastDays, request.FutureDays)),
                 ct);
             await audit.WriteAsync(
                 http, AuditActions.FeedCreated, true, AdminContext.Of(http).User, targetType: "Feed", targetId: feed.Id.ToString("D"),
@@ -92,7 +92,8 @@ public static class AdminFeedEndpoints
                 request.Mapping ?? new FeedMapping(),
                 request.Filters ?? new Dictionary<string, string>(),
                 FeedLanguages.Normalize(request.Language),
-                string.IsNullOrWhiteSpace(request.ApiKeyUserTimeZoneId) ? null : request.ApiKeyUserTimeZoneId);
+                string.IsNullOrWhiteSpace(request.ApiKeyUserTimeZoneId) ? null : request.ApiKeyUserTimeZoneId,
+                new FeedRange(request.PastDays, request.FutureDays));
             if (!await feeds.UpdateAsync(id, update, ct))
             {
                 return Results.NotFound();
@@ -108,6 +109,7 @@ public static class AdminFeedEndpoints
             if (!before.Filters.OrderBy(p => p.Key).SequenceEqual(update.Filters.OrderBy(p => p.Key))) { changed.Add("filters"); }
             if (before.Language != update.Language) { changed.Add("language"); }
             if (before.ApiKeyUserTimeZoneId != update.ApiKeyUserTimeZoneId) { changed.Add("apiKeyUserTimeZoneId"); }
+            if (before.EffectiveRange != (update.Range ?? FeedRange.Default)) { changed.Add("range"); }
 
             await audit.WriteAsync(
                 http, AuditActions.FeedUpdated, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"),
@@ -195,7 +197,9 @@ public sealed record CreateFeedRequest(
     Dictionary<string, string>? Filters,
     string? ApiKey = null,
     string? ApiKeyUserTimeZoneId = null,
-    string? Language = null)
+    string? Language = null,
+    int? PastDays = FeedRange.DefaultPastDays,
+    int? FutureDays = null)
 {
     private static readonly Regex ColumnName = new("^[A-Za-z][A-Za-z0-9_]{0,63}$", RegexOptions.Compiled);
 
@@ -233,6 +237,11 @@ public sealed record CreateFeedRequest(
             return ServerMessages.Get(ServerMessageKeys.FeedTimeZoneInvalid, language);
         }
 
+        if (new FeedRange(PastDays, FutureDays).Validate(language) is { } rangeError)
+        {
+            return rangeError;
+        }
+
         return Language is not null && !FeedLanguages.IsSupported(Language)
             ? ServerMessages.Get(ServerMessageKeys.FeedLanguageInvalid, language, string.Join(" / ", FeedLanguages.Supported))
             : null;
@@ -246,10 +255,12 @@ public sealed record UpdateFeedRequest(
     FeedMapping? Mapping,
     Dictionary<string, string>? Filters,
     string? ApiKeyUserTimeZoneId = null,
-    string? Language = null)
+    string? Language = null,
+    int? PastDays = FeedRange.DefaultPastDays,
+    int? FutureDays = null)
 {
     /// <summary>入力を検証する（作成と同じ条件）。問題があれば理由を返す。</summary>
-    public string? Validate(string? language = null) => new CreateFeedRequest(Name, SiteId, Mapping, Filters, null, ApiKeyUserTimeZoneId, Language).Validate(language);
+    public string? Validate(string? language = null) => new CreateFeedRequest(Name, SiteId, Mapping, Filters, null, ApiKeyUserTimeZoneId, Language, PastDays, FutureDays).Validate(language);
 }
 
 /// <summary>API キーの差し替えの要求。</summary>
@@ -285,9 +296,10 @@ public sealed record FeedView(
     string? ApiKeyUserTimeZoneId,
     bool HasApiKey,
     string? ApiKeyHint,
-    FeedFetchResult? LastFetch)
+    FeedFetchResult? LastFetch,
+    FeedRange Range)
 {
     public static FeedView From(FeedDefinition f) => new(
         f.Id, f.Name, f.SiteId, f.Mapping, f.Filters, f.CreatedAt,
-        f.Language, f.ApiKeyUserTimeZoneId, f.HasApiKey, f.ApiKeyHint, f.LastFetch);
+        f.Language, f.ApiKeyUserTimeZoneId, f.HasApiKey, f.ApiKeyHint, f.LastFetch, f.EffectiveRange);
 }

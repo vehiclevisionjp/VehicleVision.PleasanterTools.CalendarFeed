@@ -98,6 +98,23 @@
     {/if}
 
     <fieldset>
+      <legend>{t('feedRange')}</legend>
+      <p class="muted small">{t('feedRangeHint')}</p>
+      <div class="grid">
+        <div class="field">
+          <label for="r-past">{t('feedRangePast')}</label>
+          <input id="r-past" type="number" min="0" max="36500" step="1" disabled={form.pastUnlimited} bind:value={form.pastDays} />
+          <label class="check"><input type="checkbox" bind:checked={form.pastUnlimited} />{t('feedRangeUnlimited')}</label>
+        </div>
+        <div class="field">
+          <label for="r-future">{t('feedRangeFuture')}</label>
+          <input id="r-future" type="number" min="0" max="36500" step="1" disabled={form.futureUnlimited} bind:value={form.futureDays} />
+          <label class="check"><input type="checkbox" bind:checked={form.futureUnlimited} />{t('feedRangeUnlimited')}</label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
       <legend>{t('feedMapping')}</legend>
       <div class="grid">
         <div class="field">

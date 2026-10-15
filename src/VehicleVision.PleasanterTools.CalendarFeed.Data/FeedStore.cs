@@ -25,7 +25,8 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
     private const string SelectColumns =
         "SELECT [Id], [Name], [SiteId], [MappingJson], [FiltersJson], [CreatedAt], [IsRevoked], "
         + "[Language], [ApiKeyUserTimeZoneId], [ApiKeyHint], "
-        + "[LastFetchAt], [LastFetchStatus], [LastFetchMessage], [LastFetchEventCount], [ConsecutiveFailures] FROM [Feeds]";
+        + "[LastFetchAt], [LastFetchStatus], [LastFetchMessage], [LastFetchEventCount], [ConsecutiveFailures], "
+        + "[RangePastDays], [RangeFutureDays] FROM [Feeds]";
 
     private string Sql(string sql) => SqlDialect.Format(connections.Provider, sql);
 
@@ -49,15 +50,15 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
         var hasKey = !string.IsNullOrEmpty(access.ApiKey);
         var feed = new FeedDefinition(
             id, name, siteId, mapping, filters, DateTimeOffset.UtcNow, IsRevoked: false,
-            language, access.ApiKeyUserTimeZoneId, hasKey ? HintOf(access.ApiKey!) : null);
+            language, access.ApiKeyUserTimeZoneId, hasKey ? HintOf(access.ApiKey!) : null, Range: access.Range ?? FeedRange.Default);
         var token = FeedTokens.Generate();
 
         await using var connection = connections.Create();
         await connection.ExecuteAsync(new CommandDefinition(
             Sql("INSERT INTO [Feeds] ([Id], [Name], [SiteId], [MappingJson], [FiltersJson], [TokenHash], [CreatedAt], "
-                + "[IsRevoked], [Language], [ApiKeyCipher], [ApiKeyHint], [ApiKeyUserTimeZoneId]) "
+                + "[IsRevoked], [Language], [ApiKeyCipher], [ApiKeyHint], [ApiKeyUserTimeZoneId], [RangePastDays], [RangeFutureDays]) "
                 + "VALUES (@Id, @Name, @SiteId, @MappingJson, @FiltersJson, @TokenHash, @CreatedAt, "
-                + "0, @Language, @ApiKeyCipher, @ApiKeyHint, @ApiKeyUserTimeZoneId)"),
+                + "0, @Language, @ApiKeyCipher, @ApiKeyHint, @ApiKeyUserTimeZoneId, @RangePastDays, @RangeFutureDays)"),
             new
             {
                 Id = id.ToString("D"),
@@ -71,6 +72,8 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
                 ApiKeyCipher = hasKey ? protector.Protect(access.ApiKey!, ContextOf(id)) : null,
                 ApiKeyHint = feed.ApiKeyHint,
                 access.ApiKeyUserTimeZoneId,
+                RangePastDays = feed.EffectiveRange.PastDays,
+                RangeFutureDays = feed.EffectiveRange.FutureDays,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return (feed, token);
@@ -111,7 +114,8 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
         // トークン・API キーは触らない。失効済みは更新しない
         return await connection.ExecuteAsync(new CommandDefinition(
             Sql("UPDATE [Feeds] SET [Name] = @Name, [SiteId] = @SiteId, [MappingJson] = @MappingJson, [FiltersJson] = @FiltersJson, "
-                + "[Language] = @Language, [ApiKeyUserTimeZoneId] = @ApiKeyUserTimeZoneId WHERE [Id] = @Id AND [IsRevoked] = 0"),
+                + "[Language] = @Language, [ApiKeyUserTimeZoneId] = @ApiKeyUserTimeZoneId, "
+                + "[RangePastDays] = @RangePastDays, [RangeFutureDays] = @RangeFutureDays WHERE [Id] = @Id AND [IsRevoked] = 0"),
             new
             {
                 Id = id.ToString("D"),
@@ -121,6 +125,8 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
                 FiltersJson = JsonSerializer.Serialize(update.Filters, Json),
                 Language = FeedLanguages.Normalize(update.Language),
                 update.ApiKeyUserTimeZoneId,
+                RangePastDays = (update.Range ?? FeedRange.Default).PastDays,
+                RangeFutureDays = (update.Range ?? FeedRange.Default).FutureDays,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
     }
@@ -254,6 +260,10 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
 
         public int ConsecutiveFailures { get; set; }
 
+        public int? RangePastDays { get; set; }
+
+        public int? RangeFutureDays { get; set; }
+
         public FeedDefinition ToDefinition() => new(
             Guid.Parse(Id),
             Name,
@@ -268,6 +278,8 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
             ApiKeyHint,
             DbTime.Parse(LastFetchAt) is { } at && !string.IsNullOrEmpty(LastFetchStatus)
                 ? new FeedFetchResult(at, LastFetchStatus, LastFetchMessage, LastFetchEventCount, ConsecutiveFailures)
-                : null);
+                : null,
+            // 列が空（NULL）の側は無制限。行ごとに必ず持つ（既存のフィードは、マイグレーションで過去 365 日を入れてある）
+            new FeedRange(RangePastDays, RangeFutureDays));
     }
 }

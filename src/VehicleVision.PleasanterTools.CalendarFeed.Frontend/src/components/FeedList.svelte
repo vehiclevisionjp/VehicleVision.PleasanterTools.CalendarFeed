@@ -27,6 +27,9 @@
   let busy = $state(false);
   let flash = $state('');
 
+  /** 期間の片側の表示。null は無制限。 */
+  const days = (value: number | null): string => (value === null ? t('feedRangeUnlimited') : t('feedRangeDays', { days: value }));
+
   async function load(): Promise<void> {
     const result = await api.feeds();
     if (!result.ok) {
@@ -143,6 +146,7 @@
             <td>
               <strong>{feed.name}</strong>
               <div class="small muted">{t('feedCreatedAt')}: {dt(feed.createdAt)}</div>
+              <div class="small muted">{t('feedRangeSummary', { past: days(feed.range.pastDays), future: days(feed.range.futureDays) })}</div>
             </td>
             <td class="mono" data-label={t('feedSiteId')}>{feed.siteId}</td>
             <td data-label={t('feedApiKey')}>
