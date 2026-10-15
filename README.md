@@ -117,6 +117,14 @@ npm ci && npm test && npm run build
 
 ## ライセンス
 
-**デュアルライセンス（AGPL-3.0-or-later OR 商用）。** Questionnaire と同じ。決定済み（[`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) 1 章）。`LICENSE` 等の整備は未了。
+**デュアルライセンス（AGPL-3.0-or-later OR 商用）。** Questionnaire と同じ。決定済み（[`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) 1 章）。
+
+| ファイル | 内容 |
+| --- | --- |
+| [`LICENSE`](LICENSE) | AGPL v3 の全文（GNU の公式の原文） |
+| [`LICENSING.md`](LICENSING.md) | デュアルライセンスの説明（どちらを選ぶか・Pleasanter との関係・依存） |
+| [`LICENSE-COMMERCIAL.md`](LICENSE-COMMERCIAL.md) | 商用ライセンスの概要（連絡先は未記入） |
+| [`CLA.md`](CLA.md) | コントリビューターライセンス同意書（**草案。法務の確認前**） |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | 貢献のしかた |
 
 Copyright (C) PMC Co.,Ltd.
