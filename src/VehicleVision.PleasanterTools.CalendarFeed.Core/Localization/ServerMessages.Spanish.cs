@@ -46,6 +46,7 @@ public static partial class ServerMessages
         [ServerMessageKeys.FeedApiKeyInvalid] = "ApiKey debe tener de 1 a 512 caracteres (sin caracteres de control).",
         [ServerMessageKeys.FeedTimeZoneInvalid] = "ApiKeyUserTimeZoneId es un ID de zona horaria que este servidor no puede resolver.",
         [ServerMessageKeys.FeedLanguageInvalid] = "Indique Language como uno de los siguientes: {0}.",
+        [ServerMessageKeys.FeedRangeInvalid] = "PastDays y FutureDays deben estar entre 0 y {0} (días). Déjelos vacíos para no limitar.",
         [ServerMessageKeys.SettingBooleanInvalid] = "{0} debe ser un valor booleano (true / false).",
         [ServerMessageKeys.SettingTooLong] = "{0} debe tener como máximo {1} caracteres.",
         [ServerMessageKeys.SettingControlChars] = "{0} no puede contener caracteres de control.",

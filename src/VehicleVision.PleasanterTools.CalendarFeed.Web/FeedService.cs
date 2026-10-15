@@ -118,12 +118,18 @@ public sealed class FeedService(
         // 日付・数値は 1 回目の生の値を本アプリが書式で整形する
         var resolvedColumns = feed.Mapping.ResolvedColumns();
 
+        // **出す期間**（Issue #67）。今日は、API キー利用者のタイムゾーンの今日（予定の時刻と同じ壁時計）。
+        // Pleasanter へは、取り過ぎない粗い絞り込みを足し（日付の列だけ）、正確な判定は取得した後で行う
+        var range = feed.EffectiveRange;
+        var today = TimeZoneInfo.ConvertTime(time.GetUtcNow(), apiUserZone).DateTime;
+        var filters = range.ApplyTo(feed.Filters, feed.Mapping, today);
+
         var events = new List<CalendarEvent>();
         var offset = 0;
         while (events.Count < options.MaxEvents)
         {
             var page = await client
-                .GetRecordsAsync(apiKey, feed.SiteId, offset, options.PageSize, feed.Filters, cancellationToken)
+                .GetRecordsAsync(apiKey, feed.SiteId, offset, options.PageSize, filters, cancellationToken)
                 .ConfigureAwait(false);
 
             // 1 回目と同じ条件（位置・件数・絞り込み）で取ると、並びと件数が揃う。レコード ID で突き合わせる
@@ -133,7 +139,7 @@ public sealed class FeedService(
                 var idColumn = page.Records[0]["IssueId"] is not null ? "IssueId" : "ResultId";
                 resolved = await client
                     .GetResolvedTextAsync(
-                        apiKey, feed.SiteId, offset, options.PageSize, feed.Filters, idColumn, resolvedColumns, cancellationToken)
+                        apiKey, feed.SiteId, offset, options.PageSize, filters, idColumn, resolvedColumns, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -141,7 +147,8 @@ public sealed class FeedService(
             {
                 // 解決できなかったレコード（突き合わせられない・権限で読めない）は、生の値のまま出す
                 var recordResolved = resolved is null ? null : ResolvedOf(resolved, record);
-                if (EventMapper.Map(record, feed, apiUserZone, pleasanter.LinkBaseUrl, recordResolved) is { } mapped)
+                if (EventMapper.Map(record, feed, apiUserZone, pleasanter.LinkBaseUrl, recordResolved) is { } mapped
+                    && range.Overlaps(today, mapped.Start.DateTime, mapped.End?.DateTime))
                 {
                     events.Add(mapped);
                 }

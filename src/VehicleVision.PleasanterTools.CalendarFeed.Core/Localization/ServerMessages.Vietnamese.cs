@@ -46,6 +46,7 @@ public static partial class ServerMessages
         [ServerMessageKeys.FeedApiKeyInvalid] = "ApiKey phải có từ 1 đến 512 ký tự (không có ký tự điều khiển).",
         [ServerMessageKeys.FeedTimeZoneInvalid] = "ApiKeyUserTimeZoneId là ID múi giờ mà máy chủ này không thể nhận diện.",
         [ServerMessageKeys.FeedLanguageInvalid] = "Hãy chỉ định Language là một trong các giá trị: {0}.",
+        [ServerMessageKeys.FeedRangeInvalid] = "PastDays và FutureDays phải từ 0 đến {0} (ngày). Để trống nghĩa là không giới hạn.",
         [ServerMessageKeys.SettingBooleanInvalid] = "{0} phải là giá trị logic (true / false).",
         [ServerMessageKeys.SettingTooLong] = "{0} chỉ được nhập tối đa {1} ký tự.",
         [ServerMessageKeys.SettingControlChars] = "{0} không được chứa ký tự điều khiển.",

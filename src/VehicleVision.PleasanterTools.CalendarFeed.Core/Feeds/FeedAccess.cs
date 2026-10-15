@@ -17,9 +17,11 @@ public sealed record FeedUpdate(
     FeedMapping Mapping,
     IReadOnlyDictionary<string, string> Filters,
     string Language,
-    string? ApiKeyUserTimeZoneId);
+    string? ApiKeyUserTimeZoneId,
+    FeedRange? Range = null);
 
 public sealed record FeedAccess(
     string? ApiKey = null,
     string? ApiKeyUserTimeZoneId = null,
-    string Language = FeedLanguages.Default);
+    string Language = FeedLanguages.Default,
+    FeedRange? Range = null);

@@ -101,6 +101,14 @@ export interface Feed {
   hasApiKey: boolean;
   apiKeyHint: string | null;
   lastFetch: FeedFetchResult | null;
+  /** 出す予定の期間（今日からの日数。null は無制限＝開区間）。 */
+  range: FeedRange;
+}
+
+/** 出す予定の期間。null の側は無制限。 */
+export interface FeedRange {
+  pastDays: number | null;
+  futureDays: number | null;
 }
 
 export interface FeedInput {
@@ -111,6 +119,9 @@ export interface FeedInput {
   language: string;
   apiKeyUserTimeZoneId: string | null;
   apiKey?: string | null;
+  /** null は無制限。 */
+  pastDays: number | null;
+  futureDays: number | null;
 }
 
 export interface Invitation {
