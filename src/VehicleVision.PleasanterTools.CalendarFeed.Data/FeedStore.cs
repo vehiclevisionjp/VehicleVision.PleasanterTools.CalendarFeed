@@ -25,7 +25,7 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
     private const string SelectColumns =
         "SELECT [Id], [Name], [SiteId], [MappingJson], [FiltersJson], [CreatedAt], [IsRevoked], "
         + "[Language], [ApiKeyUserTimeZoneId], [ApiKeyHint], "
-        + "[LastFetchAt], [LastFetchStatus], [LastFetchMessage], [LastFetchEventCount] FROM [Feeds]";
+        + "[LastFetchAt], [LastFetchStatus], [LastFetchMessage], [LastFetchEventCount], [ConsecutiveFailures] FROM [Feeds]";
 
     private string Sql(string sql) => SqlDialect.Format(connections.Provider, sql);
 
@@ -155,13 +155,15 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
         return string.IsNullOrEmpty(cipher) ? null : protector.Unprotect(cipher, ContextOf(id));
     }
 
-    public async Task RecordFetchAsync(
+    public async Task<int> RecordFetchAsync(
         Guid id, FeedFetchResult result, CancellationToken cancellationToken = default)
     {
         await using var connection = connections.Create();
+        // 連続の失敗は、読んでから足さず、1 文の UPDATE で数える（同時の取得で数えこぼさない）
         await connection.ExecuteAsync(new CommandDefinition(
             Sql("UPDATE [Feeds] SET [LastFetchAt] = @At, [LastFetchStatus] = @Status, [LastFetchMessage] = @Message, "
-                + "[LastFetchEventCount] = @EventCount WHERE [Id] = @Id"),
+                + "[LastFetchEventCount] = @EventCount, "
+                + "[ConsecutiveFailures] = CASE WHEN @Succeeded = 1 THEN 0 ELSE [ConsecutiveFailures] + 1 END WHERE [Id] = @Id"),
             new
             {
                 Id = id.ToString("D"),
@@ -170,8 +172,31 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
                 // 制御文字を落として桁で切る（桁溢れで記録が落ちないように。API キーは渡さない前提）
                 Message = AuditText.Safe(result.Message, 500),
                 result.EventCount,
+                Succeeded = result.Succeeded ? 1 : 0,
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
+        return await connection.QuerySingleOrDefaultAsync<int?>(new CommandDefinition(
+            Sql("SELECT [ConsecutiveFailures] FROM [Feeds] WHERE [Id] = @Id"),
+            new { Id = id.ToString("D") }, cancellationToken: cancellationToken)).ConfigureAwait(false) ?? 0;
+    }
+
+    public async Task<bool> TryMarkFailureNotifiedAsync(
+        Guid id, DateTimeOffset now, TimeSpan repeatAfter, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [Feeds] SET [FailureNotifiedAt] = @Now WHERE [Id] = @Id "
+                + "AND ([FailureNotifiedAt] IS NULL OR [FailureNotifiedAt] <= @Threshold)"),
+            new { Id = id.ToString("D"), Now = DbTime.Format(now), Threshold = DbTime.Format(now - repeatAfter) },
+            cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+    }
+
+    public async Task<bool> TryClearFailureNotifiedAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [Feeds] SET [FailureNotifiedAt] = NULL WHERE [Id] = @Id AND [FailureNotifiedAt] IS NOT NULL"),
+            new { Id = id.ToString("D") }, cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
     }
 
     public async Task<bool> SetApiKeyAsync(
@@ -227,6 +252,8 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
 
         public int? LastFetchEventCount { get; set; }
 
+        public int ConsecutiveFailures { get; set; }
+
         public FeedDefinition ToDefinition() => new(
             Guid.Parse(Id),
             Name,
@@ -240,7 +267,7 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
             ApiKeyUserTimeZoneId,
             ApiKeyHint,
             DbTime.Parse(LastFetchAt) is { } at && !string.IsNullOrEmpty(LastFetchStatus)
-                ? new FeedFetchResult(at, LastFetchStatus, LastFetchMessage, LastFetchEventCount)
+                ? new FeedFetchResult(at, LastFetchStatus, LastFetchMessage, LastFetchEventCount, ConsecutiveFailures)
                 : null);
     }
 }

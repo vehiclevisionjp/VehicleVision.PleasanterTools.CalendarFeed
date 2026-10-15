@@ -155,6 +155,7 @@
             <td data-label={t('feedLastFetch')}>
               {#if feed.lastFetch}
                 <span class="badge {statusClass(feed.lastFetch.status)}">{statusText(feed)}</span>
+                {#if feed.lastFetch.consecutiveFailures >= 2}<span class="badge bad">{t('feedFailing', { count: feed.lastFetch.consecutiveFailures })}</span>{/if}
                 <div class="small muted">{dt(feed.lastFetch.at)}</div>
                 {#if feed.lastFetch.message}<div class="small muted">{feed.lastFetch.message}</div>{/if}
               {:else}

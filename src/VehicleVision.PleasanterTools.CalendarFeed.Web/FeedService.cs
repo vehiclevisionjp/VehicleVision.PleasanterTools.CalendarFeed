@@ -17,6 +17,15 @@ public sealed class FeedOptions
 
     /// <summary>Pleasanter へ求める 1 ページの件数。サーバ側の上限で切られる。</summary>
     public int PageSize { get; init; } = 1000;
+
+    /// <summary>取得の失敗が続いたら、フィードを編集できる管理者へメールで知らせるか。</summary>
+    public bool NotifyFailure { get; init; }
+
+    /// <summary>何回続けて失敗したら知らせるか。一時的な 1 回の失敗では知らせない。</summary>
+    public int NotifyThreshold { get; init; } = 3;
+
+    /// <summary>失敗が続くときに、同じフィードを再び知らせる間隔。</summary>
+    public TimeSpan NotifyRepeat { get; init; } = TimeSpan.FromHours(24);
 }
 
 /// <summary>Pleasanter から取って .ics を組み立てる。</summary>
@@ -25,6 +34,7 @@ public sealed class FeedService(
     IFeedStore feeds,
     RuntimeSettings settings,
     IMemoryCache cache,
+    FeedFailureNotifier notifier,
     TimeProvider time)
 {
     private PleasanterOptions pleasanter => settings.Current.Pleasanter;
@@ -71,7 +81,10 @@ public sealed class FeedService(
     {
         try
         {
-            await feeds.RecordFetchAsync(feed.Id, result, CancellationToken.None).ConfigureAwait(false);
+            var failures = await feeds.RecordFetchAsync(feed.Id, result, CancellationToken.None).ConfigureAwait(false);
+
+            // 失敗が続いたら知らせ、回復したら知らせる。**通知の失敗で .ics の応答を落とさない**
+            await notifier.OnRecordedAsync(feed, result with { ConsecutiveFailures = failures }).ConfigureAwait(false);
         }
         catch (System.Data.Common.DbException)
         {

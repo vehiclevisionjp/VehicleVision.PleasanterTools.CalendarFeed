@@ -9,7 +9,9 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 /// <param name="Status"><see cref="FeedFetchStatus"/> のいずれか。</param>
 /// <param name="Message">失敗の理由（短い文字列）。成功なら <c>null</c>。</param>
 /// <param name="EventCount">成功したときの予定の件数。</param>
-public sealed record FeedFetchResult(DateTimeOffset At, string Status, string? Message = null, int? EventCount = null)
+/// <param name="ConsecutiveFailures">いまの連続の失敗の回数（成功で 0 に戻る。失敗の通知の閾値に使う）。</param>
+public sealed record FeedFetchResult(
+    DateTimeOffset At, string Status, string? Message = null, int? EventCount = null, int ConsecutiveFailures = 0)
 {
     /// <summary>成功したか。</summary>
     public bool Succeeded => Status == FeedFetchStatus.Success;

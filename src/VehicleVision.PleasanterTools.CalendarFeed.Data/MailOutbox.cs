@@ -34,6 +34,12 @@ public enum MailKind
 
     /// <summary>メール設定の試し送信。</summary>
     SettingsTest = 3,
+
+    /// <summary>フィードの取得の失敗が続いている通知（Issue #48）。</summary>
+    FeedFetchFailure = 4,
+
+    /// <summary>フィードの取得が回復した通知（Issue #48）。</summary>
+    FeedFetchRecovered = 5,
 }
 
 /// <summary>メールの送信待ち（アウトボックス）。</summary>

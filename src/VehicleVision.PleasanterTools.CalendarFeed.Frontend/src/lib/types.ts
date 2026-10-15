@@ -85,6 +85,8 @@ export interface FeedFetchResult {
   status: FetchStatus;
   message: string | null;
   eventCount: number | null;
+  /** いまの連続の失敗の回数（成功で 0 に戻る）。 */
+  consecutiveFailures: number;
 }
 
 export interface Feed {
