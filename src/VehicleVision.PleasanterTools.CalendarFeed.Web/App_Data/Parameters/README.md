@@ -30,9 +30,15 @@
 | --- | --- |
 | サービス | `CALENDARFEED_PUBLIC_BASEURL`、`CALENDARFEED_TIMEZONE_DEFAULT` |
 | Pleasanter | `CALENDARFEED_PLEASANTER_BASEURL`・`_APIKEY`（秘密）・`_APIVERSION`・`_TIMEOUTSECONDS`・`_TIMEZONE`・`_LINKBASEURL` |
-| フィード | `CALENDARFEED_FEED_CACHESECONDS`・`_MAXEVENTS`・`_PAGESIZE` |
+| フィード | `CALENDARFEED_FEED_CACHESECONDS`・`_MAXEVENTS`・`_PAGESIZE`・`_FAILURENOTIFY`・`_FAILURENOTIFYTHRESHOLD`・`_FAILURENOTIFYREPEATHOURS`（取得の失敗の通知） |
 | セキュリティ | `CALENDARFEED_ADMIN_TWOFACTOR`、`CALENDARFEED_PASSWORD_MINIMUMLENGTH`・`_ALLOWSAMEASLOGINID`、`CALENDARFEED_AUDITLOG_RETENTION_DAYS` |
+| SAML ログイン | `CALENDARFEED_SAML_ENABLED`・`_ENTITYID`・`_IDPENTITYID`・`_SINGLESIGNONURL`・`_IDPCERTIFICATE`・`_UNKNOWNUSER`・`_REGISTERROLE`・`_LOGINIDSOURCE`・`_LOGINIDCLAIM`・`_BUTTONLABEL`・`_SINGLELOGOUTURL` |
+| Pleasanter のログイン | `CALENDARFEED_PLEASANTERSSO_ENABLED`・`_INTERNALBASEURL`・`_LOGINURL`・`_LOGOUTURL`・`_COOKIENAMES`・`_ALLOWEDDEPTIDS`・`_ALLOWEDGROUPIDS`・`_UNKNOWNUSER`・`_REGISTERROLE`・`_REVALIDATEMINUTES`・`_TIMEOUTSECONDS`・`_BUTTONLABEL` |
 | メール | `CALENDARFEED_MAIL_ENABLED`・`_TRANSPORT`・`_SMTP_HOST`・`_SMTP_PORT`・`_SMTP_SECURITY`・`_SMTP_USER`・`_SMTP_PASSWORD`（秘密）・`_FROM_ADDRESS`・`_FROM_NAME`・`_REPLYTO_ADDRESS`・`_SES_REGION`・`_ACS_ENDPOINT`・`_TIMEOUT_SECONDS`・`_SEND_PER_MINUTE` |
+
+**SAML・Pleasanter のログインの設定をファイルで固定するとき**は、キーに**環境変数と同じ正式名**（`CALENDARFEED_SAML_ENABLED` など）をそのまま書く
+（短い別名の写しは、上のファイルごとの表にあるものだけ）。例: `Service.json` に `"CALENDARFEED_SAML_ENABLED": "true"`。環境変数で与えるのが普通で、複数行の証明書（`_IDPCERTIFICATE`）はファイルの方が書きやすい。
+実値を含むときは、読む対象のファイル（`Service` / `Pleasanter` / `Feed` / `Rds` / `Security` / `Mail`）の `.local.json` に書く（`Saml.json` のような新しい名前のファイルは読まれない）。
 
 **画面から編集しない設定（起動に要る、またはインスタンスごとの設定）**は、これまでどおりファイル／環境変数だけ:
 `CALENDARFEED_DB_*`（接続先・自動マイグレーション）、`CALENDARFEED_SECRET_KEY`、`CALENDARFEED_FORWARDED_PROXY_NETWORKS`、`PasswordPolicies`（正規表現の条件）、`CALENDARFEED_MAIL_WORKER`（この台で送信ワーカーを動かすか）、`CALENDARFEED_PARAMETERS_DIRECTORY`。
@@ -55,7 +61,11 @@
 | `Feed.json` | `CacheSeconds` | `CALENDARFEED_FEED_CACHESECONDS` | `.ics` を使い回す秒数（既定 300） |
 | `Feed.json` | `MaxEvents` | `CALENDARFEED_FEED_MAXEVENTS` | 1 フィードの予定の上限（既定 5000） |
 | `Feed.json` | `PageSize` | `CALENDARFEED_FEED_PAGESIZE` | Pleasanter へ求める 1 ページの件数（既定 1000） |
-| `Rds.json` | `ConnectionString` | `CALENDARFEED_DB_CONNECTIONSTRING` | 本アプリの DB。現状は SQLite のみ |
+| `Feed.json` | `FailureNotify` | `CALENDARFEED_FEED_FAILURENOTIFY` | 取得の失敗が続いたらメールで知らせる（既定 `false`） |
+| `Feed.json` | `FailureNotifyThreshold` | `CALENDARFEED_FEED_FAILURENOTIFYTHRESHOLD` | 知らせる連続の失敗の回数（既定 3） |
+| `Feed.json` | `FailureNotifyRepeatHours` | `CALENDARFEED_FEED_FAILURENOTIFYREPEATHOURS` | 失敗が続くときの再通知の間隔（時間。既定 24） |
+| `Rds.json` | `Provider` | `CALENDARFEED_DB_PROVIDER` | `Sqlite`（既定。簡易セットアップとデバッグ用）/ `SqlServer` / `PostgreSql` / `MySql` |
+| `Rds.json` | `ConnectionString` | `CALENDARFEED_DB_CONNECTIONSTRING` | 本アプリの DB（Pleasanter の DB とは別）。**実値は書かない** |
 | `Security.json` | `SecretKey` | `CALENDARFEED_SECRET_KEY` | フィードごとの API キーと管理者の TOTP の共有鍵を DB へ暗号化して置く鍵（Base64・32 バイト）。**実値は書かない。** `dotnet run -- --generate-secret-key` で作る。**失うと保管した API キーは復号できない** |
 | `Security.json` | `AdminTwoFactor` | `CALENDARFEED_ADMIN_TWOFACTOR` | 管理者の 2 要素。`required`（登録するまでログインが完了しない）/ `optional`（既定）/ `disabled`（登録の口を閉じる。登録済みの人からは外さない）。**知らない値は起動時に落とす** |
 | `Security.json` | `AuditLogRetentionDays` | `CALENDARFEED_AUDITLOG_RETENTION_DAYS` | 監査ログを残す日数（既定 365。`0` なら消さない。読めない値は既定へ） |
