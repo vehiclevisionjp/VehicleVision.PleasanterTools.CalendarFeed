@@ -107,7 +107,7 @@
       {#each ACTIONS as a (a)}<option value={a}>{a}</option>{/each}
     </select>
     <label class="check"><input type="checkbox" bind:checked={failedOnly} />{t('auditFailedOnly')}</label>
-    <button class="btn" type="button" onclick={() => load(false)}>{t('refresh')}</button>
+    <button class="btn" type="button" onclick={() => load(false)}><span class="material-icons" aria-hidden="true">refresh</span>{t('refresh')}</button>
   </div>
 </div>
 <p class="muted">{t('auditLead')}</p>

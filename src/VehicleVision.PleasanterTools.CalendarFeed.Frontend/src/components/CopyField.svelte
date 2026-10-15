@@ -17,5 +17,5 @@
 
 <div class="copy-row">
   <input type="text" readonly {value} aria-label={label} onfocus={(e) => e.currentTarget.select()} />
-  <button type="button" class="btn" onclick={copy}>{copied ? t('copied') : t('copy')}</button>
+  <button type="button" class="btn" onclick={copy}><span class="material-icons" aria-hidden="true">{copied ? 'check' : 'content_copy'}</span>{copied ? t('copied') : t('copy')}</button>
 </div>

@@ -149,7 +149,7 @@
 
 <div class="page-head">
   <h1>{t('settingsTitle')}</h1>
-  <button class="btn" type="button" onclick={load}>{t('refresh')}</button>
+  <button class="btn" type="button" onclick={load}><span class="material-icons" aria-hidden="true">refresh</span>{t('refresh')}</button>
 </div>
 <p class="muted">{t('settingsLead')}</p>
 

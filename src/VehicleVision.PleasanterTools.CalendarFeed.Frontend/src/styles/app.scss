@@ -1,23 +1,25 @@
 // CSP は style-src 'self'。インラインの style 属性・<style> は使えないので、見た目はすべてここへ書く。
 :root {
   color-scheme: light dark;
-  --bg: #f4f6f9;
+  // 配色は Questionnaire の管理画面に揃える（同じ組織の製品として、見た目をそろえる）
+  --bg: #f9fafb;
   --surface: #ffffff;
-  --surface-2: #eef1f6;
-  --text: #1c2430;
-  --muted: #5b6676;
-  --border: #d5dbe5;
-  --accent: #1f5fbf;
+  --surface-2: #f2f4f7;
+  --text: #101828;
+  --muted: #667085;
+  --border: #d0d5dd;
+  --accent: #175cd3;
   --accent-text: #ffffff;
-  --danger: #b3261e;
-  --danger-bg: #fdecea;
-  --ok: #1e7a3c;
-  --ok-bg: #e7f5ec;
-  --warn: #8a5a00;
-  --warn-bg: #fff4d6;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --ok: #067647;
+  --ok-bg: #ecfdf3;
+  --warn: #7a4b00;
+  --warn-bg: #fff4e5;
   --radius: 8px;
-  --font: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Yu Gothic UI', 'Noto Sans CJK JP', 'Noto Sans', sans-serif;
-  --mono: ui-monospace, 'Cascadia Mono', Consolas, 'Noto Sans Mono CJK JP', monospace;
+  // 同梱した書体（@fontsource-variable）。等幅は日本語も等幅になる
+  --font: 'Noto Sans JP Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'M PLUS 1 Code Variable', ui-monospace, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -41,6 +43,25 @@
 
 * {
   box-sizing: border-box;
+}
+
+// アイコンの下地（同梱した Material Icons）。中身はアイコンの名前（リガチャで字形へ置き換わる）。
+// **意味は文字でも書くこと**（アイコンだけの釦は読み上げで何も伝わらない）。**aria-hidden="true" を必ず付ける**
+.material-icons {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 1.25em;
+  line-height: 1;
+  letter-spacing: normal;
+  white-space: nowrap;
+  vertical-align: -0.15em;
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn .material-icons {
+  margin-right: 0.25em;
 }
 
 body {

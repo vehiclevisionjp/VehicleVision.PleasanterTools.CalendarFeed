@@ -143,7 +143,7 @@
     <div class="header-tools">
       <LanguageSelect />
       <span class="small muted">{me.loginId}</span>
-      <button class="btn small" type="button" onclick={signOut}>{t('signOut')}</button>
+      <button class="btn small" type="button" onclick={signOut}><span class="material-icons" aria-hidden="true">logout</span>{t('signOut')}</button>
     </div>
   </header>
   <main>

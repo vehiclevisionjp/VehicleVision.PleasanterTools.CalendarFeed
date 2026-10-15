@@ -63,6 +63,13 @@ Copyright (C) PMC Co.,Ltd.
   vite 8.3.4 / MIT / https://github.com/vitejs/vite
   sass 1.105.1 / MIT / https://github.com/sass/dart-sass
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
+
+  書体とアイコン（アプリへ同梱する。コードではなくフォントのファイル。Questionnaire の Frontend と同じ版・同じ扱い）。**SIL Open Font License 1.1**
+  （寛容ライセンスの一覧にはないが、フォントの再配布を許す。ソフトウェアとして単独で売らない限り同梱・再配布してよい。商用利用可）
+  @fontsource-variable/noto-sans-jp 5.3.1 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-sans-jp
+  @fontsource-variable/m-plus-1-code 5.3.1 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/m-plus-1-code
+  @fontsource/material-icons 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/material-icons
+    （Material Icons。上流（google/material-design-icons）は Apache-2.0 だが、npm パッケージは OFL-1.1 を宣言している）
     （2 要素の登録の QR コードをブラウザの中で描く）
   （ビルド・試験のみ。配布物の JavaScript には含まれない: typescript 6.0.x / Apache-2.0、svelte-check 4.7.6 / MIT、vitest 5.0.4 / MIT、@types/qrcode / MIT）
 
