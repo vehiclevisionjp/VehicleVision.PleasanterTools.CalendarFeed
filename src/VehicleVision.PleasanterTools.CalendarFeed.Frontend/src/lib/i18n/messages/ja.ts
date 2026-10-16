@@ -136,7 +136,7 @@ export const ja = {
   feedCalDavUrl: 'CalDAV の URL',
   feedCalDavEnabledDone: 'CalDAV を有効にしました',
   feedCalDavDisabledDone: 'CalDAV を無効にしました',
-  feedCalDavHint: 'カレンダーアプリから直接つなげます。ユーザー名は任意、パスワードには利用者本人の Pleasanter の API キーを入れます（本アプリは保管しません）。いまは読み取りのみです。',
+  feedCalDavHint: 'カレンダーアプリから直接つなげます。ユーザー名は任意、パスワードには利用者本人の Pleasanter の API キーを入れます（本アプリは保管しません）。予定の読み取りと、作成・更新ができます（削除は未対応）。',
   feedRange: '表示する期間',
   feedRangeHint: '今日を基準に、過去と未来を何日までとるか。期間と重なる予定を出します（期間の前に始まって今も続く予定は消えません）。「無制限」にすると、その側は制限しません。',
   feedRangePast: '過去（日前まで）',

@@ -3,6 +3,7 @@ using System.Text;
 using System.Xml.Linq;
 using VehicleVision.PleasanterTools.CalendarFeed.CalDav;
 using VehicleVision.PleasanterTools.CalendarFeed.Calendar;
+using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
@@ -10,13 +11,14 @@ using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Endpoints;
 
 /// <summary>
-/// カレンダーアプリが直接つなぐ CalDAV（Issue #85。設計方針 <c>_documents/CalDAV書き込み-設計方針.md</c>）。<b>いまは読み取りのみ</b>。
+/// カレンダーアプリが直接つなぐ CalDAV（Issue #85。設計方針 <c>_documents/CalDAV書き込み-設計方針.md</c>）。<b>読み取りと、予定の作成・更新（PUT）</b>。
 /// </summary>
 /// <remarks>
 /// <para>
 /// 一次情報: RFC 4791（CalDAV）、RFC 4918（WebDAV）。実装したのは、探索（<c>current-user-principal</c> → <c>calendar-home-set</c> → カレンダー）と、
 /// <c>OPTIONS</c> / <c>PROPFIND</c> / <c>REPORT</c>（<c>calendar-query</c>・<c>calendar-multiget</c>）/ <c>GET</c> だけ。
-/// 書き込み（<c>PUT</c>・<c>DELETE</c>）・<c>MKCALENDAR</c>・スケジューリング（<c>calendar-auto-schedule</c>）は<b>未対応</b>で、405 を返す。
+/// <c>PUT</c> は作成（<c>If-None-Match: *</c>）と更新（<c>If-Match</c> 必須）。<b>削除（<c>DELETE</c>）</b>・<c>MKCALENDAR</c>・スケジューリング
+/// （<c>calendar-auto-schedule</c>）は<b>未対応</b>で、405 を返す。
 /// </para>
 /// <para>
 /// <b>認証は Basic。</b>ユーザー名は任意（検証しない）、<b>パスワードは利用者本人の Pleasanter の API キー</b>。
@@ -39,7 +41,7 @@ public static class CalDavEndpoints
         "PUT", "DELETE", "POST", "PROPPATCH", "MKCOL", "MKCALENDAR", "COPY", "MOVE", "LOCK", "UNLOCK",
     ];
 
-    private const string AllowedMethods = "OPTIONS, GET, HEAD, PROPFIND, REPORT";
+    private const string AllowedMethods = "OPTIONS, GET, HEAD, PROPFIND, REPORT, PUT";
     private const string EventContentType = "text/calendar; charset=utf-8; component=vevent";
 
     public static void MapCalDav(this WebApplication app)
@@ -56,6 +58,8 @@ public static class CalDavEndpoints
         HttpContext http,
         IFeedStore feeds,
         FeedService service,
+        ICalDavStore store,
+        CalDavWriteService writer,
         CancellationToken ct)
     {
         var method = http.Request.Method.ToUpperInvariant();
@@ -76,7 +80,7 @@ public static class CalDavEndpoints
             return Results.NotFound();
         }
 
-        if (method is not ("GET" or "HEAD" or "PROPFIND" or "REPORT"))
+        if (method is not ("GET" or "HEAD" or "PROPFIND" or "REPORT" or "PUT"))
         {
             return Results.StatusCode(StatusCodes.Status405MethodNotAllowed);
         }
@@ -85,9 +89,10 @@ public static class CalDavEndpoints
         {
             return method switch
             {
-                "PROPFIND" => await PropfindAsync(http, target, credentials, feeds, service, ct),
-                "REPORT" => await ReportAsync(http, target, credentials, feeds, service, ct),
-                _ => await GetAsync(target, credentials, feeds, service, ct),
+                "PROPFIND" => await PropfindAsync(http, target, credentials, feeds, service, store, ct),
+                "REPORT" => await ReportAsync(http, target, credentials, feeds, service, store, ct),
+                "PUT" => await PutAsync(http, target, credentials, feeds, writer, ct),
+                _ => await GetAsync(target, credentials, feeds, service, store, ct),
             };
         }
         catch (DavXmlException ex)
@@ -161,7 +166,8 @@ public static class CalDavEndpoints
 
     // ---- 資源 ----------------------------------------------------------------------------------
 
-    private sealed record EventResource(string Uid, string Href, string Body, string ETag, CalendarEvent Event);
+    /// <param name="Name">資源の名前（デコード済み）。カレンダーアプリが PUT した名前、無ければ <c>{UID}.ics</c>。</param>
+    private sealed record EventResource(string Uid, string Name, string Href, string Body, string ETag, CalendarEvent Event);
 
     private static async Task<FeedDefinition?> EnabledFeedAsync(Guid id, IFeedStore feeds, CancellationToken ct)
     {
@@ -169,21 +175,32 @@ public static class CalDavEndpoints
         return feed is { CalDavEnabled: true } ? feed : null;
     }
 
-    private static List<EventResource> Materialize(FeedDefinition feed, IReadOnlyList<CalendarEvent> events) =>
-        events
-            .GroupBy(e => e.Uid, StringComparer.Ordinal)
+    /// <summary>
+    /// 予定を資源にする。<b>カレンダーアプリが作ったものは、付けられた UID と名前のまま</b>返す
+    /// （UID が変わると別の予定と見なされて重複する）。そうでないものは、レコードから導く UID と名前。
+    /// </summary>
+    private static async Task<List<EventResource>> MaterializeAsync(
+        FeedDefinition feed, IReadOnlyList<CalendarEvent> events, ICalDavStore store, CancellationToken ct)
+    {
+        var stored = (await store.ListAsync(feed.Id, ct)).ToDictionary(r => r.RecordId);
+        return events
+            .Select(e => stored.TryGetValue(e.RecordId ?? 0, out var s)
+                ? (Event: e with { Uid = s.Uid }, Name: s.Name)
+                : (Event: e, Name: CalDavPaths.ResourceName(e.Uid)))
+            .GroupBy(x => x.Name, StringComparer.Ordinal)
             .Select(g => g.First())
-            .Select(e =>
+            .Select(x =>
             {
-                var body = ICalWriter.WriteResource(e);
-                return new EventResource(e.Uid, CalDavPaths.Event(feed.Id, e.Uid), body, CalDavPaths.ETagOf(body), e);
+                var body = ICalWriter.WriteResource(x.Event);
+                return new EventResource(x.Event.Uid, x.Name, CalDavPaths.Event(feed.Id, x.Name), body, CalDavPaths.ETagOf(body), x.Event);
             })
             .ToList();
+    }
 
     // ---- GET -----------------------------------------------------------------------------------
 
     private static async Task<IResult> GetAsync(
-        CalDavTarget target, (string User, string ApiKey) credentials, IFeedStore feeds, FeedService service, CancellationToken ct)
+        CalDavTarget target, (string User, string ApiKey) credentials, IFeedStore feeds, FeedService service, ICalDavStore store, CancellationToken ct)
     {
         if (target.Kind != CalDavKind.Event || target.FeedId is not { } feedId)
         {
@@ -191,23 +208,97 @@ public static class CalDavEndpoints
         }
 
         var feed = await EnabledFeedAsync(feedId, feeds, ct);
-        if (feed is null || CalDavPaths.UidOf(target.FileName!) is not { } uid)
+        if (feed is null)
         {
             return Results.NotFound();
         }
 
-        var resources = Materialize(feed, await service.GetCalDavEventsAsync(feed, credentials.ApiKey, ct));
-        var resource = resources.FirstOrDefault(r => r.Uid == uid);
+        var resources = await MaterializeAsync(feed, await service.GetCalDavEventsAsync(feed, credentials.ApiKey, ct), store, ct);
+        var resource = resources.FirstOrDefault(r => r.Name == target.FileName);
         return resource is null
             ? Results.NotFound()
             : new CalDavResult(StatusCodes.Status200OK, resource.Body, EventContentType, [("ETag", resource.ETag)]);
     }
 
+    // ---- PUT（作成・更新） ---------------------------------------------------------------------
+
+    private static async Task<IResult> PutAsync(
+        HttpContext http, CalDavTarget target, (string User, string ApiKey) credentials,
+        IFeedStore feeds, CalDavWriteService writer, CancellationToken ct)
+    {
+        if (target.Kind != CalDavKind.Event)
+        {
+            return Results.StatusCode(StatusCodes.Status405MethodNotAllowed);
+        }
+
+        var feed = await EnabledFeedAsync(target.FeedId!.Value, feeds, ct);
+        if (feed is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (http.Request.ContentLength is > ICalReader.MaxLength)
+        {
+            return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+        }
+
+        string body;
+        using (var reader = new StreamReader(http.Request.Body, Encoding.UTF8, leaveOpen: true))
+        {
+            var buffer = new char[ICalReader.MaxLength + 1];
+            var read = await reader.ReadBlockAsync(buffer.AsMemory(), ct);
+            if (read > ICalReader.MaxLength)
+            {
+                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+            }
+
+            body = new string(buffer, 0, read);
+        }
+
+        var ifMatch = http.Request.Headers.IfMatch.Count > 0 ? string.Join(',', http.Request.Headers.IfMatch.ToArray()) : null;
+        var ifNoneMatchAny = http.Request.Headers.IfNoneMatch.ToString().Trim() == "*";
+
+        var result = await writer.PutAsync(feed, credentials.ApiKey, target.FileName!, body, ifMatch, ifNoneMatchAny, ct);
+        return result.Status switch
+        {
+            // **ETag は返さない。**保存した内容は、送られた内容を整えたもの（RFC 4791 5.3.4）。クライアントが取り直す
+            CalDavWriteStatus.Created => new CalDavResult(StatusCodes.Status201Created),
+            CalDavWriteStatus.Updated => new CalDavResult(StatusCodes.Status204NoContent),
+            CalDavWriteStatus.PreconditionFailed => Text(StatusCodes.Status412PreconditionFailed, result.Reason),
+            CalDavWriteStatus.PreconditionRequired => Text(StatusCodes.Status428PreconditionRequired, result.Reason),
+            CalDavWriteStatus.UidConflict => ErrorXml(
+                StatusCodes.Status409Conflict,
+                new XElement(DavXml.C + "no-uid-conflict", new XElement(DavXml.D + "href", result.ConflictHref))),
+            CalDavWriteStatus.Busy => new CalDavResult(
+                StatusCodes.Status503ServiceUnavailable, result.Reason, "text/plain; charset=utf-8", [("Retry-After", "2")]),
+            _ => ErrorXml(
+                StatusCodes.Status403Forbidden,
+                new XElement(DavXml.C + ConditionName(result.Problem), result.Reason)),
+        };
+    }
+
+    private static string ConditionName(ICalProblem? problem) => problem switch
+    {
+        ICalProblem.InvalidData => "valid-calendar-data",
+        ICalProblem.UnsupportedComponent => "supported-calendar-component",
+        _ => "valid-calendar-object-resource",
+    };
+
+    private static IResult Text(int status, string? message) =>
+        new CalDavResult(status, message ?? string.Empty, "text/plain; charset=utf-8");
+
+    /// <summary>事前条件の失敗（RFC 4918 16 章の <c>D:error</c>）。</summary>
+    private static IResult ErrorXml(int status, XElement condition) =>
+        new CalDavResult(
+            status,
+            new XDocument(new XElement(DavXml.D + "error", condition)).ToString(SaveOptions.DisableFormatting),
+            "application/xml; charset=utf-8");
+
     // ---- PROPFIND ------------------------------------------------------------------------------
 
     private static async Task<IResult> PropfindAsync(
         HttpContext http, CalDavTarget target, (string User, string ApiKey) credentials,
-        IFeedStore feeds, FeedService service, CancellationToken ct)
+        IFeedStore feeds, FeedService service, ICalDavStore store, CancellationToken ct)
     {
         var depth = http.Request.Headers["Depth"].ToString().Trim();
         if (depth.Equals("infinity", StringComparison.OrdinalIgnoreCase))
@@ -252,7 +343,7 @@ public static class CalDavEndpoints
                     return Results.NotFound();
                 }
 
-                var resources = Materialize(feed, await service.GetCalDavEventsAsync(feed, credentials.ApiKey, ct));
+                var resources = await MaterializeAsync(feed, await service.GetCalDavEventsAsync(feed, credentials.ApiKey, ct), store, ct);
                 var ctag = CalDavPaths.CTagOf(resources.Select(r => r.ETag));
                 Add(multi, CalDavPaths.Calendar(feed.Id), CalendarProps(feed, credentials.User, ctag), request);
                 if (children)
@@ -269,12 +360,13 @@ public static class CalDavEndpoints
             case CalDavKind.Event:
             {
                 var feed = await EnabledFeedAsync(target.FeedId!.Value, feeds, ct);
-                if (feed is null || CalDavPaths.UidOf(target.FileName!) is not { } uid)
+                if (feed is null)
                 {
                     return Results.NotFound();
                 }
 
-                var resource = Materialize(feed, await service.GetCalDavEventsAsync(feed, credentials.ApiKey, ct)).FirstOrDefault(r => r.Uid == uid);
+                var resource = (await MaterializeAsync(feed, await service.GetCalDavEventsAsync(feed, credentials.ApiKey, ct), store, ct))
+                    .FirstOrDefault(r => r.Name == target.FileName);
                 if (resource is null)
                 {
                     return Results.NotFound();
@@ -328,7 +420,7 @@ public static class CalDavEndpoints
 
     private static async Task<IResult> ReportAsync(
         HttpContext http, CalDavTarget target, (string User, string ApiKey) credentials,
-        IFeedStore feeds, FeedService service, CancellationToken ct)
+        IFeedStore feeds, FeedService service, ICalDavStore store, CancellationToken ct)
     {
         if (target.Kind != CalDavKind.Calendar)
         {
@@ -354,7 +446,7 @@ public static class CalDavEndpoints
             return Results.NotFound();
         }
 
-        var resources = Materialize(feed, await service.GetCalDavEventsAsync(feed, credentials.ApiKey, ct));
+        var resources = await MaterializeAsync(feed, await service.GetCalDavEventsAsync(feed, credentials.ApiKey, ct), store, ct);
         var propfind = new PropfindRequest(false, false, request.Props);
         var multi = new MultiStatus();
 
@@ -362,10 +454,14 @@ public static class CalDavEndpoints
         {
             foreach (var href in request.Hrefs)
             {
-                var path = Uri.TryCreate(href, UriKind.Absolute, out var absolute) ? absolute.AbsolutePath : href;
+                // **絶対 URL（http・https）のときだけパスを取り出す。** Linux では "/caldav/…" も絶対 URI（file）として読めてしまい、
+                // パスが壊れる（CI の Linux で見つかった）
+                var path = (href.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || href.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    && Uri.TryCreate(href, UriKind.Absolute, out var absolute)
+                        ? absolute.AbsolutePath
+                        : href;
                 var found = CalDavPaths.Parse(path) is { Kind: CalDavKind.Event } t && t.FeedId == feed.Id
-                    && CalDavPaths.UidOf(t.FileName!) is { } uid
-                    ? resources.FirstOrDefault(r => r.Uid == uid)
+                    ? resources.FirstOrDefault(r => r.Name == t.FileName)
                     : null;
                 if (found is null)
                 {
@@ -445,11 +541,14 @@ public static class CalDavEndpoints
             [DavXml.D + "current-user-principal"] = new XElement(DavXml.D + "current-user-principal", HrefOf(CalDavPaths.Principal(user))),
             [DavXml.C + "supported-calendar-component-set"] = new XElement(
                 DavXml.C + "supported-calendar-component-set", new XElement(DavXml.C + "comp", new XAttribute("name", "VEVENT"))),
-            // **いまは読み取りのみ**なので、書き込みの権限（bind・write-content・unbind）は出さない
+            // **作成（bind）と更新（write-content）を示す。削除（unbind）は未対応なので出さない。**
+            // 実際に書けるかは、利用者の Pleasanter の権限で決まる（書けなければ PUT が 403 になる）
             [DavXml.D + "current-user-privilege-set"] = new XElement(
                 DavXml.D + "current-user-privilege-set",
                 new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "read")),
-                new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "read-current-user-privilege-set"))),
+                new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "read-current-user-privilege-set")),
+                new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "write-content")),
+                new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "bind"))),
             [DavXml.D + "supported-report-set"] = new XElement(
                 DavXml.D + "supported-report-set",
                 new XElement(DavXml.D + "supported-report", new XElement(DavXml.D + "report", new XElement(DavXml.C + "calendar-query"))),

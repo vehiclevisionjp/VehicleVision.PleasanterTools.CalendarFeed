@@ -71,6 +71,8 @@ builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 // **無効（既定）なら何も送らない。** 招待は画面の URL を手で渡す。設定は管理画面から編集できる
 builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
 builder.Services.AddSingleton<IRateLimitStore, RateLimitStore>();
+builder.Services.AddSingleton<ICalDavStore, CalDavStore>();
+builder.Services.AddSingleton<CalDavWriteService>();
 builder.Services.AddSingleton<SharedRateLimiter>();
 builder.Services.AddSingleton<RateLimitPurgeService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RateLimitPurgeService>());

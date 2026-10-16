@@ -134,7 +134,7 @@ export const zh: Record<MessageKey, string> = {
   feedCalDavUrl: 'CalDAV 地址',
   feedCalDavEnabledDone: '已启用 CalDAV',
   feedCalDavDisabledDone: '已停用 CalDAV',
-  feedCalDavHint: '日历应用可以直接连接。用户名任意，密码请填写本人的 Pleasanter API 密钥（本应用不会保存）。目前仅支持读取。',
+  feedCalDavHint: '日历应用可以直接连接。用户名任意，密码请填写本人的 Pleasanter API 密钥（本应用不会保存）。可以读取、创建和更新日程（暂不支持删除）。',
   feedRange: '显示的时间范围',
   feedRangeHint: '以今天为基准，向过去和未来各取多少天。与该范围重叠的日程都会显示（在范围之前开始、现在仍在进行的日程不会消失）。选择“不限制”则该侧不设限。',
   feedRangePast: '过去（几天前）',
