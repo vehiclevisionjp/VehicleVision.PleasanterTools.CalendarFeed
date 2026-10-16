@@ -134,7 +134,7 @@ export const ko: Record<MessageKey, string> = {
   feedCalDavUrl: 'CalDAV URL',
   feedCalDavEnabledDone: 'CalDAV를 사용하도록 설정했습니다',
   feedCalDavDisabledDone: 'CalDAV를 사용하지 않도록 설정했습니다',
-  feedCalDavHint: '캘린더 앱에서 직접 연결할 수 있습니다. 사용자 이름은 임의이며, 비밀번호에는 본인의 Pleasanter API 키를 입력합니다(이 앱은 저장하지 않습니다). 일정을 읽고, 만들고, 수정할 수 있습니다(삭제는 아직 지원하지 않습니다).',
+  feedCalDavHint: '캘린더 앱에서 직접 연결할 수 있습니다. 사용자 이름은 임의이며, 비밀번호에는 본인의 Pleasanter API 키를 입력합니다(이 앱은 저장하지 않습니다). 일정을 읽고, 만들고, 수정하고, 삭제할 수 있습니다.',
   feedRange: '표시할 기간',
   feedRangeHint: '오늘을 기준으로 과거와 미래를 며칠까지 포함할지 정합니다. 기간과 겹치는 일정이 표시됩니다(기간 이전에 시작해 지금도 이어지는 일정은 사라지지 않습니다). "제한 없음"을 선택하면 그쪽은 제한하지 않습니다.',
   feedRangePast: '과거(며칠 전까지)',

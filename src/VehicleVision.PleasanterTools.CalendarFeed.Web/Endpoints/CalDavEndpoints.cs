@@ -17,8 +17,8 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Endpoints;
 /// <para>
 /// 一次情報: RFC 4791（CalDAV）、RFC 4918（WebDAV）。実装したのは、探索（<c>current-user-principal</c> → <c>calendar-home-set</c> → カレンダー）と、
 /// <c>OPTIONS</c> / <c>PROPFIND</c> / <c>REPORT</c>（<c>calendar-query</c>・<c>calendar-multiget</c>）/ <c>GET</c> だけ。
-/// <c>PUT</c> は作成（<c>If-None-Match: *</c>）と更新（<c>If-Match</c> 必須）。<b>削除（<c>DELETE</c>）</b>・<c>MKCALENDAR</c>・スケジューリング
-/// （<c>calendar-auto-schedule</c>）は<b>未対応</b>で、405 を返す。
+/// <c>PUT</c> は作成（<c>If-None-Match: *</c>）と更新（<c>If-Match</c> 必須）、<c>DELETE</c> は削除（<c>If-Match</c> 必須。
+/// Pleasanter のごみ箱へ移る）。<c>MKCALENDAR</c>・スケジューリング（<c>calendar-auto-schedule</c>）は<b>未対応</b>で、405 を返す。
 /// </para>
 /// <para>
 /// <b>認証は Basic。</b>ユーザー名は任意（検証しない）、<b>パスワードは利用者本人の Pleasanter の API キー</b>。
@@ -41,7 +41,7 @@ public static class CalDavEndpoints
         "PUT", "DELETE", "POST", "PROPPATCH", "MKCOL", "MKCALENDAR", "COPY", "MOVE", "LOCK", "UNLOCK",
     ];
 
-    private const string AllowedMethods = "OPTIONS, GET, HEAD, PROPFIND, REPORT, PUT";
+    private const string AllowedMethods = "OPTIONS, GET, HEAD, PROPFIND, REPORT, PUT, DELETE";
     private const string EventContentType = "text/calendar; charset=utf-8; component=vevent";
 
     public static void MapCalDav(this WebApplication app)
@@ -80,7 +80,7 @@ public static class CalDavEndpoints
             return Results.NotFound();
         }
 
-        if (method is not ("GET" or "HEAD" or "PROPFIND" or "REPORT" or "PUT"))
+        if (method is not ("GET" or "HEAD" or "PROPFIND" or "REPORT" or "PUT" or "DELETE"))
         {
             return Results.StatusCode(StatusCodes.Status405MethodNotAllowed);
         }
@@ -92,6 +92,7 @@ public static class CalDavEndpoints
                 "PROPFIND" => await PropfindAsync(http, target, credentials, feeds, service, store, ct),
                 "REPORT" => await ReportAsync(http, target, credentials, feeds, service, store, ct),
                 "PUT" => await PutAsync(http, target, credentials, feeds, writer, ct),
+                "DELETE" => await DeleteAsync(http, target, credentials, feeds, writer, ct),
                 _ => await GetAsync(target, credentials, feeds, service, store, ct),
             };
         }
@@ -274,6 +275,37 @@ public static class CalDavEndpoints
             _ => ErrorXml(
                 StatusCodes.Status403Forbidden,
                 new XElement(DavXml.C + ConditionName(result.Problem), result.Reason)),
+        };
+    }
+
+    // ---- DELETE（削除） ------------------------------------------------------------------------
+
+    private static async Task<IResult> DeleteAsync(
+        HttpContext http, CalDavTarget target, (string User, string ApiKey) credentials,
+        IFeedStore feeds, CalDavWriteService writer, CancellationToken ct)
+    {
+        if (target.Kind != CalDavKind.Event)
+        {
+            return Results.StatusCode(StatusCodes.Status405MethodNotAllowed);
+        }
+
+        var feed = await EnabledFeedAsync(target.FeedId!.Value, feeds, ct);
+        if (feed is null)
+        {
+            return Results.NotFound();
+        }
+
+        var ifMatch = http.Request.Headers.IfMatch.Count > 0 ? string.Join(',', http.Request.Headers.IfMatch.ToArray()) : null;
+        var result = await writer.DeleteAsync(feed, credentials.ApiKey, target.FileName!, ifMatch, ct);
+        return result.Status switch
+        {
+            CalDavWriteStatus.Deleted => new CalDavResult(StatusCodes.Status204NoContent),
+            CalDavWriteStatus.NotFound => Results.NotFound(),
+            CalDavWriteStatus.PreconditionFailed => Text(StatusCodes.Status412PreconditionFailed, result.Reason),
+            CalDavWriteStatus.PreconditionRequired => Text(StatusCodes.Status428PreconditionRequired, result.Reason),
+            CalDavWriteStatus.Busy => new CalDavResult(
+                StatusCodes.Status503ServiceUnavailable, result.Reason, "text/plain; charset=utf-8", [("Retry-After", "2")]),
+            _ => Text(StatusCodes.Status403Forbidden, result.Reason),
         };
     }
 
@@ -541,14 +573,15 @@ public static class CalDavEndpoints
             [DavXml.D + "current-user-principal"] = new XElement(DavXml.D + "current-user-principal", HrefOf(CalDavPaths.Principal(user))),
             [DavXml.C + "supported-calendar-component-set"] = new XElement(
                 DavXml.C + "supported-calendar-component-set", new XElement(DavXml.C + "comp", new XAttribute("name", "VEVENT"))),
-            // **作成（bind）と更新（write-content）を示す。削除（unbind）は未対応なので出さない。**
+            // **作成（bind）・更新（write-content）・削除（unbind）を示す。**
             // 実際に書けるかは、利用者の Pleasanter の権限で決まる（書けなければ PUT が 403 になる）
             [DavXml.D + "current-user-privilege-set"] = new XElement(
                 DavXml.D + "current-user-privilege-set",
                 new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "read")),
                 new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "read-current-user-privilege-set")),
                 new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "write-content")),
-                new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "bind"))),
+                new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "bind")),
+                new XElement(DavXml.D + "privilege", new XElement(DavXml.D + "unbind"))),
             [DavXml.D + "supported-report-set"] = new XElement(
                 DavXml.D + "supported-report-set",
                 new XElement(DavXml.D + "supported-report", new XElement(DavXml.D + "report", new XElement(DavXml.C + "calendar-query"))),

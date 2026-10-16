@@ -17,6 +17,12 @@ public enum CalDavWriteStatus
     /// <summary>更新した（204）。</summary>
     Updated,
 
+    /// <summary>削除した（204。Pleasanter のごみ箱へ移る）。</summary>
+    Deleted,
+
+    /// <summary>資源が無い（404）。</summary>
+    NotFound,
+
     /// <summary>前提の条件が合わない（412）。<c>If-Match</c> の ETag が違う、<c>If-None-Match: *</c> なのに既にある、など。</summary>
     PreconditionFailed,
 
@@ -185,35 +191,9 @@ public sealed class CalDavWriteService(
 
         try
         {
-            // **最新を取り直して、ETag を比べる。**（Pleasanter の API は競合を検出しない）
-            System.Text.Json.Nodes.JsonNode record;
-            try
+            if (await CheckCurrentAsync(feed, apiKey, resource, ifMatch, zone, cancellationToken).ConfigureAwait(false) is { } failure)
             {
-                record = await client.GetRecordAsync(apiKey, resource.RecordId, cancellationToken).ConfigureAwait(false);
-            }
-            catch (PleasanterException ex) when (ex.StatusCode == 404)
-            {
-                // レコードが無い（Pleasanter で消された）。古い対応は消し、「前提が合わない」として再取得させる
-                await store.DeleteByRecordAsync(feed.Id, resource.RecordId, cancellationToken).ConfigureAwait(false);
-                feeds.Invalidate(feed.Id);
-                return new CalDavWriteResult(CalDavWriteStatus.PreconditionFailed, "The event no longer exists.");
-            }
-
-            if (!BelongsTo(record, feed))
-            {
-                return new CalDavWriteResult(CalDavWriteStatus.Rejected, "The record does not belong to this calendar.", ICalProblem.InvalidResource);
-            }
-
-            var current = EventMapper.Map(record, feed, zone, settings.Current.Pleasanter.LinkBaseUrl);
-            if (current is null)
-            {
-                return new CalDavWriteResult(CalDavWriteStatus.PreconditionFailed, "The event cannot be read any more.");
-            }
-
-            var etag = CalDavPaths.ETagOf(ICalWriter.WriteResource(current with { Uid = resource.Uid }));
-            if (!IfMatchSatisfied(ifMatch, etag))
-            {
-                return new CalDavWriteResult(CalDavWriteStatus.PreconditionFailed, "The event was changed. Fetch it again.");
+                return failure;
             }
 
             await client.UpdateRecordAsync(apiKey, resource.RecordId, fields, cancellationToken).ConfigureAwait(false);
@@ -224,6 +204,90 @@ public sealed class CalDavWriteService(
         {
             await store.ReleaseLockAsync(lockKey, owner, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// <b>予定を削除する。</b><c>If-Match</c> が<b>あれば比べる</b>（違えば 412）。<b>無くても削除する</b>
+    /// （更新と違い、Pleasanter では<b>ごみ箱へ移って戻せる</b>。<c>If-Match</c> を付けないクライアントがある。実機の Python <c>caldav</c> など）。
+    /// 対応表の行は消す（その UID・名前で作り直せるように）。
+    /// </summary>
+    public async Task<CalDavWriteResult> DeleteAsync(
+        FeedDefinition feed, string apiKey, string name, string? ifMatch, CancellationToken cancellationToken)
+    {
+        if (await ResolveAsync(feed, name, cancellationToken).ConfigureAwait(false) is not { } resource)
+        {
+            return new CalDavWriteResult(CalDavWriteStatus.NotFound);
+        }
+
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(
+            feed.ApiKeyUserTimeZoneId ?? settings.Current.Pleasanter.ApiKeyUserTimeZoneId);
+        var lockKey = $"{feed.Id:N}:r{resource.RecordId}";
+        var owner = Guid.NewGuid().ToString("D");
+        if (!await AcquireAsync(lockKey, owner, cancellationToken).ConfigureAwait(false))
+        {
+            return new CalDavWriteResult(CalDavWriteStatus.Busy, "Another write to this event is in progress.");
+        }
+
+        try
+        {
+            if (await CheckCurrentAsync(feed, apiKey, resource, ifMatch, zone, cancellationToken).ConfigureAwait(false) is { } failure)
+            {
+                return failure;
+            }
+
+            await client.DeleteRecordAsync(apiKey, resource.RecordId, cancellationToken).ConfigureAwait(false);
+            await store.DeleteByRecordAsync(feed.Id, resource.RecordId, cancellationToken).ConfigureAwait(false);
+            feeds.Invalidate(feed.Id);
+            return new CalDavWriteResult(CalDavWriteStatus.Deleted);
+        }
+        finally
+        {
+            await store.ReleaseLockAsync(lockKey, owner, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// <b>最新のレコードを取り直して、ETag を <c>If-Match</c> と比べる</b>（Pleasanter の API は競合を検出しない）。
+    /// レコードが無ければ古い対応を消して「前提が合わない」、別のサイトのものなら断る。通ってよければ <c>null</c>。
+    /// <paramref name="ifMatch"/> が <c>null</c> なら ETag は比べない。
+    /// </summary>
+    private async Task<CalDavWriteResult?> CheckCurrentAsync(
+        FeedDefinition feed,
+        string apiKey,
+        (long RecordId, string Uid) resource,
+        string? ifMatch,
+        TimeZoneInfo zone,
+        CancellationToken cancellationToken)
+    {
+        System.Text.Json.Nodes.JsonNode record;
+        try
+        {
+            record = await client.GetRecordAsync(apiKey, resource.RecordId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (PleasanterException ex) when (ex.StatusCode == 404)
+        {
+            // レコードが無い（Pleasanter で消された）。古い対応は消し、「前提が合わない」として再取得させる
+            await store.DeleteByRecordAsync(feed.Id, resource.RecordId, cancellationToken).ConfigureAwait(false);
+            feeds.Invalidate(feed.Id);
+            return new CalDavWriteResult(CalDavWriteStatus.PreconditionFailed, "The event no longer exists.");
+        }
+
+        if (!BelongsTo(record, feed))
+        {
+            return new CalDavWriteResult(CalDavWriteStatus.Rejected, "The record does not belong to this calendar.", ICalProblem.InvalidResource);
+        }
+
+        var current = EventMapper.Map(record, feed, zone, settings.Current.Pleasanter.LinkBaseUrl);
+        if (current is null)
+        {
+            return new CalDavWriteResult(CalDavWriteStatus.PreconditionFailed, "The event cannot be read any more.");
+        }
+
+        // If-Match が無い（削除だけ。更新は呼び出し側が先に断っている）なら、比べない
+        var etag = CalDavPaths.ETagOf(ICalWriter.WriteResource(current with { Uid = resource.Uid }));
+        return ifMatch is null || IfMatchSatisfied(ifMatch, etag)
+            ? null
+            : new CalDavWriteResult(CalDavWriteStatus.PreconditionFailed, "The event was changed. Fetch it again.");
     }
 
     private async Task<CalDavWriteResult> CreateAsync(

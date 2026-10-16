@@ -236,6 +236,15 @@ public sealed class PleasanterClient(HttpClient httpClient, IPleasanterOptionsSo
     public async Task UpdateRecordAsync(string apiKey, long recordId, JsonObject fields, CancellationToken cancellationToken = default) =>
         await PostAsync($"api/items/{recordId}/Update", WithAuth(apiKey, fields), cancellationToken).ConfigureAwait(false);
 
+    /// <summary>
+    /// レコードを削除する（CalDAV の書き込み。Issue #85）。<b>Pleasanter のごみ箱へ移る</b>（実機検証結果 14 章）ので、Pleasanter の画面から戻せる。
+    /// </summary>
+    public async Task DeleteRecordAsync(string apiKey, long recordId, CancellationToken cancellationToken = default) =>
+        await PostAsync(
+            $"api/items/{recordId}/Delete",
+            new Dictionary<string, object?> { ["ApiKey"] = apiKey, ["ApiVersion"] = options.ApiVersion },
+            cancellationToken).ConfigureAwait(false);
+
     private Dictionary<string, object?> WithAuth(string apiKey, JsonObject fields)
     {
         var body = new Dictionary<string, object?>(StringComparer.Ordinal);

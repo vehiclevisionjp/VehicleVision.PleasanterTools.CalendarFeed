@@ -298,8 +298,9 @@ internal sealed class FakePleasanter : HttpMessageHandler
         var path = request.RequestUri!.AbsolutePath;
         Requests.Add((path, LastRequestBody));
 
-        // 作成・更新（CalDAV の書き込み）
-        if (path.EndsWith("/Create", StringComparison.Ordinal) || path.EndsWith("/Update", StringComparison.Ordinal))
+        // 作成・更新・削除（CalDAV の書き込み）
+        if (path.EndsWith("/Create", StringComparison.Ordinal) || path.EndsWith("/Update", StringComparison.Ordinal)
+            || path.EndsWith("/Delete", StringComparison.Ordinal))
         {
             var created = path.EndsWith("/Create", StringComparison.Ordinal);
             return new HttpResponseMessage(WriteStatusCode ?? StatusCode)

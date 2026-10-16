@@ -134,7 +134,7 @@ export const es: Record<MessageKey, string> = {
   feedCalDavUrl: 'URL de CalDAV',
   feedCalDavEnabledDone: 'Se activó CalDAV',
   feedCalDavDisabledDone: 'Se desactivó CalDAV',
-  feedCalDavHint: 'Las aplicaciones de calendario pueden conectarse directamente. El nombre de usuario es libre; como contraseña, introduzca su propia clave de API de Pleasanter (esta aplicación no la guarda). Se pueden leer, crear y modificar eventos (aún no se admite eliminar).',
+  feedCalDavHint: 'Las aplicaciones de calendario pueden conectarse directamente. El nombre de usuario es libre; como contraseña, introduzca su propia clave de API de Pleasanter (esta aplicación no la guarda). Se pueden leer, crear, modificar y eliminar eventos.',
   feedRange: 'Periodo a mostrar',
   feedRangeHint: 'Cuántos días hacia el pasado y el futuro, contados desde hoy. Se muestran los eventos que se solapan con el periodo (un evento que empezó antes y sigue en curso se conserva). «Sin límite» deja ese lado abierto.',
   feedRangePast: 'Pasado (días atrás)',
