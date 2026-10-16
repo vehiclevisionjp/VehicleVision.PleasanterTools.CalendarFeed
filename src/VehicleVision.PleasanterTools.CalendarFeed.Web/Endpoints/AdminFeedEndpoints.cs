@@ -1,3 +1,4 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using System.Text.RegularExpressions;
@@ -187,12 +188,15 @@ public static class AdminFeedEndpoints
         }).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.FeedsWrite));
 
         admin.MapDelete("/{id:guid}", async (
-            Guid id, HttpContext http, IFeedStore feeds, FeedService service, AuditLogService audit, CancellationToken ct) =>
+            Guid id, HttpContext http, IFeedStore feeds, FeedService service, ICalDavStore calDav, AuditLogService audit, CancellationToken ct) =>
         {
             if (!await feeds.RevokeAsync(id, ct))
             {
                 return Results.NotFound();
             }
+
+            // CalDAV の UID の対応は、フィードと一緒に消す（無効にしただけでは残す。有効に戻したときに UID が変わらないように）
+            await calDav.DeleteFeedAsync(id, ct);
 
             service.Invalidate(id);
             await audit.WriteAsync(http, AuditActions.FeedRevoked, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));

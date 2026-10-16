@@ -134,7 +134,7 @@ export const en: Record<MessageKey, string> = {
   feedCalDavUrl: 'CalDAV URL',
   feedCalDavEnabledDone: 'CalDAV was enabled',
   feedCalDavDisabledDone: 'CalDAV was disabled',
-  feedCalDavHint: 'Calendar apps can connect directly. The user name is arbitrary; enter your own Pleasanter API key as the password (this app does not store it). Read-only for now.',
+  feedCalDavHint: 'Calendar apps can connect directly. The user name is arbitrary; enter your own Pleasanter API key as the password (this app does not store it). You can read, create and update events (deleting is not supported yet).',
   feedRange: 'Period to show',
   feedRangeHint: 'How many days into the past and the future, counted from today. Events that overlap the period are shown (an event that started before the period and is still running is kept). "Unlimited" leaves that side open.',
   feedRangePast: 'Past (days back)',

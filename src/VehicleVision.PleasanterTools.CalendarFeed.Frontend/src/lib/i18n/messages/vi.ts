@@ -134,7 +134,7 @@ export const vi: Record<MessageKey, string> = {
   feedCalDavUrl: 'URL CalDAV',
   feedCalDavEnabledDone: 'Đã bật CalDAV',
   feedCalDavDisabledDone: 'Đã tắt CalDAV',
-  feedCalDavHint: 'Ứng dụng lịch có thể kết nối trực tiếp. Tên người dùng tùy ý; mật khẩu là khóa API Pleasanter của chính bạn (ứng dụng này không lưu). Hiện chỉ đọc.',
+  feedCalDavHint: 'Ứng dụng lịch có thể kết nối trực tiếp. Tên người dùng tùy ý; mật khẩu là khóa API Pleasanter của chính bạn (ứng dụng này không lưu). Có thể đọc, tạo và sửa sự kiện (chưa hỗ trợ xóa).',
   feedRange: 'Khoảng thời gian hiển thị',
   feedRangeHint: 'Số ngày về quá khứ và tương lai, tính từ hôm nay. Các sự kiện giao với khoảng thời gian sẽ được hiển thị (sự kiện bắt đầu trước đó và vẫn đang diễn ra sẽ được giữ lại). Chọn "Không giới hạn" để bỏ giới hạn phía đó.',
   feedRangePast: 'Quá khứ (số ngày trước)',

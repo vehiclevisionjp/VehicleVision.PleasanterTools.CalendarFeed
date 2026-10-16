@@ -18,29 +18,18 @@ public static class CalDavPaths
     /// <summary>フィード 1 つのカレンダー。</summary>
     public static string Calendar(Guid feedId) => $"{Home}{feedId:D}/";
 
-    /// <summary>予定 1 件の資源。UID から決まる名前（<c>.ics</c>）。</summary>
-    public static string Event(Guid feedId, string uid) => Calendar(feedId) + FileName(uid);
+    /// <summary>
+    /// 予定 1 件の資源の URL。<paramref name="name"/> は<b>デコード済みの資源の名前</b>（<c>.ics</c> つき）。
+    /// カレンダーアプリが PUT した名前をそのまま使う。作られたものでなければ <see cref="ResourceName"/>。
+    /// </summary>
+    public static string Event(Guid feedId, string name) => Calendar(feedId) + Uri.EscapeDataString(name);
 
-    /// <summary>予定の資源の名前。UID を URL 用に直し、<c>.ics</c> を付ける。</summary>
-    public static string FileName(string uid) => Uri.EscapeDataString(uid) + ".ics";
+    /// <summary>レコードから導く UID の予定の、資源の名前（<c>{UID}.ics</c>。デコード済み）。</summary>
+    public static string ResourceName(string uid) => uid + ".ics";
 
-    /// <summary>資源の名前から UID へ戻す。<c>.ics</c> で終わらない・壊れた名前は <c>null</c>。</summary>
-    public static string? UidOf(string fileName)
-    {
-        if (!fileName.EndsWith(".ics", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        try
-        {
-            return Uri.UnescapeDataString(fileName[..^4]);
-        }
-        catch (UriFormatException)
-        {
-            return null;
-        }
-    }
+    /// <summary>資源の名前（デコード済み）から、導く UID へ戻す。<c>.ics</c> で終わらない名前は <c>null</c>。</summary>
+    public static string? UidOf(string name) =>
+        name.EndsWith(".ics", StringComparison.OrdinalIgnoreCase) && name.Length > 4 ? name[..^4] : null;
 
     /// <summary>URL の形を読む。未知の形は <see cref="CalDavKind.Unknown"/>。</summary>
     public static CalDavTarget Parse(string path)

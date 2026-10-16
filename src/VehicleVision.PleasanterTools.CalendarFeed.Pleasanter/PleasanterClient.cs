@@ -71,7 +71,7 @@ public sealed class PleasanterException(PleasanterErrorKind kind, string message
 /// <param name="Records">このページのレコード。</param>
 public sealed record PleasanterPage(int TotalCount, int PageSize, IReadOnlyList<JsonNode> Records);
 
-/// <summary>Pleasanter の標準 API を叩く（このアプリで要るのは一覧取得だけ）。</summary>
+/// <summary>Pleasanter の標準 API を叩く（一覧の取得と、CalDAV の書き込みのためのレコードの取得・作成・更新）。</summary>
 /// <remarks>**再試行しない。** 失敗の扱いは呼び出し側が決める。</remarks>
 /// <summary>接続設定の出どころ。<b>呼び出すたびに読む</b>（管理画面で編集した設定が、再起動なしで効く）。</summary>
 public interface IPleasanterOptionsSource
@@ -195,15 +195,73 @@ public sealed class PleasanterClient(HttpClient httpClient, IPleasanterOptionsSo
             body["View"] = view;
         }
 
+        var node = await PostAsync($"api/items/{siteId}/Get", body, cancellationToken).ConfigureAwait(false);
+        if (node["Response"] is not JsonObject payload || payload["Data"] is not JsonArray data)
+        {
+            throw new PleasanterException(
+                PleasanterErrorKind.Permanent, "Pleasanter の応答に Response.Data がありません。");
+        }
+
+        return new PleasanterPage(
+            payload["TotalCount"]?.GetValue<int>() ?? data.Count,
+            payload["PageSize"]?.GetValue<int>() ?? pageSize,
+            data.OfType<JsonNode>().ToList());
+    }
+
+    /// <summary>
+    /// レコード 1 件を<b>最新の状態で</b>取る（CalDAV の書き込みが、競合の検出に使う。Issue #85）。
+    /// 無い・読めないときは <see cref="PleasanterException"/>（<c>StatusCode</c> が 404 なら無い）。
+    /// </summary>
+    public async Task<JsonNode> GetRecordAsync(string apiKey, long recordId, CancellationToken cancellationToken = default)
+    {
+        var node = await PostAsync(
+            $"api/items/{recordId}/Get",
+            new Dictionary<string, object?> { ["ApiKey"] = apiKey, ["ApiVersion"] = options.ApiVersion },
+            cancellationToken).ConfigureAwait(false);
+        return node["Response"]?["Data"] is JsonArray { Count: > 0 } data && data[0] is { } record
+            ? record
+            : throw new PleasanterException(PleasanterErrorKind.Permanent, "Pleasanter の応答にレコードがありません。", 404);
+    }
+
+    /// <summary>レコードを作る。作ったレコードの ID を返す（CalDAV の書き込み。Issue #85）。</summary>
+    /// <param name="fields">レコードの項目（<c>Title</c> など。<c>ClassHash</c> 等の入れ子も可）。</param>
+    public async Task<long> CreateRecordAsync(string apiKey, long siteId, JsonObject fields, CancellationToken cancellationToken = default)
+    {
+        var node = await PostAsync($"api/items/{siteId}/Create", WithAuth(apiKey, fields), cancellationToken).ConfigureAwait(false);
+        return node["Id"]?.GetValue<long>()
+            ?? throw new PleasanterException(PleasanterErrorKind.Permanent, "Pleasanter の応答に作成したレコードの ID がありません。");
+    }
+
+    /// <summary>レコードを更新する。<paramref name="fields"/> に書いた項目だけが変わる（CalDAV の書き込み。Issue #85）。</summary>
+    public async Task UpdateRecordAsync(string apiKey, long recordId, JsonObject fields, CancellationToken cancellationToken = default) =>
+        await PostAsync($"api/items/{recordId}/Update", WithAuth(apiKey, fields), cancellationToken).ConfigureAwait(false);
+
+    private Dictionary<string, object?> WithAuth(string apiKey, JsonObject fields)
+    {
+        var body = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var (name, value) in fields)
+        {
+            body[name] = value?.DeepClone();
+        }
+
+        body["ApiKey"] = apiKey;
+        body["ApiVersion"] = options.ApiVersion;
+        return body;
+    }
+
+    /// <summary>
+    /// 標準 API へ POST し、状態を見て応答の JSON を返す。<b>API キーは本文にしか載せず、例外・ログへ出さない。</b>
+    /// HTTP が 200 でも、本文の <c>StatusCode</c> が 200 でなければ失敗として扱う。
+    /// </summary>
+    private async Task<JsonNode> PostAsync(string path, object body, CancellationToken cancellationToken)
+    {
         // 画面から編集できる設定なので、未設定のまま使われうる。分かるメッセージで止める（再試行しても直らない）
         if (string.IsNullOrWhiteSpace(options.BaseUrl))
         {
             throw new PleasanterException(PleasanterErrorKind.Permanent, "Pleasanter の URL が設定されていません。管理画面の設定で指定してください。");
         }
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"{options.BaseUrl.TrimEnd('/')}/api/items/{siteId}/Get")
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{options.BaseUrl.TrimEnd('/')}/{path}")
         {
             Content = JsonContent.Create(body, options: SerializerOptions),
         };
@@ -258,16 +316,7 @@ public sealed class PleasanterClient(HttpClient httpClient, IPleasanterOptionsSo
                     s);
             }
 
-            if (node?["Response"] is not JsonObject payload || payload["Data"] is not JsonArray data)
-            {
-                throw new PleasanterException(
-                    PleasanterErrorKind.Permanent, "Pleasanter の応答に Response.Data がありません。", status);
-            }
-
-            return new PleasanterPage(
-                payload["TotalCount"]?.GetValue<int>() ?? data.Count,
-                payload["PageSize"]?.GetValue<int>() ?? pageSize,
-                data.OfType<JsonNode>().ToList());
+            return node ?? throw new PleasanterException(PleasanterErrorKind.Transient, "Pleasanter の応答が空です。", status);
         }
     }
 

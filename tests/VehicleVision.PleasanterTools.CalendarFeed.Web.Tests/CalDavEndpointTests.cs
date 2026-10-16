@@ -66,7 +66,9 @@ public sealed class CalDavEndpointTests : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("calendar-access", response.Headers.GetValues("DAV").Single());
-        Assert.DoesNotContain("PUT", string.Join(",", response.Content.Headers.Allow));
+        var allow = string.Join(",", response.Content.Headers.Allow);
+        Assert.Contains("PUT", allow);
+        Assert.DoesNotContain("DELETE", allow);
     }
 
     [Fact]
@@ -127,9 +129,11 @@ public sealed class CalDavEndpointTests : IDisposable
         Assert.Equal("共有予定", doc.Descendants(DavXml.D + "displayname").Single().Value);
         Assert.Equal("VEVENT", doc.Descendants(DavXml.C + "comp").Single().Attribute("name")!.Value);
         Assert.NotEmpty(doc.Descendants(DavXml.CS + "getctag").Single().Value);
-        var privileges = doc.Descendants(DavXml.D + "current-user-privilege-set").Single().Descendants().Select(e => e.Name.LocalName);
-        Assert.DoesNotContain("write-content", privileges);
+        var privileges = doc.Descendants(DavXml.D + "current-user-privilege-set").Single().Descendants().Select(e => e.Name.LocalName).ToList();
         Assert.Contains("read", privileges);
+        Assert.Contains("write-content", privileges);
+        Assert.Contains("bind", privileges);
+        Assert.DoesNotContain("unbind", privileges); // 削除は未対応
     }
 
     [Fact]
@@ -292,11 +296,10 @@ public sealed class CalDavEndpointTests : IDisposable
     }
 
     [Theory]
-    [InlineData("PUT")]
     [InlineData("DELETE")]
     [InlineData("MKCALENDAR")]
     [InlineData("PROPPATCH")]
-    public async Task 書き込み系はまだ405(string method)
+    public async Task 削除など未対応の書き込み系は405(string method)
     {
         var (_, calendar) = await EnabledFeedAsync();
 

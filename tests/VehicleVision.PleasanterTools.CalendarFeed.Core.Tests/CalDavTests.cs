@@ -136,6 +136,7 @@ public sealed class CalDavTests
         Assert.Equal(feed, CalDavPaths.Parse($"/caldav/calendars/{feed:D}/").FeedId);
         var ev = CalDavPaths.Parse($"/caldav/calendars/{feed:D}/1-5%40x.ics");
         Assert.Equal(CalDavKind.Event, ev.Kind);
+        Assert.Equal("1-5@x.ics", ev.FileName);   // デコード済みの名前
         Assert.Equal("1-5@x", CalDavPaths.UidOf(ev.FileName!));
     }
 
@@ -151,12 +152,17 @@ public sealed class CalDavTests
     }
 
     [Fact]
-    public void UIDとファイル名は_往復できる()
+    public void UIDと資源の名前は_往復でき_URLでは符号化される()
     {
         const string uid = "123-5@feed.calendarfeed";
+        var feed = Guid.NewGuid();
 
-        Assert.Equal(uid, CalDavPaths.UidOf(CalDavPaths.FileName(uid)));
+        Assert.Equal(uid, CalDavPaths.UidOf(CalDavPaths.ResourceName(uid)));
         Assert.Null(CalDavPaths.UidOf("x.txt"));
+        Assert.Null(CalDavPaths.UidOf(".ics"));
+        Assert.EndsWith("/a%20b%2F%40.ics", CalDavPaths.Event(feed, "a b/@.ics"));
+        // URL に載せた名前は、読み直すと元に戻る
+        Assert.Equal("a b@.ics", CalDavPaths.Parse(CalDavPaths.Event(feed, "a b@.ics")).FileName);
     }
 
     private static CalendarEvent Event(string summary = "打合せ") => new()
