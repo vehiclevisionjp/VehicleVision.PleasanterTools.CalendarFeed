@@ -26,7 +26,7 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
         "SELECT [Id], [Name], [SiteId], [MappingJson], [FiltersJson], [CreatedAt], [IsRevoked], "
         + "[Language], [ApiKeyUserTimeZoneId], [ApiKeyHint], "
         + "[LastFetchAt], [LastFetchStatus], [LastFetchMessage], [LastFetchEventCount], [ConsecutiveFailures], "
-        + "[RangePastDays], [RangeFutureDays] FROM [Feeds]";
+        + "[RangePastDays], [RangeFutureDays], [CalDavEnabled] FROM [Feeds]";
 
     private string Sql(string sql) => SqlDialect.Format(connections.Provider, sql);
 
@@ -128,6 +128,15 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
                 RangePastDays = (update.Range ?? FeedRange.Default).PastDays,
                 RangeFutureDays = (update.Range ?? FeedRange.Default).FutureDays,
             },
+            cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
+    }
+
+    public async Task<bool> SetCalDavEnabledAsync(Guid id, bool enabled, CancellationToken cancellationToken = default)
+    {
+        await using var connection = connections.Create();
+        return await connection.ExecuteAsync(new CommandDefinition(
+            Sql("UPDATE [Feeds] SET [CalDavEnabled] = @Enabled WHERE [Id] = @Id AND [IsRevoked] = 0"),
+            new { Id = id.ToString("D"), Enabled = enabled ? 1 : 0 },
             cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
     }
 
@@ -264,6 +273,8 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
 
         public int? RangeFutureDays { get; set; }
 
+        public int CalDavEnabled { get; set; }
+
         public FeedDefinition ToDefinition() => new(
             Guid.Parse(Id),
             Name,
@@ -280,6 +291,7 @@ public sealed class FeedStore(IDbConnectionFactory connections, ISecretProtector
                 ? new FeedFetchResult(at, LastFetchStatus, LastFetchMessage, LastFetchEventCount, ConsecutiveFailures)
                 : null,
             // 列が空（NULL）の側は無制限。行ごとに必ず持つ（既存のフィードは、マイグレーションで過去 365 日を入れてある）
-            new FeedRange(RangePastDays, RangeFutureDays));
+            new FeedRange(RangePastDays, RangeFutureDays),
+            CalDavEnabled != 0);
     }
 }

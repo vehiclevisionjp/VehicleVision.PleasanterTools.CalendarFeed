@@ -28,6 +28,7 @@
     'feed.updated',
     'feed.token_rotated',
     'feed.apikey_set',
+    'feed.caldav_changed',
     'feed.revoked',
     'user.invited',
     'user.invite_reissued',

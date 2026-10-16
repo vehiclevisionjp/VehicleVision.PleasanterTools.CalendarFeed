@@ -48,6 +48,7 @@ describe('フィードのフォーム', () => {
     apiKeyHint: 'abcd',
     lastFetch: null,
     range: { pastDays: 30, futureDays: null },
+    calDavEnabled: false,
   };
 
   it('既存のフィードから作ったフォームを、そのまま送る内容へ戻せる', () => {

@@ -27,6 +27,9 @@ public static class AuditActions
     public const string TotpDisableFailed = "totp.disable_failed";
     public const string FeedCreated = "feed.created";
     public const string FeedUpdated = "feed.updated";
+
+    /// <summary>フィードの CalDAV を有効・無効にした。</summary>
+    public const string FeedCalDavChanged = "feed.caldav_changed";
     public const string SettingsUpdated = "settings.updated";
     public const string SettingsMailTest = "settings.mail_test";
     public const string FeedTokenRotated = "feed.token_rotated";
