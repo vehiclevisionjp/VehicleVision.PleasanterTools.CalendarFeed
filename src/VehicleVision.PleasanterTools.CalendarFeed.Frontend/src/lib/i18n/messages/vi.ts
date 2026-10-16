@@ -140,6 +140,7 @@ export const vi: Record<MessageKey, string> = {
   feedNeverFetched: 'Chưa lấy',
   fetchSuccess: 'Thành công ({count} sự kiện)',
   fetchTransient: 'Lỗi tạm thời (có thể tự phục hồi)',
+  fetchRateLimited: 'Đã đạt giới hạn API của Pleasanter (phục hồi khi sang ngày mới)',
   fetchUnauthorized: 'Khóa API bị từ chối',
   fetchPermanent: 'Không thể lấy (hãy kiểm tra cài đặt)',
   fetchKeyError: 'Không thể giải mã khóa API (hãy đăng ký lại)',

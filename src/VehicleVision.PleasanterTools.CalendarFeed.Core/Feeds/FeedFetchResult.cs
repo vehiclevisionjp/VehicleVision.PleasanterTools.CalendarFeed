@@ -31,6 +31,12 @@ public static class FeedFetchStatus
     /// <summary>送った内容か権限の問題。再試行しても通らない。</summary>
     public const string Permanent = "Permanent";
 
+    /// <summary>
+    /// Pleasanter の API の回数の上限に達した（サイトごと・1 日ごと）。<b>日付が変わるまで戻らない。</b>
+    /// 上限を上げるか、キャッシュ秒数を伸ばして取りに行く回数を減らす（手順書）。
+    /// </summary>
+    public const string RateLimited = "RateLimited";
+
     /// <summary>API キーを復号できない（秘密の鍵を失った・変えた）。API キーを登録し直す必要がある。</summary>
     public const string KeyError = "KeyError";
 }

@@ -1,0 +1,19 @@
+# 資格情報は書かない。Secret は別に作り、名前だけ指定する。
+image:
+  repository: example.azurecr.io/calendarfeed
+  tag: 0123456789ab
+
+existingSecret: calendarfeed-secrets
+
+config:
+  dbProvider: SqlServer
+  pleasanterUrl: https://pleasanter.example.com
+  timezone: Asia/Tokyo
+  # Application Routing Ingress の送信元を含む実際の CIDR に置き換える。
+  forwardedNetworks:
+    - 10.244.0.0/16
+
+ingress:
+  enabled: true
+  host: calendarfeed.example.com
+  tlsSecretName: calendarfeed-tls

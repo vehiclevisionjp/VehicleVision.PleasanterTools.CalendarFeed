@@ -47,6 +47,12 @@ public enum PleasanterErrorKind
 
     /// <summary>送った内容か権限の問題。再試行しても通らない。</summary>
     Permanent,
+
+    /// <summary>
+    /// <b>API の回数の上限に達した</b>（HTTP 429。サイトごと・1 日ごとの <c>LimitPerSite</c>。実機検証結果 13 章）。
+    /// 上限は、API キーの利用者のタイムゾーンの日付が変わるまで戻らないので、<see cref="Transient"/> のように短く待っても直らない。
+    /// </summary>
+    RateLimited,
 }
 
 /// <summary>Pleasanter 呼び出しの失敗。</summary>
@@ -270,7 +276,8 @@ public sealed class PleasanterClient(HttpClient httpClient, IPleasanterOptionsSo
         HttpStatusCode.Unauthorized => PleasanterErrorKind.Unauthorized,
         HttpStatusCode.BadRequest or HttpStatusCode.Forbidden or HttpStatusCode.NotFound
             => PleasanterErrorKind.Permanent,
-        HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests => PleasanterErrorKind.Transient,
+        HttpStatusCode.TooManyRequests => PleasanterErrorKind.RateLimited,
+        HttpStatusCode.RequestTimeout => PleasanterErrorKind.Transient,
         _ => (int)statusCode >= 500 ? PleasanterErrorKind.Transient : PleasanterErrorKind.Permanent,
     };
 }

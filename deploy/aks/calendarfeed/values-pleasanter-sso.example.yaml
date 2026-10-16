@@ -1,0 +1,11 @@
+# Pleasanter のログインで管理画面へ入る例。values-production.example.yaml に重ねて使う（helm の --values を 2 つ並べる）。
+# **本アプリと Pleasanter を同じホスト名に置くこと**（Cookie を共有するため。本アプリはサブパス配置に未対応）。
+# Pleasanter 側の Ingress は、このチャートの外で用意する。
+config:
+  pleasanterSso:
+    enabled: true
+    # 本アプリの Pod から Pleasanter へ直接届く URL（クラスター内の Service でよい）。
+    internalBaseUrl: http://pleasanter.pleasanter.svc.cluster.local
+    # ブラウザが開く URL。同じホスト名の Pleasanter のログイン画面。
+    loginUrl: /users/login
+    logoutUrl: /users/logout

@@ -50,4 +50,44 @@ public static class DatabaseMigrator
         using var scope = services.CreateScope();
         scope.ServiceProvider.GetRequiredService<IMigrationRunner>().MigrateUp();
     }
+
+    /// <summary>
+    /// DB に繋がるまで待つ。DB より先にアプリやマイグレーションが立ち上がったとき（コンテナで一緒に起動したとき）のため。
+    /// </summary>
+    /// <remarks>
+    /// 繋がらない理由は、待てば消えることも消えないこともある。見分けが付かないので、期限まではどちらも待つ。
+    /// <b>待つのはマイグレーションの道具と準備の確認だけ。</b>アプリ本体は待たない（設定の誤りを起動の遅さで隠さないため）。
+    /// </remarks>
+    /// <returns>待った末に繋がらなかったときの例外。繋がれば <c>null</c>。</returns>
+    public static async Task<Exception?> WaitForDatabaseAsync(
+        DatabaseProvider provider,
+        string connectionString,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        var factory = new DbConnectionFactory(provider, connectionString);
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        Exception? last = null;
+
+        while (true)
+        {
+            try
+            {
+                await using var connection = factory.Create();
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                return null;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                last = exception;
+            }
+
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                return last;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+        }
+    }
 }

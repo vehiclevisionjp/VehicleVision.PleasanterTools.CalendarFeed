@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "calendarfeed.fullname" . }}
+  labels:
+    {{- include "calendarfeed.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_URLS: http://+:8080
+  CALENDARFEED_DB_PROVIDER: {{ .Values.config.dbProvider | quote }}
+  CALENDARFEED_PLEASANTER_BASEURL: {{ .Values.config.pleasanterUrl | quote }}
+  CALENDARFEED_PLEASANTER_TIMEZONE: {{ .Values.config.timezone | quote }}
+  CALENDARFEED_FORWARDED_PROXY_NETWORKS: {{ join "," .Values.config.forwardedNetworks | quote }}
+  TZ: {{ .Values.config.timezone | quote }}
+  {{- /* 書いた項目だけ渡す。空文字でも渡すと管理画面から変えられなくなるため、空と null は渡さない。 */}}
+  {{- range $key, $value := .Values.config.pleasanterSso }}
+  {{- if and (not (kindIs "invalid" $value)) (ne (toString $value) "") }}
+  {{- /* 数値は YAML から float64 で来るため、指数表記にならないよう整数に戻す。 */}}
+  {{ printf "CALENDARFEED_PLEASANTERSSO_%s" (upper $key) }}: {{ ternary (int64 $value | toString) (toString $value) (kindIs "float64" $value) | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if not (kindIs "invalid" .Values.migration.autoMigrateOnStartup) }}
+  CALENDARFEED_DB_AUTOMIGRATE: {{ toString .Values.migration.autoMigrateOnStartup | quote }}
+  {{- end }}

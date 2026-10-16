@@ -78,7 +78,7 @@ export interface FeedMapping {
   defaultDurationMinutes: number;
 }
 
-export type FetchStatus = 'Success' | 'Transient' | 'Unauthorized' | 'Permanent' | 'KeyError';
+export type FetchStatus = 'Success' | 'Transient' | 'Unauthorized' | 'Permanent' | 'KeyError' | 'RateLimited';
 
 export interface FeedFetchResult {
   at: string;

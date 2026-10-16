@@ -1,0 +1,63 @@
+replicaCount: 2
+
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# 資格情報を Helm の values / release history に保存しないため、既存 Secret を参照します。
+existingSecret: ""
+
+config:
+  dbProvider: SqlServer
+  pleasanterUrl: ""
+  timezone: Asia/Tokyo
+  forwardedNetworks: []
+  # Pleasanter のログインで管理画面へ入る機能（CALENDARFEED_PLEASANTERSSO_*）。
+  # 書いた項目だけを環境変数として渡す。渡した項目は管理画面から変えられなくなる（外部設定が勝つ）。
+  # 既定は何も渡さない（無効のまま。管理画面から設定できる）。秘密を含む項目は無い。
+  # 書ける項目: enabled / internalBaseUrl / loginUrl / logoutUrl / cookieNames /
+  #   unknownUser / registerRole / revalidateMinutes / timeoutSeconds / buttonLabel
+  pleasanterSso: {}
+
+serviceAccount:
+  annotations: {}
+
+service:
+  port: 80
+
+ingress:
+  enabled: false
+  className: webapprouting.kubernetes.azure.com
+  annotations: {}
+  host: ""
+  # Ingress で本アプリへ振り分けるパス。空なら /。サブパス配置は未対応なので、通常は空のまま。
+  path: ""
+  pathType: Prefix
+  tlsSecretName: ""
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+migration:
+  waitSeconds: 180
+  activeDeadlineSeconds: 300
+  backoffLimit: 2
+  # Pod 起動時の自動適用（CALENDARFEED_DB_AUTOMIGRATE）。null なら渡さず、アプリの既定（true）に従う。
+  # 上の hook Job が先に適用し終えるので、既定のままでも Pod は未適用が無いことを確かめるだけになる。
+  autoMigrateOnStartup: null
