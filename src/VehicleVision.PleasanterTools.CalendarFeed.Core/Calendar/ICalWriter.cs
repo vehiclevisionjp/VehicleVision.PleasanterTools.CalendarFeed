@@ -52,6 +52,22 @@ public static class ICalWriter
         return sb.ToString();
     }
 
+    /// <summary>
+    /// <b>CalDAV の 1 件の資源</b>（RFC 4791 4.1）にする。<c>METHOD</c> は書かない（資源に <c>METHOD</c> を入れてはならない）。
+    /// <c>DTSTAMP</c> は予定の最終更新（無ければ開始）にして、<b>同じ内容なら同じ本文</b>になるようにする（ETag を安定させる）。
+    /// </summary>
+    public static string WriteResource(CalendarEvent e)
+    {
+        var sb = new StringBuilder();
+        Line(sb, "BEGIN:VCALENDAR");
+        Line(sb, "VERSION:2.0");
+        Line(sb, $"PRODID:{ProductId}");
+        Line(sb, "CALSCALE:GREGORIAN");
+        WriteEvent(sb, e, e.LastModified ?? e.Start);
+        Line(sb, "END:VCALENDAR");
+        return sb.ToString();
+    }
+
     private static void WriteEvent(StringBuilder sb, CalendarEvent e, DateTimeOffset now)
     {
         Line(sb, "BEGIN:VEVENT");

@@ -273,6 +273,9 @@ app.MapAdminSaml();
 app.MapAdminPleasanterSso();
 app.MapAdminUi();
 
+// ---- CalDAV（カレンダーアプリが直接つなぐ。いまは読み取りのみ。Issue #85） ------------------------------
+app.MapCalDav();
+
 app.Run();
 
 /// <summary>テストが <c>WebApplicationFactory</c> で起動するための宣言。</summary>

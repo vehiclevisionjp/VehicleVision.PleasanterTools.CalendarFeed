@@ -3,7 +3,8 @@
 カレンダーアプリから予定を作成・更新・削除し、Pleasanter のレコードへ反映するための設計方針。
 **実装はこの文書の対象外**（別 Issue）。Issue #73。
 
-> 状態: **設計（未実装）**。「確認が必要な点」に残した事項は実機で確かめてから実装する。
+> 状態: **段階 1・2（探索・読み取り・Basic 認証・有効化の設定）は実装済み**（Issue #85）。書き込み（段階 3・4）は未実装。
+> 実機で確かめた事項は実機検証結果 14・15 章。
 
 ## 1. 決定事項（2026-10-15、利用者の回答）
 
@@ -119,13 +120,16 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    S1[1 読み取りの CalDAV 化\nPROPFIND / REPORT / GET] --> S2[2 認証\nBasic ＋ 書き込み有効化の設定]
+    S1[1 読み取りの CalDAV 化\n探索 / PROPFIND / REPORT / GET] --> S2[2 認証\nBasic ＋ 有効化の設定]
     S2 --> S3[3 作成・更新\nPUT / ETag / 逆変換]
     S3 --> S4[4 削除\nDELETE]
     S4 --> S5[5 実クライアント検証\nOutlook / Google / Apple / Thunderbird]
 ```
 
 各段階を 1 スライス（Issue・PR）とする。**段階 1 だけでもクライアントから読み取りの CalDAV として使える**。
+
+> **段階 1 と 2 は 1 つの PR にまとめた**（読み取りも利用者の API キーで取るため、認証なしの読み取りは作れない）。
+> 有効化の設定は、フィードごとのスイッチ（`Feeds.CalDavEnabled`。管理画面と `PUT /admin/api/feeds/{id}/caldav`）。
 
 ## 9. 確認が必要な点
 
