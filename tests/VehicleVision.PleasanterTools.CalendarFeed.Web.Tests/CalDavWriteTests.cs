@@ -342,4 +342,112 @@ public sealed class CalDavWriteTests : IDisposable
 
         Assert.True(_app.Pleasanter.Requests.Count(r => r.Path.EndsWith("/Get", StringComparison.Ordinal)) > before);
     }
+
+    // ---- 削除 ----------------------------------------------------------------------------------
+
+    private static HttpRequestMessage Delete(string path, string? ifMatch = null, string key = UserKey)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"alice:{key}")));
+        if (ifMatch is not null)
+        {
+            request.Headers.TryAddWithoutValidation("If-Match", ifMatch);
+        }
+
+        return request;
+    }
+
+    [Fact]
+    public async Task 削除_If_Matchが合えば204_利用者のAPIキーでPleasanterへ削除を送る()
+    {
+        var (id, calendar) = await FeedAsync();
+        var (name, _, etag, _) = await ExistingAsync(id, calendar);
+
+        var response = await _app.Client().SendAsync(Delete(calendar + Uri.EscapeDataString(name), etag));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var request = _app.Pleasanter.Requests.Single(r => r.Path.EndsWith("/Delete", StringComparison.Ordinal));
+        Assert.Equal("/api/items/5/Delete", request.Path);
+        Assert.Equal(UserKey, (string?)JsonNode.Parse(request.Body)!["ApiKey"]);
+    }
+
+    [Fact]
+    public async Task 削除_作ったときの名前でも消せて_対応表の行も消える()
+    {
+        var (id, calendar) = await FeedAsync();
+        await _app.Service<ICalDavStore>().TryAddAsync(new CalDavResource(id, "mine.ics", "client-uid-1", 5));
+        var etag = (await _app.Client().SendAsync(Get(calendar + "mine.ics"))).Headers.ETag!.Tag;
+
+        var response = await _app.Client().SendAsync(Delete(calendar + "mine.ics", etag));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Null(await _app.Service<ICalDavStore>().FindByNameAsync(id, "mine.ics"));
+        Assert.Null(await _app.Service<ICalDavStore>().FindByUidAsync(id, "client-uid-1")); // 同じ UID で作り直せる
+    }
+
+    [Fact]
+    public async Task 削除_If_Matchが古ければ412で消さない_付けなければ消す_ごみ箱へ移るので()
+    {
+        var (id, calendar) = await FeedAsync();
+        var (name, _, etag, _) = await ExistingAsync(id, calendar);
+        var path = calendar + Uri.EscapeDataString(name);
+        _app.Pleasanter.Record = _app.Pleasanter.Record.Replace("打合せ", "画面で直した題名", StringComparison.Ordinal);
+
+        Assert.Equal(HttpStatusCode.PreconditionFailed, (await _app.Client().SendAsync(Delete(path, etag))).StatusCode); // 取得の後で直された
+        Assert.DoesNotContain(_app.Pleasanter.Requests, r => r.Path.EndsWith("/Delete", StringComparison.Ordinal));
+
+        // If-Match を付けないクライアント（実機の Python caldav など）。削除は戻せるので、そのまま消す
+        Assert.Equal(HttpStatusCode.NoContent, (await _app.Client().SendAsync(Delete(path))).StatusCode);
+        Assert.Single(_app.Pleasanter.Requests, r => r.Path.EndsWith("/Delete", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task 削除_無い資源は404_別のサイトのレコードは消さない()
+    {
+        var (id, calendar) = await FeedAsync();
+        var (name, _, etag, _) = await ExistingAsync(id, calendar);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await _app.Client().SendAsync(Delete(calendar + "none.ics", "\"x\""))).StatusCode);
+
+        _app.Pleasanter.Record = _app.Pleasanter.Record.Replace("\"SiteId\": 123", "\"SiteId\": 999", StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _app.Client().SendAsync(Delete(calendar + Uri.EscapeDataString(name), etag))).StatusCode);
+        Assert.DoesNotContain(_app.Pleasanter.Requests, r => r.Path.EndsWith("/Delete", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task 削除_権限が無ければ403_レコードが既に無ければ412で対応を捨てる()
+    {
+        var (id, calendar) = await FeedAsync();
+        var (name, _, etag, _) = await ExistingAsync(id, calendar);
+
+        _app.Pleasanter.WriteStatusCode = HttpStatusCode.Forbidden;
+        Assert.Equal(HttpStatusCode.Forbidden, (await _app.Client().SendAsync(Delete(calendar + Uri.EscapeDataString(name), etag))).StatusCode);
+
+        await _app.Service<ICalDavStore>().TryAddAsync(new CalDavResource(id, "gone.ics", "gone-uid", 5));
+        _app.Pleasanter.RecordStatusCode = HttpStatusCode.NotFound;
+        Assert.Equal(HttpStatusCode.PreconditionFailed, (await _app.Client().SendAsync(Delete(calendar + "gone.ics", "\"x\""))).StatusCode);
+        Assert.Null(await _app.Service<ICalDavStore>().FindByNameAsync(id, "gone.ics"));
+    }
+
+    [Fact]
+    public async Task 削除_認証なしは401_カレンダーそのものの削除は405()
+    {
+        var (_, calendar) = await FeedAsync();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await _app.Client().SendAsync(new HttpRequestMessage(HttpMethod.Delete, calendar + "a.ics"))).StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await _app.Client().SendAsync(Delete(calendar, "\"x\""))).StatusCode);
+        Assert.Empty(_app.Pleasanter.Requests);
+    }
+
+    [Fact]
+    public async Task 削除した予定は_フィードを失効させると対応表も消える()
+    {
+        var (id, _) = await FeedAsync();
+        await _app.Service<ICalDavStore>().TryAddAsync(new CalDavResource(id, "mine.ics", "client-uid-1", 5));
+
+        var response = await _app.AdminClient().DeleteAsync($"/admin/api/feeds/{id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Empty(await _app.Service<ICalDavStore>().ListAsync(id));
+    }
 }

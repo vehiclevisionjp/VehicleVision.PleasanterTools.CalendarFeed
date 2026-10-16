@@ -134,7 +134,7 @@ export const de: Record<MessageKey, string> = {
   feedCalDavUrl: 'CalDAV-URL',
   feedCalDavEnabledDone: 'CalDAV wurde aktiviert',
   feedCalDavDisabledDone: 'CalDAV wurde deaktiviert',
-  feedCalDavHint: 'Kalender-Apps können sich direkt verbinden. Der Benutzername ist beliebig; als Passwort geben Sie Ihren eigenen Pleasanter-API-Schlüssel ein (wird von dieser App nicht gespeichert). Termine lassen sich lesen, anlegen und ändern (Löschen wird noch nicht unterstützt).',
+  feedCalDavHint: 'Kalender-Apps können sich direkt verbinden. Der Benutzername ist beliebig; als Passwort geben Sie Ihren eigenen Pleasanter-API-Schlüssel ein (wird von dieser App nicht gespeichert). Termine lassen sich lesen, anlegen, ändern und löschen.',
   feedRange: 'Angezeigter Zeitraum',
   feedRangeHint: 'Wie viele Tage in Vergangenheit und Zukunft, ab heute gezählt. Termine, die den Zeitraum überschneiden, werden angezeigt (ein Termin, der davor begann und noch läuft, bleibt erhalten). „Unbegrenzt“ lässt die jeweilige Seite offen.',
   feedRangePast: 'Vergangenheit (Tage zurück)',

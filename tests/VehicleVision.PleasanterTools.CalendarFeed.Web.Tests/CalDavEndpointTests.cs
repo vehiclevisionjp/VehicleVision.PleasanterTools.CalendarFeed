@@ -68,7 +68,8 @@ public sealed class CalDavEndpointTests : IDisposable
         Assert.Contains("calendar-access", response.Headers.GetValues("DAV").Single());
         var allow = string.Join(",", response.Content.Headers.Allow);
         Assert.Contains("PUT", allow);
-        Assert.DoesNotContain("DELETE", allow);
+        Assert.Contains("DELETE", allow);
+        Assert.DoesNotContain("MKCALENDAR", allow);
     }
 
     [Fact]
@@ -133,7 +134,7 @@ public sealed class CalDavEndpointTests : IDisposable
         Assert.Contains("read", privileges);
         Assert.Contains("write-content", privileges);
         Assert.Contains("bind", privileges);
-        Assert.DoesNotContain("unbind", privileges); // 削除は未対応
+        Assert.Contains("unbind", privileges);
     }
 
     [Fact]
@@ -296,10 +297,9 @@ public sealed class CalDavEndpointTests : IDisposable
     }
 
     [Theory]
-    [InlineData("DELETE")]
     [InlineData("MKCALENDAR")]
     [InlineData("PROPPATCH")]
-    public async Task 削除など未対応の書き込み系は405(string method)
+    public async Task 未対応の書き込み系は405(string method)
     {
         var (_, calendar) = await EnabledFeedAsync();
 
