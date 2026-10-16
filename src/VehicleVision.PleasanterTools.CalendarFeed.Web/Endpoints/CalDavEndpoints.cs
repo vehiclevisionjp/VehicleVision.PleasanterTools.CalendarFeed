@@ -454,7 +454,12 @@ public static class CalDavEndpoints
         {
             foreach (var href in request.Hrefs)
             {
-                var path = Uri.TryCreate(href, UriKind.Absolute, out var absolute) ? absolute.AbsolutePath : href;
+                // **絶対 URL（http・https）のときだけパスを取り出す。** Linux では "/caldav/…" も絶対 URI（file）として読めてしまい、
+                // パスが壊れる（CI の Linux で見つかった）
+                var path = (href.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || href.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    && Uri.TryCreate(href, UriKind.Absolute, out var absolute)
+                        ? absolute.AbsolutePath
+                        : href;
                 var found = CalDavPaths.Parse(path) is { Kind: CalDavKind.Event } t && t.FeedId == feed.Id
                     ? resources.FirstOrDefault(r => r.Name == t.FileName)
                     : null;
