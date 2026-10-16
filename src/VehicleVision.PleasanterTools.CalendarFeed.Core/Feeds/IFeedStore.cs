@@ -35,6 +35,9 @@ public interface IFeedStore
     /// **トークン（購読 URL）と API キーは変えない。** フィードが無い・失効済みなら <c>false</c>。
     /// </summary>
     Task<bool> UpdateAsync(Guid id, FeedUpdate update, CancellationToken cancellationToken = default);
+    /// <summary>CalDAV の有効・無効を切り替える。フィードが無い・失効済みなら <c>false</c>。</summary>
+    Task<bool> SetCalDavEnabledAsync(Guid id, bool enabled, CancellationToken cancellationToken = default);
+
     /// <summary>最後に Pleasanter へ取りに行った結果を残す（上書き）。</summary>
     /// <summary>取得の結果を残し、<b>連続の失敗の回数</b>（成功なら 0）を返す。</summary>
     Task<int> RecordFetchAsync(Guid id, FeedFetchResult result, CancellationToken cancellationToken = default);
