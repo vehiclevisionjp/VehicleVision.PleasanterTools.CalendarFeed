@@ -1,0 +1,116 @@
+# AKS へ配備するコンテナイメージを Azure Container Registry (ACR) でビルドする。
+# 実行環境へ Azure の長期シークレットを置かず、GitHub OIDC でログインする。
+#
+# 参照した一次情報（いずれも 2026-08-30 参照）
+#   - GitHub Actions から Azure への OpenID Connect
+#     https://learn.microsoft.com/azure/developer/github/connect-from-azure-openid-connect
+#   - ACR Tasks（az acr build）
+#     https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview
+#   - azure/login v3.0.2
+#     https://github.com/Azure/login/releases/tag/v3.0.2
+name: AKS image
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "ビルドするタグまたはコミット（省略時は実行したref）"
+        required: false
+        type: string
+      image_tag:
+        description: "ACRへ発行するイメージタグ（省略時はコミットSHA先頭12桁）"
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.source_ref || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: ACRへ発行
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: aks-production
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
+          submodules: false
+
+      - name: 設定とイメージタグを検証する
+        id: image
+        env:
+          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_ACR_NAME; do
+              if [ -z "${!name:-}" ]; then
+                  echo "NG: Environment aks-production の変数 $name が未設定" >&2
+                  exit 1
+              fi
+          done
+
+          tag="$INPUT_IMAGE_TAG"
+          if [ -z "$tag" ]; then
+              tag="$(git rev-parse --short=12 HEAD)"
+          fi
+          if [ "$tag" = "latest" ]; then
+              echo "NG: 上書き可能な latest タグは発行しない" >&2
+              exit 1
+          fi
+          if ! printf '%s' "$tag" | grep -qE '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$'; then
+              echo "NG: '$tag' は有効なコンテナイメージタグではない" >&2
+              exit 1
+          fi
+
+          repository="$AZURE_ACR_NAME.azurecr.io/calendarfeed"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+
+      - name: AzureへOIDCでログインする
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACRでイメージをビルドして発行する
+        env:
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+        run: >-
+          az acr build
+          --registry "$AZURE_ACR_NAME"
+          --image "calendarfeed:$IMAGE_TAG"
+          --file Dockerfile
+          .
+
+      - name: 発行結果をまとめる
+        env:
+          IMAGE_REPOSITORY: ${{ steps.image.outputs.repository }}
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+        run: |
+          digest="$(az acr repository show \
+              --name "$AZURE_ACR_NAME" \
+              --image "calendarfeed:$IMAGE_TAG" \
+              --query digest \
+              --output tsv)"
+          {
+              echo "## ACR発行結果"
+              echo
+              echo "- イメージ: \`$IMAGE_REPOSITORY:$IMAGE_TAG\`"
+              echo "- ダイジェスト: \`$digest\`"
+              echo
+              echo "AKSへの適用は \`_documents/AKS-導入更新運用手順書.md\` を参照してください。"
+          } >> "$GITHUB_STEP_SUMMARY"
