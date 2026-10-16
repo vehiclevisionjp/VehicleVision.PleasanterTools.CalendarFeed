@@ -101,6 +101,23 @@ public sealed class FeedService(
         return id is not null && resolved.TryGetValue(id, out var texts) ? texts : null;
     }
 
+    /// <summary>
+    /// 失敗の応答の <c>Retry-After</c>（秒）。一時的な失敗は 60 秒。<b>API の回数の上限（<see cref="PleasanterErrorKind.RateLimited"/>）は、
+    /// API キーの利用者のタイムゾーンの日付が変わるまで戻らない</b>ので、次の 0 時（＋1 分）まで。
+    /// </summary>
+    public int RetryAfterSeconds(FeedDefinition feed, PleasanterException failure)
+    {
+        if (failure.Kind is not PleasanterErrorKind.RateLimited)
+        {
+            return 60;
+        }
+
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(feed.ApiKeyUserTimeZoneId ?? pleasanter.ApiKeyUserTimeZoneId);
+        var now = TimeZoneInfo.ConvertTime(time.GetUtcNow(), zone).DateTime;
+        var untilMidnight = now.Date.AddDays(1) - now + TimeSpan.FromMinutes(1);
+        return (int)Math.Clamp(untilMidnight.TotalSeconds, 60, 24 * 60 * 60);
+    }
+
     /// <summary>生成済みの .ics を捨てる。**API キーを差し替えたら呼ぶ**（古いキーで取った結果を返さない）。</summary>
     public void Invalidate(Guid feedId) => cache.Remove(feedId);
 

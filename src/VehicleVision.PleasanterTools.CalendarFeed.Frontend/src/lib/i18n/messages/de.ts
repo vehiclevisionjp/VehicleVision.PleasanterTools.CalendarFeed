@@ -140,6 +140,7 @@ export const de: Record<MessageKey, string> = {
   feedNeverFetched: 'Noch nicht abgerufen',
   fetchSuccess: 'Erfolgreich ({count} Termine)',
   fetchTransient: 'Vorübergehender Fehler (sollte sich erholen)',
+  fetchRateLimited: 'Das Pleasanter-API-Limit ist erreicht (erholt sich mit dem Datumswechsel)',
   fetchUnauthorized: 'Der API-Schlüssel wurde abgelehnt',
   fetchPermanent: 'Abruf nicht möglich (Einstellungen prüfen)',
   fetchKeyError: 'Der API-Schlüssel kann nicht entschlüsselt werden (erneut registrieren)',

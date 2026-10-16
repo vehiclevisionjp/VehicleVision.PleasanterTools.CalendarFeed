@@ -237,9 +237,9 @@ app.MapGet("/feeds/{token}.ics", async (
     {
         // **トークンをログへ出さない。** フィード ID だけで追える
         logger.LogError("フィード {FeedId} の取得に失敗しました（{Kind}）: {Message}", feed.Id, ex.Kind, ex.Message);
-        if (ex.Kind is PleasanterErrorKind.Transient)
+        if (ex.Kind is PleasanterErrorKind.Transient or PleasanterErrorKind.RateLimited)
         {
-            http.Response.Headers.RetryAfter = "60";
+            http.Response.Headers.RetryAfter = service.RetryAfterSeconds(feed, ex).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
         }
 

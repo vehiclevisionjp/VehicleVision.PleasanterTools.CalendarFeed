@@ -140,6 +140,7 @@ export const ko: Record<MessageKey, string> = {
   feedNeverFetched: '아직 가져오지 않음',
   fetchSuccess: '성공({count}건)',
   fetchTransient: '일시적 실패(복구될 수 있음)',
+  fetchRateLimited: 'Pleasanter API 횟수 상한에 도달했습니다(날짜가 바뀌면 복구됩니다)',
   fetchUnauthorized: 'API 키가 거부되었습니다',
   fetchPermanent: '가져올 수 없음(설정을 확인해 주세요)',
   fetchKeyError: 'API 키를 복호화할 수 없습니다(다시 등록해 주세요)',

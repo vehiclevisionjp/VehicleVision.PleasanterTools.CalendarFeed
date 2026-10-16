@@ -142,6 +142,7 @@ export const ja = {
   feedNeverFetched: 'まだ取得されていません',
   fetchSuccess: '成功（{count} 件）',
   fetchTransient: '一時的な失敗（待てば直る見込み）',
+  fetchRateLimited: 'Pleasanter の API の回数の上限に達しました（日付が変わるまで戻りません）',
   fetchUnauthorized: 'API キーが拒否されました',
   fetchPermanent: '取得できません（設定の確認が必要）',
   fetchKeyError: 'API キーを復号できません（再登録が必要）',
