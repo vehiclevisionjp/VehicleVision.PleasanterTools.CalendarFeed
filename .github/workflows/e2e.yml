@@ -197,3 +197,19 @@ jobs:
       - name: 後片付け
         if: always()
         run: docker compose -f tools/saml-idp/docker-compose.yml down -v
+
+  # CalDAV の実クライアント（Python の caldav・vdirsyncer）を、本アプリ（コンテナ）と実機の Pleasanter で通す。
+  # **必須チェックにはしていない**（実クライアントの版が変わって落ちることがある。気づくための仕掛け）。
+  # 必須にするときは、e2e-skip.yml に同名のジョブを足すこと
+  caldav:
+    name: 端から端まで通す試験（CalDAV）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: 実クライアントで CalDAV を通す
+        run: bash tools/caldav-check/run.sh

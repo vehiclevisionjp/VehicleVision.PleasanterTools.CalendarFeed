@@ -39,6 +39,11 @@ COPY --from=build /app/publish .
 # 管理画面のビルド成果物
 COPY --from=frontend /VehicleVision.PleasanterTools.CalendarFeed.Web/wwwroot/admin ./wwwroot/admin
 
+# SQLite の既定の置き場（compose.yaml の app-data ボリューム）。**非 root の実行ユーザーが書けるようにしておく。**
+# 名前付きボリュームは、初めて使うときにイメージ側の所有者を引き継ぐ（これが無いと root 所有になり、
+# 「unable to open database file」で起動しない。compose で実際に踏んだ）
+RUN mkdir -p /data && chown "$APP_UID" /data
+
 # **root で動かさない。**
 USER $APP_UID
 EXPOSE 8080
