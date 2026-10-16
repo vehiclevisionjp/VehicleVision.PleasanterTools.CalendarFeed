@@ -1,0 +1,478 @@
+# `vX.Y.Z` タグの push で GitHub Release を作る。
+#
+# **手順の参照元は _documents/リリース手順書.md。** ここはその 5〜6 番
+# （タグを付ける → Release を作る）を自動化したもので、1〜4 番（develop の確定、
+# VersionPrefix の引き上げ、develop → master の PR、マージ）は人が行う。
+#
+# **リリース前の確認（同手順書）のうち機械で確かめられるものは、このワークフローで
+# 必ず通す。** タグを付けた後で「実は警告が出ていた」と分かっても、
+# release-tag-protection でタグは付け直せない（間違えたら次のパッチ版）。
+#
+#   | 確認項目                      | ここでの扱い                                   |
+#   | ----------------------------- | ---------------------------------------------- |
+#   | dotnet build が警告 0 で通る  | ビルドする（TreatWarningsAsErrors=true）       |
+#   | 単体テストが通る              | 実行する                                       |
+#   | 4 RDBMS 結合テストが通る      | **ここでは回さない**（下記）                   |
+#   | license-check.sh が通る       | 実行する                                       |
+#   | NOTICE の依存一覧が一致する   | notice-check.sh を実行する                     |
+#   | 破壊的変更でメジャーを上げた  | 人が判断する（機械で確かめられない）           |
+#   | 配置用 ZIP が揃っている         | 発行し、中身と SHA-256 を検査する              |
+#   | マイグレーション手順を書いた  | 人が判断する。Release 本文へ追記すること       |
+#
+# **4 RDBMS 結合テストをここで回さない理由。** リリースタグは master 上のコミットへ
+# 付ける決まりで（同手順書「タグを付けるとき」）、そのコミットは master へ push された
+# 時点で integration.yml が既に検証している。同じコミットをもう一度 3 つの DB へ
+# 当て直しても、分かることは増えない。**タグが master に含まれることの確認**を
+# 下の検証ジョブで行っているのは、この前提を機械で守るため。
+#
+# **dry-run。** リリース経路はリリース時にしか動かないため、壊れていても次の
+# リリースまで気付けない。workflow_dispatch の dry_run（既定 true）で、
+# 副作用のある Release 作成だけを外して検証部分を通せる。
+#
+# 参照した一次情報（いずれも 2026-08-19 参照）
+#   - on.push.tags / workflow_dispatch.inputs / permissions / jobs.<id>.outputs
+#     https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+#     （branches だけを書いた push はタグで発火せず、tags だけを書いた push は
+#     ブランチで発火しない）
+#   - GITHUB_TOKEN の権限
+#     https://docs.github.com/en/actions/reference/workflows-and-actions/controlling-permissions-for-github_token
+#   - Release の作成は gh CLI で行う。第三者 action を足さずに済み、
+#     依存 OSS のライセンス確認（LICENSING.md）も増えない
+#     https://cli.github.com/manual/gh_release_create
+#   - actions/checkout v7 / actions/setup-dotnet v6 / actions/setup-node v7 は
+#     .github/workflows/ci.yml と同じ版に揃えた（勝手に上げない）
+#   - 配置用 ZIP のジョブ間受け渡し（2026-08-30 参照）
+#     https://github.com/actions/upload-artifact （v7）
+#     https://github.com/actions/download-artifact （v8）
+name: Release
+
+on:
+  push:
+    tags:
+      # **グロブは起動条件の近似。** セマンティックバージョニングの厳密な検査は
+      # 下の「タグの形式を検証する」で正規表現により行う
+      - "v[0-9]*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "対象のタグ（vX.Y.Z）。dry-run では省略可（既存の最新タグで検証する）"
+        required: false
+        type: string
+      dry_run:
+        description: "dry-run（Release を作らず検証だけ行う）。実際に出すときだけ false"
+        required: false
+        default: true
+        type: boolean
+
+# **同じタグの実行は打ち切らない。** リリースは取り消しの効かない操作で、
+# 途中で切られると Release が半端な状態で残りうる
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  verify:
+    name: リリース検証
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      dry_run: ${{ steps.resolve.outputs.dry_run }}
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          # **タグと master の関係を見るため全履歴が要る。**
+          # 既定の浅い取得では merge-base も直前のタグも求められない
+          fetch-depth: 0
+          submodules: false
+
+      - name: 対象のタグを決める
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSHED_TAG: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        # **`${{ }}` を run の中へ直接埋めない。** 入力値がそのままシェルの一部に
+        # なると、タグ名に仕込んだ文字列でコマンドを差し込める。env 経由で渡す
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "push" ]; then
+              tag="$PUSHED_TAG"
+              dry_run=false
+          else
+              tag="$INPUT_TAG"
+              dry_run="${INPUT_DRY_RUN:-true}"
+              if [ -z "$tag" ]; then
+                  if [ "$dry_run" != "true" ]; then
+                      echo "NG: dry-run でない実行では release_tag を指定すること" >&2
+                      exit 1
+                  fi
+                  tag="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+                  if [ -z "$tag" ]; then
+                      # **初回 Release の前にも dry-run できること。** タグがまだ無い段階で
+                      # 検証できなければ、最初のタグを付けてから壊れていると分かる。
+                      prefix="$(sed -nE 's@.*<VersionPrefix>([^<]+)</VersionPrefix>.*@\1@p' \
+                          Directory.Build.props | head -n 1)"
+                      if [ -z "$prefix" ]; then
+                          echo "NG: VersionPrefix から初回 Release の版を決められない" >&2
+                          exit 1
+                      fi
+                      tag="v$prefix"
+                      echo "既存タグが無いため、初回 Release の候補 $tag で検証する"
+                  else
+                      echo "release_tag の指定が無いため、既存の最新タグ $tag で検証する"
+                  fi
+              fi
+          fi
+
+          echo "対象のタグ: $tag（dry-run: $dry_run）"
+          {
+              echo "tag=$tag"
+              echo "dry_run=$dry_run"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: タグの形式を検証する
+        id: version
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        # **セマンティックバージョニング（vX.Y.Z）。** 先頭 0 埋めを許さない。
+        # プレリリースは v1.0.0-rc.1 の形（_documents/リリース手順書.md）
+        run: |
+          set -euo pipefail
+
+          pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'
+          if ! printf '%s' "$TAG" | grep -qE "$pattern"; then
+              echo "NG: タグ '$TAG' がセマンティックバージョニングの形になっていない" >&2
+              echo "    正しい例: v0.1.0 / v1.2.3 / v1.0.0-rc.1" >&2
+              exit 1
+          fi
+
+          version="${TAG#v}"
+          case "$version" in
+              *-*) prerelease=true ;;
+              *)   prerelease=false ;;
+          esac
+
+          echo "OK   バージョン: $version（プレリリース: $prerelease）"
+          {
+              echo "version=$version"
+              echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: タグが master に含まれることを確認する
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+          DRY_RUN: ${{ steps.resolve.outputs.dry_run }}
+        # **タグは master にだけ付ける**（_documents/リリース手順書.md）。
+        # develop のコミットへ付けると、リリース確定状態と中身が食い違う
+        run: |
+          set -euo pipefail
+
+          # dry-run は作業ブランチの Release 経路をタグを付ける前に試すもの。
+          # 実在タグと master の関係は、本番のタグ push でだけ強制する。
+          if [ "$DRY_RUN" = "true" ]; then
+              echo "dry-run のため、タグと master の包含関係は検査しない"
+              exit 0
+          fi
+
+          git fetch --no-tags origin master:refs/remotes/origin/master
+          if git merge-base --is-ancestor "$TAG^{commit}" refs/remotes/origin/master; then
+              echo "OK   タグ $TAG のコミットは master に含まれている"
+          else
+              echo "NG: タグ $TAG のコミットが master に含まれていない" >&2
+              echo "    タグは master へマージ済みのコミットにだけ付けること" >&2
+              echo "    （_documents/リリース手順書.md「タグを付けるとき」）" >&2
+              exit 1
+          fi
+
+      - name: VersionPrefix とタグが一致することを確認する
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        # **アセンブリのバージョンの単一情報源は Directory.Build.props の VersionPrefix**
+        # （_documents/リリース手順書.md）。ここがずれると、配布物の中身と
+        # タグの表す版が食い違う
+        run: |
+          set -euo pipefail
+
+          prefix="$(sed -nE 's@.*<VersionPrefix>([^<]+)</VersionPrefix>.*@\1@p' Directory.Build.props | head -n 1)"
+          if [ -z "$prefix" ]; then
+              echo "NG: Directory.Build.props から VersionPrefix を読み取れない" >&2
+              exit 1
+          fi
+
+          # プレリリースのタグ（v1.0.0-rc.1）は、核となる 1.0.0 の部分で突き合わせる
+          core="${VERSION%%-*}"
+          if [ "$prefix" != "$core" ]; then
+              echo "NG: VersionPrefix ($prefix) とタグ ($VERSION) が一致しない" >&2
+              echo "    Directory.Build.props の VersionPrefix を上げる PR を先に通すこと" >&2
+              exit 1
+          fi
+          echo "OK   VersionPrefix: $prefix"
+
+      - name: .NET SDK を用意する
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: 依存を復元する
+        run: dotnet restore VehicleVision.PleasanterTools.CalendarFeed.slnx
+
+      - name: ビルドする
+        # **警告 0 の確認を兼ねる。** Directory.Build.props の
+        # TreatWarningsAsErrors=true により、警告が 1 つでも出れば失敗する
+        run: >-
+          dotnet build VehicleVision.PleasanterTools.CalendarFeed.slnx
+          --no-restore -c Release
+
+      - name: 単体テストを実行する
+        # ci.yml と同じ範囲（結合テストは integration.yml が master への push で回す。冒頭の但し書きを参照）
+        run: >-
+          dotnet test VehicleVision.PleasanterTools.CalendarFeed.slnx
+          --no-build -c Release
+
+      - name: Node を用意する
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: >-
+            src/VehicleVision.PleasanterTools.CalendarFeed.Frontend/package-lock.json
+
+      - name: フロントエンドを検査してビルドする
+        working-directory: src/VehicleVision.PleasanterTools.CalendarFeed.Frontend
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run check
+          npx vite build
+
+      - name: Pleasanter 本体の混入を検査する
+        run: bash ./scripts/license-check.sh
+
+      - name: NOTICE の依存一覧を実物と突き合わせる
+        run: bash ./scripts/notice-check.sh
+
+      - name: Azure Web App／IIS 用の配置物を作る
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          publish_dir="$RUNNER_TEMP/calendarfeed-publish"
+          # OS・CPU を指定しない発行なので portable と名乗る（win-x64 などとは名乗らない）
+          package_name="VehicleVision.PleasanterTools.CalendarFeed-$VERSION-portable.zip"
+          package_path="$RUNNER_TEMP/$package_name"
+
+          # デバッグ記号（pdb）は配置先に要らない。サイズと内部情報の露出を減らす。
+          # **後から消すのではなく、作らない。** DebugType=none ＋ DebugSymbols=false を発行に渡す
+          # （2026-10-10 実測: 何も渡さないと 7 個、CopyOutputSymbolsToPublishDirectory=false だけでは
+          # 参照先プロジェクトの分が残って 6 個、この 2 つで 0 個）
+          dotnet publish src/VehicleVision.PleasanterTools.CalendarFeed.Web \
+            --no-restore -c Release -o "$publish_dir" \
+            -p:DebugType=none -p:DebugSymbols=false
+
+          # 渡し忘れや SDK の挙動変更で、pdb が混ざったまま出さないための検査
+          remaining_pdb="$(find "$publish_dir" -name '*.pdb')"
+          if [ -n "$remaining_pdb" ]; then
+            echo "NG: 配置用 ZIP に pdb が残っている: $remaining_pdb" >&2
+            exit 1
+          fi
+
+          # Dockerfile と同じ構成にする。資格情報の実値は含めず、設定の説明と
+          # ライセンスだけを足す。ZIP の直下がそのまま wwwroot になる形にする。
+          cp LICENSE LICENSING.md LICENSE-COMMERCIAL.md NOTICE "$publish_dir/"
+
+          # 発行コマンドが成功しても、フロントエンドを先に作り忘れると画面が無い
+          # ZIP ができる。利用者が配置してから気付かないよう、Release 前に止める。
+          required=(
+            VehicleVision.PleasanterTools.CalendarFeed.Web.dll
+            web.config
+            wwwroot/admin/index.html
+            App_Data/Parameters/Feed.json
+            LICENSE
+            LICENSING.md
+            LICENSE-COMMERCIAL.md
+            NOTICE
+          )
+          for path in "${required[@]}"; do
+            test -f "$publish_dir/$path" || {
+              echo "NG: 配置用 ZIP に必要なファイルが無い: $path" >&2
+              exit 1
+            }
+          done
+
+          (cd "$publish_dir" && zip -q -r "$package_path" .)
+          (cd "$RUNNER_TEMP" && sha256sum "$package_name" > "$package_name.sha256")
+
+          echo "OK   配置用 ZIP: $package_name"
+          du -h "$package_path"
+
+      - name: 配置用 ZIP をジョブ間で受け渡す
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-package
+          path: |
+            ${{ runner.temp }}/VehicleVision.PleasanterTools.CalendarFeed-${{ steps.version.outputs.version }}-portable.zip
+            ${{ runner.temp }}/VehicleVision.PleasanterTools.CalendarFeed-${{ steps.version.outputs.version }}-portable.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: 検証結果をまとめる
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          DRY_RUN: ${{ steps.resolve.outputs.dry_run }}
+        run: |
+          {
+              echo "## リリース検証"
+              echo
+              echo "| 項目 | 値 |"
+              echo "| --- | --- |"
+              echo "| タグ | \`$TAG\` |"
+              echo "| バージョン | \`$VERSION\` |"
+              echo "| プレリリース | $PRERELEASE |"
+              echo "| dry-run | $DRY_RUN |"
+              echo
+              echo "**機械で確かめていないもの。** 人が確認すること。"
+              echo
+              echo "- 破壊的変更があればメジャーを上げているか"
+              echo "- マイグレーションがある場合、適用手順を Release 本文へ書いたか"
+              echo "- 依存のライセンスが寛容ライセンス（MIT / BSD 系 / Apache-2.0）のままか"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: GitHub Release 作成
+    needs: verify
+    # dry-run では作らない。検証だけで終える
+    if: needs.verify.outputs.dry_run == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # **Release の作成に書き込みが要る。** 既定の read のままでは作れない
+      contents: write
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          # 前回のタグからの変更内容を組み立てるため全履歴が要る
+          fetch-depth: 0
+          submodules: false
+
+      - name: 配置用 ZIP を取得する
+        uses: actions/download-artifact@v8
+        with:
+          name: deployment-package
+          path: ${{ runner.temp }}/deployment-package
+
+      - name: 配置用 ZIP の SHA-256 を検査する
+        working-directory: ${{ runner.temp }}/deployment-package
+        run: sha256sum --check *.zip.sha256
+
+      - name: Release 本文を組み立てる
+        id: notes
+        env:
+          TAG: ${{ needs.verify.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+        # **本文は日本語で作る**（.github/copilot-instructions.md）。
+        # gh release create --generate-notes は "What's Changed" などの見出しが
+        # 英語で入るため使わない。squash マージの運用なので、コミットの件名が
+        # そのまま PR のタイトル（日本語）になっている
+        run: |
+          set -euo pipefail
+
+          previous="$(git tag --list 'v*' --sort=-v:refname \
+              | grep -vFx "$TAG" \
+              | head -n 1 || true)"
+
+          body="$(mktemp)"
+          {
+              echo "## 変更内容"
+              echo
+              if [ -n "$previous" ]; then
+                  git log --no-merges --pretty=format:'- %s' "$previous..$TAG"
+                  echo
+              else
+                  git log --no-merges --pretty=format:'- %s' "$TAG"
+                  echo
+              fi
+              echo
+              echo "## ライセンス"
+              echo
+              echo "本ソフトウェアはデュアルライセンス（AGPL-3.0-or-later OR 商用）で提供します。"
+              echo "詳細は \`LICENSING.md\` を参照してください。"
+              echo "依存 OSS の一覧とライセンスは \`NOTICE\` にあります。"
+              echo
+              echo "## 添付"
+              echo
+              echo "- ソース一式は GitHub が自動で付けます"
+              echo "- Azure Web App／IIS 共用の配置用 ZIP と SHA-256"
+              echo "- \`LICENSE\` / \`LICENSING.md\` / \`LICENSE-COMMERCIAL.md\` / \`NOTICE\`"
+              echo
+              if [ -n "$previous" ]; then
+                  echo "**全変更**: $SERVER_URL/$REPOSITORY/compare/$previous...$TAG"
+              else
+                  echo "**初回のリリースです。**"
+              fi
+          } > "$body"
+
+          echo "body_file=$body" >> "$GITHUB_OUTPUT"
+          echo "---- 本文 ----"
+          cat "$body"
+
+      - name: GitHub Release を作る
+        env:
+          # gh CLI は GH_TOKEN を見る
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.verify.outputs.tag }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+          BODY_FILE: ${{ steps.notes.outputs.body_file }}
+          REPOSITORY: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          DEPLOYMENT_ZIP: ${{ runner.temp }}/deployment-package/VehicleVision.PleasanterTools.CalendarFeed-${{ needs.verify.outputs.version }}-portable.zip
+          DEPLOYMENT_SHA256: ${{ runner.temp }}/deployment-package/VehicleVision.PleasanterTools.CalendarFeed-${{ needs.verify.outputs.version }}-portable.zip.sha256
+        run: |
+          set -euo pipefail
+
+          args=(
+              "$TAG"
+              --title "$TAG"
+              --notes-file "$BODY_FILE"
+              --verify-tag
+          )
+          if [ "$PRERELEASE" = "true" ]; then
+              args+=(--prerelease)
+          fi
+
+          gh release create "${args[@]}" \
+              LICENSE \
+              LICENSING.md \
+              LICENSE-COMMERCIAL.md \
+              NOTICE \
+              "$DEPLOYMENT_ZIP" \
+              "$DEPLOYMENT_SHA256"
+
+          {
+              echo "## GitHub Release を作成した"
+              echo
+              echo "$SERVER_URL/$REPOSITORY/releases/tag/$TAG"
+              echo
+              echo "**変更内容が実態と合っているか目を通すこと。**"
+              echo "コミットの件名から組み立てているため、"
+              echo "マイグレーションの適用手順などは自動では入らない"
+              echo "（_documents/リリース手順書.md「リリース前の確認」）。"
+          } >> "$GITHUB_STEP_SUMMARY"

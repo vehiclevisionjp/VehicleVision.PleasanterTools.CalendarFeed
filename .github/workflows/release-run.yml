@@ -1,0 +1,265 @@
+# `major` / `minor` / `patch` を選ぶだけでリリースを通す。
+#
+# ■ 何のためか
+#   `release.yml` は **`v*` タグの push 以降**（_documents/リリース手順書.md の 6）
+#   しか自動化しておらず、2〜5（`VersionPrefix` の引き上げ → `develop`→`master` の
+#   PR → マージ → タグ push）が手作業だった。**採番を人がやると間違える。**
+#   しかも `release-tag-protection` でタグは付け直せない。
+#
+# ■ 採番
+#   **起点は既存の最新 `v*` タグ**（`scripts/release-next-version.sh`）。
+#   実際に出した版を起点にすれば重複しない。**タグがまだ無い初回は
+#   `Directory.Build.props` の `VersionPrefix` をそのまま出す版とし、
+#   `bump` の指定を無視する。**
+#   プレリリース（`v1.0.0-rc.1`）は発行しない。必要になったら手でタグを付ける
+#   （`release.yml` は rc を扱える）。
+#
+# ■ ⚠️ **`my-repo-automation-bot` のトークンで動く。`GITHUB_TOKEN` では動かない**
+#   `master-protection` は PR 必須＋必須ステータスチェック 6 本で、bypass は
+#   Admin ロールのみ。**`GITHUB_TOKEN` の push / PR 作成では CI が起動しない**ため
+#   （ワークフローの連鎖を防ぐ仕様）、必須チェックが永久に pending になり
+#   マージできない。GitHub App の installation token を発行して使う。
+#
+#   **Dealer と同じ立て付けにしてある**（VehicleVision.Dealer の
+#   `create-release-tag.yml` / `create-release-pr.yml`）。長期の PAT を置かずに済む。
+#
+#     - Repository Variables: `MY_REPO_AUTOMATION_BOT_CLIENT_ID`（App の Client ID）
+#     - Secrets: `MY_REPO_AUTOMATION_BOT_PRIVATE_KEY`（App の秘密鍵 PEM）
+#     - ⚠️ **App 側の権限が Contents / Pull requests とも
+#       Read and write になっていること。** 既定は Read-only のことがある
+#
+# ■ ⚠️ **タグは付け直せない**
+#   一気通貫にすると、人の確認点（破壊的変更でメジャーを上げたか、
+#   マイグレーション手順を書いたか）が飛ぶ。**既定を dry-run にし、
+#   実行時は `acknowledge` の明示を要求する**ことで埋めている。
+#   `develop`→`master` の PR 本文にも確認項目を載せる。
+#
+# ■ ⚠️ **途中で落ちたら途中まで進んだ状態が残る**
+#   `develop` へのマージ後に落ちると、版だけ上がってタグが無い状態になる。
+#   復旧手順は _documents/リリース手順書.md「一気通貫の実行が途中で落ちたとき」。
+#   **再実行しても既にある PR とブランチは作り直さず引き継ぐ。**
+#
+# 参照した一次情報（いずれも 2026-09-11 参照）
+#   - workflow_dispatch.inputs（choice / boolean）
+#     https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax
+#   - GITHUB_TOKEN の操作ではワークフローが起動しない
+#     https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow
+#   - gh pr merge --auto / gh pr create
+#     https://cli.github.com/manual/gh_pr_merge
+#     https://cli.github.com/manual/gh_pr_create
+#   - actions/create-github-app-token v3（client-id / private-key / permission-*）
+#     https://github.com/actions/create-github-app-token
+#     **`app-id` ではなく `client-id` が推奨。** Dealer も client-id で揃えている
+#   - actions/checkout v7 は .github/workflows/ci.yml と同じ版に揃えた（勝手に上げない）
+name: リリース実行
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "上げるもの（初回リリースでは無視され、VersionPrefix がそのまま出る版になる）"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: "dry-run（採番と前提確認だけ行い、PR もタグも作らない）。実際に出すときだけ false"
+        required: false
+        default: true
+        type: boolean
+      acknowledge:
+        description: "機械で確かめられない確認（破壊的変更の版・マイグレーション手順・依存のライセンス）を済ませた"
+        required: false
+        default: false
+        type: boolean
+
+# **走っているものを止めない。** リリースは取り消しの効かない操作で、
+# 途中で切られると版だけ上がってタグが無い状態が残りうる
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: 版を採番して前提を確かめる
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      next_version: ${{ steps.version.outputs.next_version }}
+      next_tag: ${{ steps.version.outputs.next_tag }}
+      needs_version_bump: ${{ steps.version.outputs.needs_version_bump }}
+      first_release: ${{ steps.version.outputs.first_release }}
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          # **採番に既存のタグ全部が要る。** 既定の浅い取得ではタグが揃わない
+          fetch-depth: 0
+          submodules: false
+
+      - name: develop から実行されていることを確かめる
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        # **リリースは develop を master へ入れる操作。** 別のブランチから
+        # 起動されても develop を対象にするため、指定と実際が食い違う
+        run: |
+          set -euo pipefail
+          if [ "$REF_NAME" != "develop" ]; then
+              echo "NG: このワークフローは develop から実行すること（今: $REF_NAME）" >&2
+              echo "    対象は常に develop → master であり、起動元のブランチは使わない" >&2
+              exit 1
+          fi
+          echo "OK   develop から実行されている"
+
+      - name: 次の版を採番する
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: bash ./scripts/release-next-version.sh
+
+      - name: develop の CI が緑であることを確かめる
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          # **`${{ }}` を run の中へ直接埋めない**（release.yml と同じ扱い）
+          REPOSITORY: ${{ github.repository }}
+        # **赤い develop からリリースを始めない。** auto-merge は待ち続けるだけで、
+        # 落ちていることを教えてくれない
+        run: |
+          set -euo pipefail
+
+          sha="$(git rev-parse HEAD)"
+          failed="$(gh api "repos/$REPOSITORY/commits/$sha/check-runs" \
+              --paginate \
+              --jq '[.check_runs[]
+                     | select(.status == "completed")
+                     | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "cancelled")
+                     | .name] | unique | join(", ")')"
+
+          if [ -z "$failed" ]; then
+              echo "OK   develop ($sha) に落ちているチェックは無い"
+              exit 0
+          fi
+
+          echo "落ちているチェック: $failed"
+          if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::develop に落ちているチェックがある: $failed"
+          else
+              echo "NG: develop に落ちているチェックがある: $failed" >&2
+              echo "    直してからリリースすること" >&2
+              exit 1
+          fi
+
+      - name: 実行の前提を確かめる
+        if: ${{ !inputs.dry_run }}
+        env:
+          ACKNOWLEDGE: ${{ inputs.acknowledge }}
+          # **`secrets` / `vars` は `if` から参照できない。** env へ写して判定する
+          # （Dealer の ci.yml と同じ理由）
+          HAS_CLIENT_ID: ${{ vars.MY_REPO_AUTOMATION_BOT_CLIENT_ID != '' }}
+          HAS_PRIVATE_KEY: ${{ secrets.MY_REPO_AUTOMATION_BOT_PRIVATE_KEY != '' }}
+        run: |
+          set -euo pipefail
+
+          ng=0
+          if [ "$ACKNOWLEDGE" != "true" ]; then
+              echo "NG: acknowledge を true にすること" >&2
+              echo "    タグは付け直せない。機械で確かめられない確認を先に済ませること" >&2
+              echo "    （_documents/リリース手順書.md「リリース前の確認」の「人」の欄）" >&2
+              ng=1
+          fi
+          if [ "$HAS_CLIENT_ID" != "true" ]; then
+              echo "NG: Repository Variable MY_REPO_AUTOMATION_BOT_CLIENT_ID が未設定" >&2
+              echo "    App の Settings > General にある Client ID（Iv23li… の形）を入れること" >&2
+              echo "    **App ID でも Object ID でもない**" >&2
+              ng=1
+          fi
+          if [ "$HAS_PRIVATE_KEY" != "true" ]; then
+              echo "NG: シークレット MY_REPO_AUTOMATION_BOT_PRIVATE_KEY が未設定" >&2
+              echo "    App の秘密鍵（PEM）を入れること" >&2
+              ng=1
+          fi
+          [ "$ng" -eq 0 ] || exit 1
+          echo "OK   実行の前提は揃っている"
+
+      - name: 計画をまとめる
+        env:
+          BUMP: ${{ inputs.bump }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
+          NEXT_VERSION: ${{ steps.version.outputs.next_version }}
+          CURRENT_VERSION: ${{ steps.version.outputs.current_version }}
+          VERSION_PREFIX: ${{ steps.version.outputs.version_prefix }}
+          FIRST_RELEASE: ${{ steps.version.outputs.first_release }}
+          NEEDS_VERSION_BUMP: ${{ steps.version.outputs.needs_version_bump }}
+        run: |
+          {
+              echo "## リリースの計画"
+              echo
+              echo "| 項目 | 値 |"
+              echo "| --- | --- |"
+              echo "| 出すタグ | \`$NEXT_TAG\` |"
+              echo "| bump の指定 | \`$BUMP\` |"
+              echo "| 起点の版 | ${CURRENT_VERSION:-（タグ無し。初回リリース）} |"
+              echo "| 現在の VersionPrefix | \`$VERSION_PREFIX\` |"
+              echo "| VersionPrefix を上げる PR | $NEEDS_VERSION_BUMP |"
+              echo "| dry-run | $DRY_RUN |"
+              echo
+              if [ "$FIRST_RELEASE" = "true" ]; then
+                  echo "**初回リリースのため \`bump\` の指定は無視した。**"
+                  echo "既存の \`v*\` タグが無く、起点が無いところで上げても意味が無いため、"
+                  echo "\`VersionPrefix\` をそのまま出す版にしている。"
+                  echo
+              fi
+              echo "**機械で確かめていないもの。** 人が確認すること。"
+              echo
+              echo "- 破壊的変更があればメジャーを上げているか"
+              echo "- マイグレーションがある場合、適用手順を Release 本文へ書いたか"
+              echo "- 依存のライセンスが寛容ライセンス（MIT / BSD 系 / Apache-2.0）のままか"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  run:
+    name: リリースを通す
+    needs: plan
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    # PR の必須チェック（4 RDBMS 結合テストを含む）の通過を 2 本待つ
+    timeout-minutes: 90
+    steps:
+      - name: my-repo-automation-bot のトークンを作る
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.MY_REPO_AUTOMATION_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.MY_REPO_AUTOMATION_BOT_PRIVATE_KEY }}
+          # ブランチとタグの push に contents、PR の作成と auto-merge の予約に
+          # pull-requests が要る。**それ以外は与えない**
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: false
+          # **App のトークンで取得する。** ここで入れたトークンが push にも使われ、
+          # push を契機に CI が起動する。GITHUB_TOKEN のままでは起動しない
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: 版を上げてマージし、タグを push する
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # コミットの作者を bot 名義に揃えるのに使う（Dealer と同じ）
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          NEXT_VERSION: ${{ needs.plan.outputs.next_version }}
+          NEXT_TAG: ${{ needs.plan.outputs.next_tag }}
+          NEEDS_VERSION_BUMP: ${{ needs.plan.outputs.needs_version_bump }}
+          BUMP: ${{ inputs.bump }}
+        run: bash ./scripts/release-run.sh
