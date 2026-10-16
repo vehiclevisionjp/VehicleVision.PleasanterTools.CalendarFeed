@@ -6,9 +6,15 @@
 ホストに要るのは Docker だけ（Windows の Git Bash でも動く）。
 
 ```bash
-bash tools/caldav-check/run.sh          # 起動 → 下ごしらえ → 検証 → 片付け（約 2〜3 分）
-KEEP=1 bash tools/caldav-check/run.sh   # 片付けない（調べるとき）。後片付けは `docker compose down -v`
+bash tools/caldav-check/run.sh                # SQLite で通す（既定。約 2〜3 分）
+DB=postgres bash tools/caldav-check/run.sh    # 本アプリの DB を PostgreSQL にして通す（sqlserver | postgres | mysql）
+DB=all bash tools/caldav-check/run.sh         # SQLite・SQL Server・PostgreSQL・MySQL を順に通す（約 4〜5 分）
+KEEP=1 bash tools/caldav-check/run.sh         # 片付けない（調べるとき）。後片付けは `docker compose --profile rdbms down -v`
 ```
+
+`DB` は**本アプリの DB** の選択（Pleasanter の DB は SQL Server 固定）。SQL Server は Pleasanter 用のサーバーに本アプリ用の
+データベース（`calendarfeed_app`）を別に作る。PostgreSQL・MySQL は `tools/pleasanter-testenv` の `rdbms` プロファイルのもの。
+**通した後、本アプリの DB の中に CalDAV の対応表の行があること**（その DB へ実際に書いた証拠）も確かめる。
 
 ## 通すクライアント
 
