@@ -130,6 +130,14 @@ if (string.IsNullOrEmpty(app.Configuration[ParameterFiles.FoundFilesKey]))
 // 起動時に自動で当てる（CALENDARFEED_DB_AUTOMIGRATE=false で無効。その場合は手で当てる）
 var db = app.Services.GetRequiredService<IDbConnectionFactory>();
 app.Logger.LogInformation("DB: {Provider}", db.Provider);
+
+// **`--migrate` ならマイグレーションだけ当てて終わる**（AKS の起動前フック・自動適用を止めた導入先のため）
+if (MigrationCommand.IsRequested(args))
+{
+    Environment.ExitCode = await MigrationCommand.RunAsync(db.Provider, db.ConnectionString, args);
+    return;
+}
+
 if (AppSettings.ReadAutoMigrate(app.Configuration))
 {
     DatabaseMigrator.Migrate(db.Provider, db.ConnectionString);
@@ -180,6 +188,22 @@ catch (Exception ex)
 
 app.UseAdminSecurityHeaders();
 app.UseRateLimiter();
+
+// ---- 生存確認・準備の確認（AKS のプローブ用。認証なし・レート制限なし） --------------------------
+// `/healthz`: プロセスが応答できるか（DB は見ない。DB の一時的な不調で Pod を再起動させないため）。
+// `/ready`: DB に繋がるか（繋がらない間は、負荷分散の対象から外す）。
+// **ここで見る依存先は本アプリの DB だけ。** 例外の中身は接続先や資格情報を含み得るので応答へ出さない
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
+    .DisableRateLimiting();
+app.MapGet("/ready", async (IDbConnectionFactory database, CancellationToken cancellationToken) =>
+{
+    var failure = await DatabaseMigrator.WaitForDatabaseAsync(
+        database.Provider, database.ConnectionString, TimeSpan.Zero, cancellationToken);
+    return failure is null
+        ? Results.Ok(new { status = "ready" })
+        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+})
+    .DisableRateLimiting();
 
 // ---- 購読フィード ----------------------------------------------------------------
 app.MapGet("/feeds/{token}.ics", async (
