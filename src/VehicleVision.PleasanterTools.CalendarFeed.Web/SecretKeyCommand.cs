@@ -93,6 +93,12 @@ public static class SecretKeyCommand
             return "environment variable " + AppSettings.SecretKey;
         }
 
+        // Docker secrets など、値をファイルから読む指定（中身は読まない。指定があれば「ある」とみなす）
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(AppSettings.SecretKey + ParameterFiles.FileSuffix)))
+        {
+            return "environment variable " + AppSettings.SecretKey + ParameterFiles.FileSuffix;
+        }
+
         foreach (var name in new[] { "Security.json", "Security.local.json" })
         {
             var path = Path.Combine(directory, name);

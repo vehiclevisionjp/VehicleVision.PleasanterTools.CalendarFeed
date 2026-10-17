@@ -41,6 +41,18 @@ public static class ParameterFiles
     /// </remarks>
     public const string FoundFilesKey = "CALENDARFEED_PARAMETERS_FOUND";
 
+    /// <summary>
+    /// 値をファイルから読んだ設定の名前（カンマ区切り。<b>名前だけ。値は入れない</b>）。起動ログへ出す。
+    /// 何も無ければ空。
+    /// </summary>
+    public const string SecretFilesKey = "CALENDARFEED_PARAMETERS_SECRETFILES";
+
+    /// <summary>設定名に付けると「値を読むファイルのパス」になる接尾辞（<c>CALENDARFEED_SECRET_KEY_FILE</c>）。</summary>
+    public const string FileSuffix = "_FILE";
+
+    /// <summary>値のファイルの大きさの上限（バイト）。複数行の証明書が収まれば十分。</summary>
+    private const int MaxValueFileBytes = 64 * 1024;
+
     /// <summary>読む対象。</summary>
     private static readonly ImmutableArray<string> Names =
         ["Service", "Pleasanter", "Feed", "Rds", "Security", "Mail", "Session", "Authentication", "RateLimit", "CalDav"];
@@ -192,6 +204,11 @@ public static class ParameterFiles
         // ---- 2. 環境変数
         builder.AddEnvironmentVariables();
 
+        // ---- 2b. 値をファイルから読む（Docker の secrets・Kubernetes の Secret のボリューム）。CALENDARFEED_X_FILE=<パス>
+        // 環境変数と同じ強さ（local.json よりは弱い）。**ファイルは起動時に 1 度だけ読む**（変えたら再起動）
+        var secretFiles = SecretFilesOf().ToList();
+        builder.AddInMemoryCollection(secretFiles);
+
         // ---- 3. {名前}.local.json（一番強い。git 管理外）
         foreach (var name in FlatNames)
         {
@@ -206,7 +223,70 @@ public static class ParameterFiles
         [
             new KeyValuePair<string, string?>(DirectoryKey, resolved),
             new KeyValuePair<string, string?>(FoundFilesKey, string.Join(" / ", FoundIn(resolved))),
+            new KeyValuePair<string, string?>(SecretFilesKey, string.Join(",", secretFiles.Select(f => f.Key))),
         ]);
+    }
+
+    /// <summary>
+    /// <b><c>{設定名}_FILE</c> の環境変数</b>が指すファイルの内容を、<c>{設定名}</c> の値にする
+    /// （<see cref="FileBackedSettings"/> の <c>CALENDARFEED_*</c> が対象）。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>両方（<c>X</c> と <c>X_FILE</c>）が指定されたら落とす</b>（どちらが本物か分からない。Docker の公式イメージの慣習と同じ）。
+    /// ファイルが無い・読めない・空・大きすぎるときも<b>起動時に落とす</b>（黙って未設定で動くと、秘密の鍵が無いまま動いてしまう）。
+    /// <b>値は例外・ログへ出さない</b>（落とす理由には名前とパスだけを書く）。
+    /// </para>
+    /// <para>
+    /// 値の末尾の改行（<c>\r\n</c>）は取る（<c>echo</c> で作ったファイルに付く）。<b>途中の改行は残す</b>（複数行の証明書）。
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<KeyValuePair<string, string?>> SecretFilesOf()
+    {
+        foreach (var setting in FileBackedSettings.Where(s => s.StartsWith("CALENDARFEED_", StringComparison.Ordinal)))
+        {
+            var variable = setting + FileSuffix;
+            var path = Environment.GetEnvironmentVariable(variable);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(setting)))
+            {
+                throw new InvalidOperationException(
+                    $"{setting} と {variable} が両方指定されています。どちらか一方にしてください（値は表示しません）。");
+            }
+
+            string value;
+            try
+            {
+                var info = new FileInfo(path);
+                if (!info.Exists)
+                {
+                    throw new InvalidOperationException($"{variable} が指すファイルがありません: {path}");
+                }
+
+                if (info.Length > MaxValueFileBytes)
+                {
+                    throw new InvalidOperationException($"{variable} が指すファイルが大きすぎます（上限 {MaxValueFileBytes} バイト）: {path}");
+                }
+
+                value = File.ReadAllText(path).TrimEnd('\r', '\n');
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // ex.Message にパスは載るが値は載らない。理由は名前とパスだけにする
+                throw new InvalidOperationException($"{variable} が指すファイルを読めません: {path}", ex);
+            }
+
+            if (value.Length == 0)
+            {
+                throw new InvalidOperationException($"{variable} が指すファイルが空です: {path}");
+            }
+
+            yield return new KeyValuePair<string, string?>(setting, value);
+        }
     }
 
     /// <summary>実際に置いてあるファイルの名前。</summary>

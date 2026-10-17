@@ -136,6 +136,12 @@ app.Logger.LogInformation(
     "設定ファイルの置き場: {Directory} / 見つかったファイル: {Files}",
     app.Configuration[ParameterFiles.DirectoryKey],
     app.Configuration[ParameterFiles.FoundFilesKey]);
+if (!string.IsNullOrEmpty(app.Configuration[ParameterFiles.SecretFilesKey]))
+{
+    // **名前だけ**（値は出さない）
+    app.Logger.LogInformation("値をファイルから読んだ設定（*_FILE）: {Names}", app.Configuration[ParameterFiles.SecretFilesKey]);
+}
+
 if (string.IsNullOrEmpty(app.Configuration[ParameterFiles.FoundFilesKey]))
 {
     app.Logger.LogWarning("設定ファイルが 1 つも見つかりません。置き場を確かめてください。");
