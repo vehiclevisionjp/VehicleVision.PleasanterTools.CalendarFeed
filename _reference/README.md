@@ -4,7 +4,7 @@
 配置したもの。固定コミットで参照する。
 
 - リポジトリ: <https://github.com/Implem/Implem.Pleasanter>
-- 固定位置: `Pleasanter_1.5.8.1`（`626a173e`。Questionnaire リポジトリと同じ位置）
+- 固定位置: `Pleasanter_1.5.9.0`（`1b7b6e6c`。2026-10-18 に 1.5.8.1 から更新。Questionnaire の固定位置とは異なる場合がある）
 
 ## 厳守事項
 
