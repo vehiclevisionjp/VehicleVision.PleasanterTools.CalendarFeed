@@ -75,14 +75,19 @@ public sealed class SharedRateLimiter(IRateLimitStore store, TimeProvider time, 
 }
 
 /// <summary>共有のレート制限を掛けるエンドポイントフィルタ。接続元（IP）ごとに、枠の名前ごとに数える。</summary>
-public sealed class SharedRateLimitFilter(string policy, int limit, TimeSpan window) : IEndpointFilter
+/// <remarks>
+/// <paramref name="policy"/> は数えの名前（DB の鍵に入る。変えると、数えが新しくなる）、<paramref name="parameter"/> は
+/// <see cref="FixedParameters"/> の枠の名前（<c>RateLimit.json</c> の <c>Policies</c>）。回数と窓は、要求のたびにそこから引く。
+/// </remarks>
+public sealed class SharedRateLimitFilter(string policy, string parameter) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var http = context.HttpContext;
         var key = $"{policy}:{http.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+        var limit = http.RequestServices.GetRequiredService<FixedParameters>().Policy(parameter);
         var decision = await http.RequestServices.GetRequiredService<SharedRateLimiter>()
-            .CheckAsync(key, limit, window, http.RequestAborted).ConfigureAwait(false);
+            .CheckAsync(key, limit.Limit, limit.Window, http.RequestAborted).ConfigureAwait(false);
         if (decision.Allowed)
         {
             return await next(context).ConfigureAwait(false);
@@ -99,18 +104,14 @@ public static class SharedRateLimits
     /// <summary>ログインの試行の枠（IP ごと 5 分に 10 回）。全体の枠に紛れさせると総当たりが通るので、別枠にする。</summary>
     public const string AdminLogin = "adminLogin";
 
-    public const int AdminLoginLimit = 10;
-
-    /// <summary>ログインの試行の枠を掛ける。</summary>
+    /// <summary>ログインの試行の枠を掛ける（回数と窓は <c>RateLimit.json</c> の <c>Policies:AdminLogin</c>）。</summary>
     public static TBuilder RequireAdminLoginRateLimit<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder =>
-        builder.AddEndpointFilter(new SharedRateLimitFilter(AdminLogin, AdminLoginLimit, TimeSpan.FromMinutes(5)));
+        builder.AddEndpointFilter(new SharedRateLimitFilter(AdminLogin, FixedParameters.AdminLogin));
 
     /// <summary>Pleasanter のログインの確認の枠を掛ける（ログインの枠とは別）。</summary>
     public static TBuilder RequirePleasanterSsoRateLimit<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder =>
         builder.AddEndpointFilter(new SharedRateLimitFilter(
-            Endpoints.AdminPleasanterSsoEndpoints.CheckRateLimitPolicy,
-            Endpoints.AdminPleasanterSsoEndpoints.CheckRequestsPer5Minutes,
-            TimeSpan.FromMinutes(5)));
+            Endpoints.AdminPleasanterSsoEndpoints.CheckRateLimitPolicy, FixedParameters.PleasanterSso));
 }
 
 /// <summary>古い数えの行を、定期的に消す。</summary>

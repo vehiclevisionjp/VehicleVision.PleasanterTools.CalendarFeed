@@ -75,13 +75,23 @@ public sealed class RuntimeSettings : IPleasanterOptionsSource
             NotifyRepeat = TimeSpan.FromHours(I(AppSettingDefinitions.FeedFailureNotifyRepeatHours)),
         };
 
+        // 時間・回数の固定のパラメータ（Session.json・Security.json。読めない値は起動時に落とす）
+        var fixedParameters = FixedParameters.FromConfiguration(configuration);
         var adminAuth = new AdminAuthOptions(
             Enum.Parse<TwoFactorMode>(V(AppSettingDefinitions.AdminTwoFactor), ignoreCase: true),
             new AdminPasswordPolicy(
                 I(AppSettingDefinitions.PasswordMinimumLength),
                 bool.Parse(V(AppSettingDefinitions.PasswordAllowSameAsLoginId)),
                 // 正規表現の条件は起動に係る（組み立てられない書き方は起動時に落とす）ので、ファイルから読む
-                configuration.GetSection(AppSettings.PasswordPolicies).Get<List<AdminPasswordRule>>() ?? []));
+                configuration.GetSection(AppSettings.PasswordPolicies).Get<List<AdminPasswordRule>>() ?? []))
+        {
+            LockoutThreshold = fixedParameters.LockoutCount,
+            Lockout = fixedParameters.LockoutPeriod,
+            PendingLifetime = fixedParameters.PendingAuthenticationPeriod,
+            SessionLifetime = fixedParameters.SessionRetention,
+            InvitationLifetime = fixedParameters.InvitationPeriod,
+            StaleAfter = fixedParameters.StaleAfter,
+        };
 
         // メールの設定は、値の組から MailOptions を読む（組み合わせの不備はここで例外になる）
         var mailValues = AppSettingDefinitions.All

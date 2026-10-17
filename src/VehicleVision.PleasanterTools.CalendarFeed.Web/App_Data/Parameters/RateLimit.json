@@ -1,0 +1,29 @@
+{
+  "//": "共有のレート制限の枠（IP ごと）。複数台でも同じ枠で数える（DB の数え）。Pleasanter の RateLimit.json の Policies に倣った階層。範囲は Limit 1〜1000000、WindowSeconds 1〜86400。環境変数なら RateLimit__Policies__CalDav__Limit のように書く",
+
+  "Policies": {
+    "//AdminLogin": "管理者のログインの試行（ログイン・TOTP・復旧コード・パスワード変更など）。全体の枠に紛れさせると総当たりが通るので別枠",
+    "AdminLogin": {
+      "Limit": 10,
+      "WindowSeconds": 300
+    },
+
+    "//PleasanterSso": "Pleasanter のログインの確認。画面が Pleasanter でのログインを待つ間（2 秒ごと）に繰り返し呼ぶので、AdminLogin とは分けて余裕を持たせる",
+    "PleasanterSso": {
+      "Limit": 300,
+      "WindowSeconds": 300
+    },
+
+    "//Feed": "購読 URL（.ics）。要求が多く DB への書き込みが重いので、台ごとの数え（共有しない）",
+    "Feed": {
+      "Limit": 60,
+      "WindowSeconds": 60
+    },
+
+    "//CalDav": "CalDAV（カレンダーアプリの同期）。1 回の同期で複数の要求（探索・一覧・取得）が出るので、購読より多い",
+    "CalDav": {
+      "Limit": 600,
+      "WindowSeconds": 300
+    }
+  }
+}

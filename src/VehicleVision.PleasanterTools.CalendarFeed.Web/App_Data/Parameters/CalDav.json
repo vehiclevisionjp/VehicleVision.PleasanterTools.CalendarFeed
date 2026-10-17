@@ -1,0 +1,15 @@
+{
+  "//": "CalDAV（カレンダーアプリが直接つなぐ入口。/caldav/）の上限。本アプリ固有（Pleasanter には無い）。環境変数なら CalDav__MaxXmlBodyKB のように書く。回数の枠は RateLimit.json の Policies:CalDav",
+
+  "//MaxXmlBodyKB": "XML の要求（PROPFIND・REPORT）の本文の上限（KB）。範囲 1〜10240",
+  "MaxXmlBodyKB": 64,
+
+  "//MaxResourceKB": "書き込まれる 1 件の予定（iCalendar）の上限（KB）。超えたら 413。範囲 1〜10240",
+  "MaxResourceKB": 256,
+
+  "//WriteLockLeaseSeconds": "同じ予定への書き込みの排他（DB の貸し出し）の有効期間（秒）。持ち主が落ちても、これが過ぎれば取り直せる。範囲 1〜3600",
+  "WriteLockLeaseSeconds": 30,
+
+  "//WriteLockWaitSeconds": "排他を待つ上限（秒）。待ちきれなければ 503（Retry-After つき）。WriteLockLeaseSeconds 以下。範囲 0〜600",
+  "WriteLockWaitSeconds": 5
+}

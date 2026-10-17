@@ -36,12 +36,73 @@
 | Pleasanter のログイン | `CALENDARFEED_PLEASANTERSSO_ENABLED`・`_INTERNALBASEURL`・`_LOGINURL`・`_LOGOUTURL`・`_COOKIENAMES`・`_ALLOWEDDEPTIDS`・`_ALLOWEDGROUPIDS`・`_UNKNOWNUSER`・`_REGISTERROLE`・`_REVALIDATEMINUTES`・`_TIMEOUTSECONDS`・`_BUTTONLABEL` |
 | メール | `CALENDARFEED_MAIL_ENABLED`・`_TRANSPORT`・`_SMTP_HOST`・`_SMTP_PORT`・`_SMTP_SECURITY`・`_SMTP_USER`・`_SMTP_PASSWORD`（秘密）・`_FROM_ADDRESS`・`_FROM_NAME`・`_REPLYTO_ADDRESS`・`_SES_REGION`・`_ACS_ENDPOINT`・`_TIMEOUT_SECONDS`・`_SEND_PER_MINUTE` |
 
-**SAML・Pleasanter のログインの設定をファイルで固定するとき**は、キーに**環境変数と同じ正式名**（`CALENDARFEED_SAML_ENABLED` など）をそのまま書く
-（短い別名の写しは、上のファイルごとの表にあるものだけ）。例: `Service.json` に `"CALENDARFEED_SAML_ENABLED": "true"`。環境変数で与えるのが普通で、複数行の証明書（`_IDPCERTIFICATE`）はファイルの方が書きやすい。
-実値を含むときは、読む対象のファイル（`Service` / `Pleasanter` / `Feed` / `Rds` / `Security` / `Mail`）の `.local.json` に書く（`Saml.json` のような新しい名前のファイルは読まれない）。
+**SAML・Pleasanter のログインの設定は、`Authentication.json` に書く**（Pleasanter 本体の `Authentication.json` の `SamlParameters`（`SPOptions`・`IdentityProviders`）に倣った階層）。
+環境変数 `CALENDARFEED_SAML_*` / `CALENDARFEED_PLEASANTERSSO_*` と同じ設定で、ファイルのキーとの対応は下の表のとおり。
+配列（`CookieNames`・`AllowedDeptIds`・`AllowedGroupIds`）は、環境変数ではカンマ区切り。複数行の証明書（`SigningCertificate`）は `Authentication.local.json` が書きやすい。
+（以前の「正式名のキーを `Service.json` などへそのまま書く」書き方も、そのまま効く。）
+
+> **環境変数で指定できる設定は、すべてファイルでも指定できる**（新しい設定を足すときは、ファイルのキーへの写しも足す。`FileBackedSettingsTests` が突き合わせる。
+> ファイルで指定しないのは、置き場そのもの `CALENDARFEED_PARAMETERS_DIRECTORY` と、読んだ結果の記録だけ）。
 
 **画面から編集しない設定（起動に要る、またはインスタンスごとの設定）**は、これまでどおりファイル／環境変数だけ:
 `CALENDARFEED_DB_*`（接続先・自動マイグレーション）、`CALENDARFEED_SECRET_KEY`、`CALENDARFEED_FORWARDED_PROXY_NETWORKS`、`PasswordPolicies`（正規表現の条件）、`CALENDARFEED_MAIL_WORKER`（この台で送信ワーカーを動かすか）、`CALENDARFEED_PARAMETERS_DIRECTORY`。
+
+## 固定のパラメータ（上限・時間。管理画面からは編集しない。Issue #92）
+
+**運用で調整しうる「上限・時間」。** Pleasanter の Parameters の持ち方（階層・ファイルの分け方）に倣った。**既定値は同梱のファイルの値と同じ**
+（ファイルが無くても同じに動く）。**読めない値・範囲の外の値は、起動時に落とす**（静かに既定へ戻さない。上限が黙って緩むのを防ぐ）。
+**暗号の長さ（鍵・ソルト・PBKDF2 の反復回数など）はここへ出さない**（調整させない）。
+
+| ファイル | キー（階層は `:`） | 既定 | 範囲 | 内容 |
+| --- | --- | --- | --- | --- |
+| `RateLimit.json` | `Policies:AdminLogin:Limit` / `WindowSeconds` | 10 回 / 300 秒 | 1〜1000000 / 1〜86400 | 管理者のログインの試行（IP ごと。複数台でも同じ枠で数える） |
+| `RateLimit.json` | `Policies:PleasanterSso:…` | 300 回 / 300 秒 | 同上 | Pleasanter のログインの確認 |
+| `RateLimit.json` | `Policies:Feed:…` | 60 回 / 60 秒 | 同上 | 購読 URL（台ごとの数え） |
+| `RateLimit.json` | `Policies:CalDav:…` | 600 回 / 300 秒 | 同上 | CalDAV（カレンダーアプリの同期） |
+| `Session.json` | `RetentionPeriod` | 480（分） | 1〜43200 | ログイン済みセッションの有効期間（Pleasanter の `Session.json` と同じキー） |
+| `Security.json` | `LockoutCount` | 5 | 1〜100 | 続けて何回失敗したら締め出すか |
+| `Security.json` | `LockoutPeriod` | 15（分） | 1〜1440 | 締め出しの長さ |
+| `Security.json` | `PendingAuthenticationPeriod` | 300（秒） | 30〜3600 | パスワードは通ったが 2 要素がまだ、の段階の有効期間 |
+| `Security.json` | `InvitationPeriod` | 48（時間） | 1〜720 | 招待の有効期間 |
+| `Security.json` | `StaleAfterDays` | 90 | 1〜3650 | 棚卸しで「長期間使われていない」とみなす日数 |
+| `Rds.json` | `MigrationLockTimeoutSeconds` | 300 | 1〜86400 | マイグレーションの排他ロックを待つ上限 |
+| `CalDav.json` | `MaxXmlBodyKB` | 64 | 1〜10240 | CalDAV の XML の要求の本文の上限 |
+| `CalDav.json` | `MaxResourceKB` | 256 | 1〜10240 | 書き込まれる 1 件の予定の上限（超えたら 413） |
+| `CalDav.json` | `WriteLockLeaseSeconds` | 30 | 1〜3600 | 同じ予定への書き込みの排他の貸し出しの有効期間 |
+| `CalDav.json` | `WriteLockWaitSeconds` | 5 | 0〜600（貸し出し以下） | 排他を待つ上限（待ちきれなければ 503） |
+
+- **階層のあるファイル（`RateLimit.json`・`CalDav.json`）は、ファイル名を節の名前にして読む**（`RateLimit:Policies:CalDav:Limit`）。
+  環境変数なら **`RateLimit__Policies__CalDav__Limit`**（`__` が階層）。優先順位は他と同じ（`*.local.json` ＞ 環境変数 ＞ `*.json`）
+- 平らなキー（`Session.json`・`Security.json`・`Rds.json`）は、環境変数 `CALENDARFEED_SESSION_RETENTIONPERIOD`・`CALENDARFEED_LOCKOUT_COUNT`・
+  `CALENDARFEED_LOCKOUT_PERIOD`・`CALENDARFEED_PENDING_AUTHENTICATION_PERIOD`・`CALENDARFEED_INVITATION_PERIOD`・`CALENDARFEED_STALE_AFTER_DAYS`・
+  `CALENDARFEED_DB_MIGRATION_LOCK_TIMEOUT_SECONDS` へ写す
+- **管理画面の設定（上の「管理画面から編集できる設定」）とは別**。こちらは画面に出ず、ファイル・環境変数だけ
+
+## ログインの方式（`Authentication.json`）
+
+| キー（階層は `:`） | 環境変数 |
+| --- | --- |
+| `SamlParameters:Enabled` | `CALENDARFEED_SAML_ENABLED` |
+| `SamlParameters:SPOptions:EntityId` | `CALENDARFEED_SAML_ENTITYID` |
+| `SamlParameters:IdentityProviders:0:EntityId` / `SignOnUrl` / `LogoutUrl` / `SigningCertificate` | `CALENDARFEED_SAML_IDPENTITYID` / `_SINGLESIGNONURL` / `_SINGLELOGOUTURL` / `_IDPCERTIFICATE` |
+| `SamlParameters:UnknownUser` / `RegisterRole` / `LoginIdSource` / `LoginIdClaim` / `ButtonLabel` | `CALENDARFEED_SAML_UNKNOWNUSER` / `_REGISTERROLE` / `_LOGINIDSOURCE` / `_LOGINIDCLAIM` / `_BUTTONLABEL` |
+| `PleasanterSsoParameters:Enabled` / `InternalBaseUrl` / `LoginUrl` / `LogoutUrl` / `CookieNames` / `AllowedDeptIds` / `AllowedGroupIds` / `UnknownUser` / `RegisterRole` / `RevalidateMinutes` / `TimeoutSeconds` / `ButtonLabel` | `CALENDARFEED_PLEASANTERSSO_` + 大文字の名前 |
+
+Pleasanter の `SigningCertificate` は証明書ストアの指定（オブジェクト）だが、本アプリは**証明書そのもの（PEM または Base64 の文字列）**。
+
+## 秘密の鍵の生成
+
+```bash
+dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web -- --generate-secret-key           # 表示するだけ
+dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web -- --generate-secret-key --write   # Security.local.json へ書く
+```
+
+- `--write` は、鍵を **`Security.local.json`（git 管理外）の `SecretKey`** へ書く。置き場は `--directory=…`、無ければ `App_Data/Parameters`。
+  **鍵そのものは画面へ出さない**（ログに残さない）。ほかのキーは残す
+- ⚠️ **すでに鍵がある（環境変数・`Security.json`・`Security.local.json`）なら、書かずに断る**（終了コード 1）。
+  黙って変えると、DB へ暗号化して保管した API キー・管理者の 2 要素が復号できなくなる。読めないファイルがあるときも断る
+- ⚠️ **ファイルが消える環境（コンテナの書き込み層など）では、書いても再起動で消える。** そういう環境では環境変数
+  （アプリケーション設定・Key Vault の参照など）で与える。**書いた鍵は控えを取る**
 
 ## ファイルと環境変数
 
@@ -81,6 +142,10 @@
 
 > ⚠️ **値が `null` や空のキーは無視する。** `ApiKey` は既定で `null`（ここへ書かせない）なので、
 > 写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
+
+> ⚠️ **平らなファイルの設定の環境変数は、`CALENDARFEED_*` の名前で与える**（`Pleasanter__BaseUrl` ではない。下の警告）。
+> **階層のファイル（`RateLimit.json`・`CalDav.json`）だけは、`__` が階層の標準の書き方**（`RateLimit__Policies__CalDav__Limit`）。
+> 環境変数を置く場所（systemd・IIS・Docker など）は [`導入-更新運用手順書.md`](../../../../_documents/導入-更新運用手順書.md) 4.2。
 
 > ⚠️ **環境変数の名前を `Pleasanter__BaseUrl` のような .NET の階層形式で与えても効かない。**
 > 上表の `CALENDARFEED_*` を使う。

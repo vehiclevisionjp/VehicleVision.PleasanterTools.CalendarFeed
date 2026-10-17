@@ -27,9 +27,6 @@ public static class AdminPleasanterSsoEndpoints
     /// </remarks>
     public const string CheckRateLimitPolicy = "adminPleasanterSso";
 
-    /// <summary>5 分あたりの上限。画面の問い合わせ間隔（2 秒）に余裕を持たせる。</summary>
-    public const int CheckRequestsPer5Minutes = 300;
-
     /// <summary>入口を登録する。</summary>
     public static void MapAdminPleasanterSso(this WebApplication app)
     {

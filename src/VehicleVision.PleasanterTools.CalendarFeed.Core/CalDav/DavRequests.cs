@@ -9,9 +9,9 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.CalDav;
 public sealed record PropfindRequest(bool AllProp, bool PropNameOnly, IReadOnlyList<XName> Props)
 {
     /// <summary>本文を読む。空の本文は <c>allprop</c>（RFC 4918 9.1）。</summary>
-    public static PropfindRequest Parse(string body)
+    public static PropfindRequest Parse(string body, int maxBytes = DavXml.MaxBodyBytes)
     {
-        var doc = DavXml.Parse(body);
+        var doc = DavXml.Parse(body, maxBytes);
         if (doc is null)
         {
             return new PropfindRequest(true, false, []);
@@ -63,9 +63,9 @@ public sealed record ReportRequest(
     DateTimeOffset? End)
 {
     /// <summary>本文を読む。対応していない REPORT は <see cref="DavXmlException"/>（呼び出し側が 403 supported-report にする）。</summary>
-    public static ReportRequest Parse(string body)
+    public static ReportRequest Parse(string body, int maxBytes = DavXml.MaxBodyBytes)
     {
-        var doc = DavXml.Parse(body) ?? throw new DavXmlException("The REPORT request needs a body.");
+        var doc = DavXml.Parse(body, maxBytes) ?? throw new DavXmlException("The REPORT request needs a body.");
         var root = doc.Root!;
         var props = root.Element(DavXml.D + "prop")?.Elements().Select(e => e.Name).Distinct().ToList() ?? [];
 

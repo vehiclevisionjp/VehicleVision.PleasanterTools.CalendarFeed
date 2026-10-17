@@ -16,9 +16,10 @@ using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
 // **設定に書く鍵を作るための道。** 手で乱数を用意させると、短い値や使い回しが混ざる。
 // コンソールへ出す文字列なので英語（.github/copilot-instructions.md）
-if (args.Contains("--generate-secret-key"))
+if (SecretKeyCommand.IsRequested(args))
 {
-    Console.WriteLine(SecretProtector.GenerateKey());
+    // `--write` を付けると、Security.local.json へ書く（すでに鍵があれば断る）
+    Environment.ExitCode = SecretKeyCommand.Run(args, Console.Out, Console.Error);
     return;
 }
 
@@ -28,6 +29,10 @@ var builder = WebApplication.CreateBuilder(args);
 // **一番先に積む。** 以降の読み取りがすべてこれを見る。
 // 優先順位は {名前}.local.json ＞ 環境変数 ＞ {名前}.json（App_Data/Parameters/README.md）
 builder.Configuration.AddParameterFiles();
+
+// ---- 固定のパラメータ（上限・時間。管理画面からは編集しない。Issue #92） ----------------------------
+// **設定は DI から読む**（テストが後から足す設定も効くように）。読めない値・範囲の外の値は、起動時（Build の直後）に落とす
+builder.Services.AddSingleton(sp => FixedParameters.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 
 // ---- 設定は DI の生成時に読む（テストからの上書きを効かせるため） ---------------
 // ---- アプリケーション設定（管理画面から編集できる設定。Questionnaire に則る） -------------------------
@@ -110,10 +115,18 @@ builder.Services.AddRateLimiter(o =>
     // ここに残るのは、要求が多く DB への書き込みが重い購読 URL の枠（台ごとの数え）
     o.AddPolicy("feed", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
+        _ => new FixedWindowRateLimiterOptions
+        {
+            // 回数と窓は RateLimit.json の Policies:Feed（既定は IP ごとに 1 分に 60 回）
+            PermitLimit = http.RequestServices.GetRequiredService<FixedParameters>().Policy(FixedParameters.Feed).Limit,
+            Window = http.RequestServices.GetRequiredService<FixedParameters>().Policy(FixedParameters.Feed).Window,
+        }));
 });
 
 var app = builder.Build();
+
+// 固定のパラメータの読み間違いは、最初の要求ではなく起動時に分かるようにする（Issue #92）
+var fixedParameters = app.Services.GetRequiredService<FixedParameters>();
 
 // 設定の読み間違い（外部設定）は、最初の要求ではなく起動時に分かるようにする
 var runtimeSettings = app.Services.GetRequiredService<RuntimeSettings>();
@@ -136,13 +149,13 @@ app.Logger.LogInformation("DB: {Provider}", db.Provider);
 // **`--migrate` ならマイグレーションだけ当てて終わる**（AKS の起動前フック・自動適用を止めた導入先のため）
 if (MigrationCommand.IsRequested(args))
 {
-    Environment.ExitCode = await MigrationCommand.RunAsync(db.Provider, db.ConnectionString, args);
+    Environment.ExitCode = await MigrationCommand.RunAsync(db.Provider, db.ConnectionString, args, fixedParameters.MigrationLockTimeout);
     return;
 }
 
 if (AppSettings.ReadAutoMigrate(app.Configuration))
 {
-    DatabaseMigrator.Migrate(db.Provider, db.ConnectionString);
+    DatabaseMigrator.Migrate(db.Provider, db.ConnectionString, fixedParameters.MigrationLockTimeout);
 }
 else
 {
