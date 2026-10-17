@@ -90,6 +90,18 @@
 
 Pleasanter の `SigningCertificate` は証明書ストアの指定（オブジェクト）だが、本アプリは**証明書そのもの（PEM または Base64 の文字列）**。
 
+## 値をファイルから読む（`*_FILE`。Issue #94）
+
+**Docker の secrets・Kubernetes の Secret のボリューム**のように、値をファイルとして渡す方式に対応している。
+環境変数 `CALENDARFEED_X` の代わりに **`CALENDARFEED_X_FILE=<ファイルのパス>`** を与えると、そのファイルの内容を値として読む
+（対象は環境変数で指定できる `CALENDARFEED_*` の設定すべて）。
+
+- 末尾の改行は取り、途中の改行は残す（複数行の証明書）。**両方（`X` と `X_FILE`）を与えると起動時に落ちる**。
+  ファイルが無い・読めない・空・64 KB 超も落ちる。落ちる理由と起動ログには**名前とパスだけ**を出し、値は出さない
+- 強さは環境変数と同じ（`*.local.json` ＞ 環境変数・`*_FILE` ＞ `*.json`）。**起動時に 1 度だけ読む**（入れ替えたら再起動）
+- 例: `CALENDARFEED_SECRET_KEY_FILE=/run/secrets/calendarfeed_secret_key`。手順は
+  [`導入-更新運用手順書.md`](../../../../_documents/導入-更新運用手順書.md) 4.2「値をファイルから渡す」
+
 ## 秘密の鍵の生成
 
 ```bash
