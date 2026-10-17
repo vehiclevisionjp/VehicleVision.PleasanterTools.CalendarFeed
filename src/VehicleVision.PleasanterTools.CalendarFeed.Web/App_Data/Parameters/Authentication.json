@@ -1,0 +1,82 @@
+{
+  "//": "管理画面へのログインの方式（パスワード以外）。Pleasanter の Authentication.json の SamlParameters（SPOptions・IdentityProviders）に倣った階層。既定は両方とも無効。実値（証明書など）を含むときは Authentication.local.json か環境変数で与える。環境変数 CALENDARFEED_SAML_* / CALENDARFEED_PLEASANTERSSO_* と同じ設定（管理画面からも編集できる。ここへ値を書くと外部設定として固定され、画面からは変えられない）",
+
+  "SamlParameters": {
+    "//Enabled": "SAML 2.0 のログイン（SP）を使うか。CALENDARFEED_SAML_ENABLED",
+    "Enabled": null,
+
+    "SPOptions": {
+      "//EntityId": "本アプリ（SP）の EntityID。CALENDARFEED_SAML_ENTITYID",
+      "EntityId": null
+    },
+
+    "IdentityProviders": [
+      {
+        "//EntityId": "IdP の EntityID。CALENDARFEED_SAML_IDPENTITYID",
+        "EntityId": null,
+
+        "//SignOnUrl": "IdP のシングルサインオンの URL。CALENDARFEED_SAML_SINGLESIGNONURL",
+        "SignOnUrl": null,
+
+        "//LogoutUrl": "IdP のシングルログアウトの URL（未設定なら SLO を使わない）。CALENDARFEED_SAML_SINGLELOGOUTURL",
+        "LogoutUrl": null,
+
+        "//SigningCertificate": "IdP の署名の証明書（PEM または Base64 の DER）。複数行になるので Authentication.local.json に書くのが書きやすい。Pleasanter の SigningCertificate は証明書ストアの指定（オブジェクト）だが、本アプリは値そのもの（文字列）。CALENDARFEED_SAML_IDPCERTIFICATE",
+        "SigningCertificate": null
+      }
+    ],
+
+    "//UnknownUser": "本アプリに無い利用者が SAML で来たとき。Reject（既定）/ Register。CALENDARFEED_SAML_UNKNOWNUSER",
+    "UnknownUser": null,
+
+    "//RegisterRole": "Register のとき登録する役割。CALENDARFEED_SAML_REGISTERROLE",
+    "RegisterRole": null,
+
+    "//LoginIdSource": "ログイン ID を何から作るか（NameId / Claim）。CALENDARFEED_SAML_LOGINIDSOURCE",
+    "LoginIdSource": null,
+
+    "//LoginIdClaim": "LoginIdSource が Claim のときの属性名。CALENDARFEED_SAML_LOGINIDCLAIM",
+    "LoginIdClaim": null,
+
+    "//ButtonLabel": "ログイン画面のボタンの文言。CALENDARFEED_SAML_BUTTONLABEL",
+    "ButtonLabel": null
+  },
+
+  "PleasanterSsoParameters": {
+    "//Enabled": "Pleasanter のログインで管理画面へ入るか（本アプリと Pleasanter を同じホスト名に置く前提）。CALENDARFEED_PLEASANTERSSO_ENABLED",
+    "Enabled": null,
+
+    "//InternalBaseUrl": "本アプリのサーバから Pleasanter へ届く URL（クラスター内の Service でよい）。CALENDARFEED_PLEASANTERSSO_INTERNALBASEURL",
+    "InternalBaseUrl": null,
+
+    "//LoginUrl": "ブラウザが開く Pleasanter のログイン画面。CALENDARFEED_PLEASANTERSSO_LOGINURL",
+    "LoginUrl": null,
+
+    "//LogoutUrl": "ブラウザが開く Pleasanter のログアウト。CALENDARFEED_PLEASANTERSSO_LOGOUTURL",
+    "LogoutUrl": null,
+
+    "//CookieNames": "Pleasanter の認証 cookie の名前（配列。環境変数ではカンマ区切り）。CALENDARFEED_PLEASANTERSSO_COOKIENAMES",
+    "CookieNames": null,
+
+    "//AllowedDeptIds": "入れる Pleasanter の組織の ID（配列。環境変数ではカンマ区切り）。CALENDARFEED_PLEASANTERSSO_ALLOWEDDEPTIDS",
+    "AllowedDeptIds": null,
+
+    "//AllowedGroupIds": "入れる Pleasanter のグループの ID（配列。環境変数ではカンマ区切り）。CALENDARFEED_PLEASANTERSSO_ALLOWEDGROUPIDS",
+    "AllowedGroupIds": null,
+
+    "//UnknownUser": "本アプリに無い利用者が来たとき。Reject（既定）/ Register。CALENDARFEED_PLEASANTERSSO_UNKNOWNUSER",
+    "UnknownUser": null,
+
+    "//RegisterRole": "Register のとき登録する役割。CALENDARFEED_PLEASANTERSSO_REGISTERROLE",
+    "RegisterRole": null,
+
+    "//RevalidateMinutes": "ログイン済みの再検証の間隔（分。1〜60）。CALENDARFEED_PLEASANTERSSO_REVALIDATEMINUTES",
+    "RevalidateMinutes": null,
+
+    "//TimeoutSeconds": "Pleasanter への問い合わせのタイムアウト（秒。1〜30）。CALENDARFEED_PLEASANTERSSO_TIMEOUTSECONDS",
+    "TimeoutSeconds": null,
+
+    "//ButtonLabel": "ログイン画面のボタンの文言。CALENDARFEED_PLEASANTERSSO_BUTTONLABEL",
+    "ButtonLabel": null
+  }
+}

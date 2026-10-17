@@ -49,7 +49,8 @@ public static class CalDavEndpoints
         // RFC 6764: 利用者がドメインだけを入れたときの入口。/caldav/ へ転送する
         app.MapMethods("/.well-known/caldav", ["GET", "HEAD", "PROPFIND", "OPTIONS"], () => Results.Redirect(CalDavPaths.Root, permanent: true));
 
-        var filter = new SharedRateLimitFilter(RateLimitPolicy, 600, TimeSpan.FromMinutes(5));
+        // 回数と窓は RateLimit.json の Policies:CalDav（既定は IP ごとに 5 分に 600 回）
+        var filter = new SharedRateLimitFilter(RateLimitPolicy, FixedParameters.CalDav);
         app.MapMethods("/caldav", AllMethods, Handle).AddEndpointFilter(filter).ExcludeFromDescription();
         app.MapMethods("/caldav/{**path}", AllMethods, Handle).AddEndpointFilter(filter).ExcludeFromDescription();
     }
@@ -60,6 +61,7 @@ public static class CalDavEndpoints
         FeedService service,
         ICalDavStore store,
         CalDavWriteService writer,
+        FixedParameters limits,
         CancellationToken ct)
     {
         var method = http.Request.Method.ToUpperInvariant();
@@ -89,9 +91,9 @@ public static class CalDavEndpoints
         {
             return method switch
             {
-                "PROPFIND" => await PropfindAsync(http, target, credentials, feeds, service, store, ct),
-                "REPORT" => await ReportAsync(http, target, credentials, feeds, service, store, ct),
-                "PUT" => await PutAsync(http, target, credentials, feeds, writer, ct),
+                "PROPFIND" => await PropfindAsync(http, target, credentials, feeds, service, store, limits, ct),
+                "REPORT" => await ReportAsync(http, target, credentials, feeds, service, store, limits, ct),
+                "PUT" => await PutAsync(http, target, credentials, feeds, writer, limits, ct),
                 "DELETE" => await DeleteAsync(http, target, credentials, feeds, writer, ct),
                 _ => await GetAsync(target, credentials, feeds, service, store, ct),
             };
@@ -225,7 +227,7 @@ public static class CalDavEndpoints
 
     private static async Task<IResult> PutAsync(
         HttpContext http, CalDavTarget target, (string User, string ApiKey) credentials,
-        IFeedStore feeds, CalDavWriteService writer, CancellationToken ct)
+        IFeedStore feeds, CalDavWriteService writer, FixedParameters limits, CancellationToken ct)
     {
         if (target.Kind != CalDavKind.Event)
         {
@@ -238,7 +240,8 @@ public static class CalDavEndpoints
             return Results.NotFound();
         }
 
-        if (http.Request.ContentLength is > ICalReader.MaxLength)
+        var maxResource = limits.CalDavMaxResourceBytes;
+        if (http.Request.ContentLength is { } length && length > maxResource)
         {
             return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
         }
@@ -246,9 +249,9 @@ public static class CalDavEndpoints
         string body;
         using (var reader = new StreamReader(http.Request.Body, Encoding.UTF8, leaveOpen: true))
         {
-            var buffer = new char[ICalReader.MaxLength + 1];
+            var buffer = new char[maxResource + 1];
             var read = await reader.ReadBlockAsync(buffer.AsMemory(), ct);
-            if (read > ICalReader.MaxLength)
+            if (read > maxResource)
             {
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
             }
@@ -330,7 +333,7 @@ public static class CalDavEndpoints
 
     private static async Task<IResult> PropfindAsync(
         HttpContext http, CalDavTarget target, (string User, string ApiKey) credentials,
-        IFeedStore feeds, FeedService service, ICalDavStore store, CancellationToken ct)
+        IFeedStore feeds, FeedService service, ICalDavStore store, FixedParameters limits, CancellationToken ct)
     {
         var depth = http.Request.Headers["Depth"].ToString().Trim();
         if (depth.Equals("infinity", StringComparison.OrdinalIgnoreCase))
@@ -342,7 +345,7 @@ public static class CalDavEndpoints
         }
 
         var children = depth == "1";
-        var request = PropfindRequest.Parse(await ReadBodyAsync(http, ct));
+        var request = PropfindRequest.Parse(await ReadBodyAsync(http, limits.CalDavMaxXmlBodyBytes, ct), limits.CalDavMaxXmlBodyBytes);
         var multi = new MultiStatus();
 
         switch (target.Kind)
@@ -452,7 +455,7 @@ public static class CalDavEndpoints
 
     private static async Task<IResult> ReportAsync(
         HttpContext http, CalDavTarget target, (string User, string ApiKey) credentials,
-        IFeedStore feeds, FeedService service, ICalDavStore store, CancellationToken ct)
+        IFeedStore feeds, FeedService service, ICalDavStore store, FixedParameters limits, CancellationToken ct)
     {
         if (target.Kind != CalDavKind.Calendar)
         {
@@ -462,7 +465,7 @@ public static class CalDavEndpoints
         ReportRequest request;
         try
         {
-            request = ReportRequest.Parse(await ReadBodyAsync(http, ct));
+            request = ReportRequest.Parse(await ReadBodyAsync(http, limits.CalDavMaxXmlBodyBytes, ct), limits.CalDavMaxXmlBodyBytes);
         }
         catch (DavXmlException ex) when (ex.Message.StartsWith("Unsupported REPORT", StringComparison.Ordinal))
         {
@@ -639,17 +642,17 @@ public static class CalDavEndpoints
     private static IResult MultiStatusResult(MultiStatus multi) =>
         new CalDavResult(StatusCodes.Status207MultiStatus, multi.ToXml(), "application/xml; charset=utf-8");
 
-    private static async Task<string> ReadBodyAsync(HttpContext http, CancellationToken ct)
+    private static async Task<string> ReadBodyAsync(HttpContext http, int maxBytes, CancellationToken ct)
     {
-        if (http.Request.ContentLength is > DavXml.MaxBodyBytes)
+        if (http.Request.ContentLength is { } length && length > maxBytes)
         {
             throw new DavXmlException("The request body is too large.");
         }
 
         using var reader = new StreamReader(http.Request.Body, Encoding.UTF8, leaveOpen: true);
-        var buffer = new char[DavXml.MaxBodyBytes + 1];
+        var buffer = new char[maxBytes + 1];
         var read = await reader.ReadBlockAsync(buffer.AsMemory(), ct);
-        return read > DavXml.MaxBodyBytes ? throw new DavXmlException("The request body is too large.") : new string(buffer, 0, read);
+        return read > maxBytes ? throw new DavXmlException("The request body is too large.") : new string(buffer, 0, read);
     }
 
     /// <summary>状態・ヘッダ・本文を指定して返す。</summary>

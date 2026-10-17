@@ -1,0 +1,6 @@
+{
+  "//": "管理者のログイン済みセッション。Pleasanter の Session.json に倣った（キーは同じ RetentionPeriod）",
+
+  "//RetentionPeriod": "ログイン済みセッションの有効期間（分）。Pleasanter の Session.json の RetentionPeriod と同じ単位。範囲 1〜43200。環境変数 CALENDARFEED_SESSION_RETENTIONPERIOD",
+  "RetentionPeriod": 480
+}

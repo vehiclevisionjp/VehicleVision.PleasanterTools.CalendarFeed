@@ -13,12 +13,27 @@
   "//PasswordPolicies": "パスワードの条件を正規表現で足す（Pleasanter 本体の Security.json の PasswordPolicies と同じ書き方）。**部分一致**（全体一致は ^…$）。上から順に見て、最初に合わなかった条件の文言を返す。Languages の Language が空の文言は既定。**先読み・後方参照・原子グループは使えない**（後退戻りしない照合器で、時間の上限つきで動かす。使えない書き方は起動時に落とす）。例: [{ \"Enabled\": true, \"Regex\": \"[0-9]\", \"Languages\": [{ \"Language\": \"ja\", \"Body\": \"数字を含めてください。\" }, { \"Language\": \"en\", \"Body\": \"Include a digit.\" }] }]。環境変数で与えるときは PasswordPolicies__0__Regex のように書く",
   "PasswordPolicies": [],
 
-  "//SecretKey": "フィードごとの Pleasanter API キーと管理者の TOTP の共有鍵を DB へ暗号化して置くための鍵（AES-256-GCM。Base64・32 バイト）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_SECRET_KEY（デプロイ先の秘密の保管先）か Security.local.json で与える。`dotnet run -- --generate-secret-key` で作れる。**失うと保管した API キーと 2 要素は復号できない**（登録し直す）。**運用開始後に変えると、同じく復号できなくなる**",
+  "//SecretKey": "フィードごとの Pleasanter API キーと管理者の TOTP の共有鍵を DB へ暗号化して置くための鍵（AES-256-GCM。Base64・32 バイト）。**このファイルへ実値を書かないこと。** 環境変数 CALENDARFEED_SECRET_KEY（デプロイ先の秘密の保管先）か Security.local.json で与える。`dotnet run -- --generate-secret-key` で作れる（`--write` を付けると、すでに鍵が無いときだけ Security.local.json へ書く）。**失うと保管した API キーと 2 要素は復号できない**（登録し直す）。**運用開始後に変えると、同じく復号できなくなる**",
   "SecretKey": null,
 
   "//AuditLogRetentionDays": "監査ログ（管理者の操作・ログイン・失敗）を残す日数。これより古い記録を 6 時間ごとに消す。0 なら消さない（表は増え続ける）。法令・社内規程で期間が決まっているなら合わせる **この値は管理画面から編集できる**（既定値はコードにある）。**ここへ値を書くと外部設定として固定され、画面からは変えられない**（環境変数も同じ）。",
   "AuditLogRetentionDays": null,
 
   "//ForwardedProxyNetworks": "転送ヘッダ（X-Forwarded-For / -Proto / -Host）を信頼するリバースプロキシのネットワーク（カンマ区切りの CIDR。例: 10.0.0.0/8,192.0.2.10/32）。**未設定なら誰も信頼しない**。プロキシの背後で未設定だと、IP ごとのレート制限が全員で 1 つの枠になる。書いたネットワーク以外から届いたヘッダは無視する。CIDR でない値は起動時に落とす",
-  "ForwardedProxyNetworks": null
+  "ForwardedProxyNetworks": null,
+
+  "//LockoutCount": "管理者のパスワードを続けて何回失敗したら締め出すか。Pleasanter の LockoutCount に相当（Pleasanter は 0 で無効。本アプリは 1 以上のみ）。範囲 1〜100。環境変数 CALENDARFEED_LOCKOUT_COUNT",
+  "LockoutCount": 5,
+
+  "//LockoutPeriod": "締め出しの長さ（分）。**恒久的には締め出さない**（正規の利用者を狙って締め出す嫌がらせが成立するため）。範囲 1〜1440。環境変数 CALENDARFEED_LOCKOUT_PERIOD",
+  "LockoutPeriod": 15,
+
+  "//PendingAuthenticationPeriod": "パスワードは通ったが 2 要素がまだ、の段階の有効期間（秒）。この間は何も操作させない。Pleasanter の AuthenticationCodeExpirationPeriod に相当。範囲 30〜3600。環境変数 CALENDARFEED_PENDING_AUTHENTICATION_PERIOD",
+  "PendingAuthenticationPeriod": 300,
+
+  "//InvitationPeriod": "管理者の招待の有効期間（時間）。短すぎると届く前に切れ、長すぎると URL が残る。切れたら出し直す。範囲 1〜720。環境変数 CALENDARFEED_INVITATION_PERIOD",
+  "InvitationPeriod": 48,
+
+  "//StaleAfterDays": "管理者の棚卸しで「長期間使われていない」とみなす日数。範囲 1〜3650。環境変数 CALENDARFEED_STALE_AFTER_DAYS",
+  "StaleAfterDays": 90
 }

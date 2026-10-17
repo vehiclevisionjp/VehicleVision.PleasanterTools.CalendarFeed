@@ -70,12 +70,14 @@ public sealed class CalDavWriteService(
     ICalDavStore store,
     FeedService feeds,
     RuntimeSettings settings,
+    FixedParameters limits,
     TimeProvider time,
     ILogger<CalDavWriteService> logger)
 {
-    private static readonly TimeSpan LockLease = TimeSpan.FromSeconds(30);
-    private const int LockAttempts = 50;
+    // 排他の貸し出しの期間と待ちの上限は CalDav.json（WriteLockLeaseSeconds・WriteLockWaitSeconds）
     private static readonly TimeSpan LockInterval = TimeSpan.FromMilliseconds(100);
+    private TimeSpan LockLease => limits.CalDavWriteLockLease;
+    private int LockAttempts => Math.Max(1, (int)(limits.CalDavWriteLockWait / LockInterval));
 
     /// <summary>1 件の予定を作る・更新する。</summary>
     /// <param name="name">資源の名前（デコード済み。<c>.ics</c> つき）。</param>
@@ -93,7 +95,7 @@ public sealed class CalDavWriteService(
         ParsedEvent parsed;
         try
         {
-            parsed = ICalReader.ParseEvent(body);
+            parsed = ICalReader.ParseEvent(body, limits.CalDavMaxResourceBytes);
         }
         catch (ICalException ex)
         {

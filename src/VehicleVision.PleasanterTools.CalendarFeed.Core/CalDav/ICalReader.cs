@@ -57,15 +57,15 @@ public enum ICalProblem
 /// </remarks>
 public static class ICalReader
 {
-    /// <summary>1 つの資源の上限（文字数）。</summary>
+    /// <summary>1 つの資源の上限の既定（文字数）。<c>CalDav.json</c> の <c>MaxResourceKB</c> で変えられる。</summary>
     public const int MaxLength = 256 * 1024;
 
     private static readonly string[] Recurrence = ["RRULE", "RDATE", "EXRULE", "EXDATE", "RECURRENCE-ID"];
 
     /// <summary>VEVENT 1 つを読む。</summary>
-    public static ParsedEvent ParseEvent(string text)
+    public static ParsedEvent ParseEvent(string text, int maxLength = MaxLength)
     {
-        if (string.IsNullOrWhiteSpace(text) || text.Length > MaxLength)
+        if (string.IsNullOrWhiteSpace(text) || text.Length > maxLength)
         {
             throw new ICalException("The calendar data is empty or too large.", ICalProblem.InvalidData);
         }

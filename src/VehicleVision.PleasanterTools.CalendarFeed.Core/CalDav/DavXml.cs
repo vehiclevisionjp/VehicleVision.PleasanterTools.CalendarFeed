@@ -19,18 +19,18 @@ public static class DavXml
     /// <summary>Apple の拡張（<c>getctag</c>）。</summary>
     public static readonly XNamespace CS = "http://calendarserver.org/ns/";
 
-    /// <summary>要求本文の上限（バイト）。</summary>
+    /// <summary>要求本文の上限の既定（バイト）。<c>CalDav.json</c> の <c>MaxXmlBodyKB</c> で変えられる。</summary>
     public const int MaxBodyBytes = 64 * 1024;
 
     /// <summary>要求本文を読む。空なら <c>null</c>。DTD を含む・壊れている・大きすぎるときは <see cref="DavXmlException"/>。</summary>
-    public static XDocument? Parse(string body)
+    public static XDocument? Parse(string body, int maxBytes = MaxBodyBytes)
     {
         if (string.IsNullOrWhiteSpace(body))
         {
             return null;
         }
 
-        if (body.Length > MaxBodyBytes)
+        if (body.Length > maxBytes)
         {
             throw new DavXmlException("The request body is too large.");
         }
@@ -41,7 +41,7 @@ public static class DavXml
             {
                 DtdProcessing = DtdProcessing.Prohibit,
                 XmlResolver = null,
-                MaxCharactersInDocument = MaxBodyBytes,
+                MaxCharactersInDocument = maxBytes,
             };
             using var reader = XmlReader.Create(new StringReader(body), settings);
             return XDocument.Load(reader);
