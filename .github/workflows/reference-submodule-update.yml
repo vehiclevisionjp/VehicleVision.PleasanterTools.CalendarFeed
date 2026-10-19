@@ -18,12 +18,15 @@
 #   ヒアドキュメントが終端しない。Issue / PR の本文を扱う処理は
 #   `scripts/reference-submodule-*.sh` へ寄せてある。手元でも同じものを流せる。
 #
-# ⚠️ **この PR には CI が回らない。** GITHUB_TOKEN の push / PR 作成は、
-#    ワークフローの連鎖を防ぐ仕様で他のワークフローを起こさない（下記 GitHub Docs）。
-#    **確かめたいときは PR を close → reopen する**か、自分のコミットを 1 つ載せる。
-#    この案内は自動 PR の本文にも入れている。
-#
-# ⚠️ **scheduled workflow は既定ブランチ（develop）の内容でしか回らない。**
+# ■ **PR は GitHub App のトークンで作る**（`my-repo-automation-bot`）
+#   - `GITHUB_TOKEN` で作った PR・push は、ワークフローの連鎖を防ぐ仕様で他のワークフローを起こさず、
+#     **必須チェックが付かないのでマージできない。** App のトークンなら通常の CI が起動する
+#   - **リポジトリ設定「Actions に PR の作成と承認を許す」を有効にしなくても動く**
+#     （`GitHub Actions is not permitted to create or approve pull requests` で失敗していた）
+#   - **Issue の作成だけは `GITHUB_TOKEN`（`issues: write`）で行う。** App に Issues の権限を足さずに済む。
+#     App へ要求するのは contents と pull-requests だけ（`release-run.yml` と同じ）
+#   - 要るもの: 変数 `MY_REPO_AUTOMATION_BOT_CLIENT_ID`、シークレット `MY_REPO_AUTOMATION_BOT_PRIVATE_KEY`
+## ⚠️ **scheduled workflow は既定ブランチ（develop）の内容でしか回らない。**
 #    ここを直しても、develop へ入るまで日次の挙動は変わらない。
 #    **実行時刻はずれることがある**（GitHub 側の混雑で遅れる。定刻の保証は無い）。
 #
@@ -51,22 +54,28 @@ concurrency:
   # **走っているものを止めない。** PR を作る途中で切ると、ブランチだけ残る
   cancel-in-progress: false
 
+# **既定は読み取りだけ。** Issue の作成に要る権限は update ジョブ側で足す
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
 
 jobs:
   check:
     name: 上流の最新タグと突き合わせる
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      needs_update: ${{ steps.check.outputs.needs_update }}
+      latest_tag: ${{ steps.check.outputs.latest_tag }}
+      latest_sha: ${{ steps.check.outputs.latest_sha }}
+      current_tag: ${{ steps.check.outputs.current_tag }}
+      current_sha: ${{ steps.check.outputs.current_sha }}
     steps:
       - name: ソースを取得する
         uses: actions/checkout@v7
         with:
           # **サブモジュールは取らない。** 索引の gitlink だけを書き換える
           submodules: false
+          persist-credentials: false
 
       - name: 上流の最新リリースタグを調べる
         id: check
@@ -84,13 +93,54 @@ jobs:
             echo "- 固定位置: \`${CURRENT_TAG:-（タグ無し）}\` (\`$CURRENT_SHA\`)"
           } >>"$GITHUB_STEP_SUMMARY"
 
-      - name: ポインタを進めて Issue と PR を出す
-        if: steps.check.outputs.needs_update == 'true'
+  update:
+    name: GitHub App で更新 PR を作る
+    needs: check
+    if: needs.check.outputs.needs_update == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Issue の作成だけに使う（GITHUB_TOKEN）。App には Issues の権限を要求しない
+      contents: read
+      issues: write
+    steps:
+      - name: App の設定を確認する
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HAS_CLIENT_ID: ${{ vars.MY_REPO_AUTOMATION_BOT_CLIENT_ID != '' }}
+          HAS_PRIVATE_KEY: ${{ secrets.MY_REPO_AUTOMATION_BOT_PRIVATE_KEY != '' }}
+        run: |
+          if [ "$HAS_CLIENT_ID" != true ] || [ "$HAS_PRIVATE_KEY" != true ]; then
+            echo '::error::MY_REPO_AUTOMATION_BOT_CLIENT_ID と MY_REPO_AUTOMATION_BOT_PRIVATE_KEY を登録してください。'
+            exit 1
+          fi
+      - name: 短期の App トークンを発行する
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.MY_REPO_AUTOMATION_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.MY_REPO_AUTOMATION_BOT_PRIVATE_KEY }}
+          # ブランチの push に contents、PR の作成に pull-requests が要る。**それ以外は与えない**
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: false
+          # **App のトークンで取得する。** ここで入れたトークンが push にも使われ、
+          # push から通常の CI が起動する
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: ポインタを進めて Issue と Draft PR を作る
+        env:
+          # ブランチの push と PR の作成は App のトークン
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Issue の作成だけは GITHUB_TOKEN（App に Issues の権限を足さないため）
+          ISSUE_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
-          LATEST_TAG: ${{ steps.check.outputs.latest_tag }}
-          LATEST_SHA: ${{ steps.check.outputs.latest_sha }}
-          CURRENT_TAG: ${{ steps.check.outputs.current_tag }}
-          CURRENT_SHA: ${{ steps.check.outputs.current_sha }}
+          LATEST_TAG: ${{ needs.check.outputs.latest_tag }}
+          LATEST_SHA: ${{ needs.check.outputs.latest_sha }}
+          CURRENT_TAG: ${{ needs.check.outputs.current_tag }}
+          CURRENT_SHA: ${{ needs.check.outputs.current_sha }}
         run: bash ./scripts/reference-submodule-open-pr.sh
