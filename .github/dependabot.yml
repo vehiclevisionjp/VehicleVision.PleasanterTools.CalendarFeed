@@ -74,6 +74,22 @@ updates:
           - "typescript"
           - "sass"
 
+  # ---- 開発道具（npm。Markdown の検査に使う markdownlint） ---------------------
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    target-branch: develop
+    labels:
+      - "2-type:dependencies"
+      - "6-eco:npm"
+    commit-message:
+      prefix: npm の依存を更新する
+
   # ---- GitHub Actions ------------------------------------------------------
   - package-ecosystem: github-actions
     directory: /
