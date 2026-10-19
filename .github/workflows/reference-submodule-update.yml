@@ -1,5 +1,6 @@
-# 参照用サブモジュール `_reference/Implem.Pleasanter` の最新化を日次で検出し、
-# 遅れていれば Issue と Draft PR を出す。
+# 参照用サブモジュール `_reference/Implem.Pleasanter` が、上流の main の先頭より
+# 遅れていないかを日次で検出し、遅れていれば Issue と Draft PR を出す。
+# 開いている PR があれば、同じ PR へコミットを足して、ポインタを最新へ進める。
 #
 # ■ 何のためか
 #   このサブモジュールは API 仕様・スキーマ・挙動の**事実確認のための参照専用**
@@ -7,11 +8,18 @@
 #   食い違う。** 手作業に任せていた結果、気付いたときには 3 リリース分
 #   遅れていた（Questionnaire #181）ので、遅れに気付く仕掛けを置く。
 #
-# ■ **Dependabot は使えない**
-#   `package-ecosystem: gitsubmodule` は存在するが、**追えるのは追跡ブランチの
-#   最新コミットだけで、タグを見ない**（dependabot/dependabot-core#1639 /
-#   #2192、2026-09-11 参照）。本リポジトリはリリースタグへ固定する方針なので、
-#   未タグのコミットへ動かされると固定の意味が無くなる。
+# ■ **追従先は、上流の main の先頭**
+#   以前はリリースタグへ固定していたが、2026-10-19 に方針を変えた
+#   （リリース前の変更にも早く気付くため。`_reference/README.md`）。
+#   **main はリリース前の変更を含む。** 「どの版か」は、コミット SHA と <Version> で言う。
+#
+# ■ **Dependabot には置き換えていない**
+#   `package-ecosystem: gitsubmodule` は追跡ブランチの最新コミットを追うので、main 追従なら
+#   合う見込みはある。ただし、**2026-02 にタグの扱いが変わったばかり**（semver 形式のタグを
+#   優先する。dependabot/dependabot-core#1639）で、追従するブランチの決め方と、未マージの
+#   PR の更新の仕方が公式ドキュメントに書かれておらず、**動作を手元で確かめられない**
+#   （2026-10-19 参照）。確かめられる自作の仕組みを残している。
+#   **置き換えるなら、Dependabot の PR の挙動を実機で確かめてから。**
 #
 # ■ **判定と文面はスクリプト側に置く**
 #   `run: |` の中は行頭が字下げされるため、閉じの `EOF` が行頭に来ず、
@@ -26,7 +34,8 @@
 #   - **Issue の作成だけは `GITHUB_TOKEN`（`issues: write`）で行う。** App に Issues の権限を足さずに済む。
 #     App へ要求するのは contents と pull-requests だけ（`release-run.yml` と同じ）
 #   - 要るもの: 変数 `MY_REPO_AUTOMATION_BOT_CLIENT_ID`、シークレット `MY_REPO_AUTOMATION_BOT_PRIVATE_KEY`
-## ⚠️ **scheduled workflow は既定ブランチ（develop）の内容でしか回らない。**
+#
+# ⚠️ **scheduled workflow は既定ブランチ（develop）の内容でしか回らない。**
 #    ここを直しても、develop へ入るまで日次の挙動は変わらない。
 #    **実行時刻はずれることがある**（GitHub 側の混雑で遅れる。定刻の保証は無い）。
 #
@@ -60,12 +69,14 @@ permissions:
 
 jobs:
   check:
-    name: 上流の最新タグと突き合わせる
+    name: 上流の main と突き合わせる
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       needs_update: ${{ steps.check.outputs.needs_update }}
+      latest_ref: ${{ steps.check.outputs.latest_ref }}
       latest_tag: ${{ steps.check.outputs.latest_tag }}
+      latest_version: ${{ steps.check.outputs.latest_version }}
       latest_sha: ${{ steps.check.outputs.latest_sha }}
       current_tag: ${{ steps.check.outputs.current_tag }}
       current_sha: ${{ steps.check.outputs.current_sha }}
@@ -77,7 +88,7 @@ jobs:
           submodules: false
           persist-credentials: false
 
-      - name: 上流の最新リリースタグを調べる
+      - name: 上流の main の先頭を調べる
         id: check
         run: bash ./scripts/reference-submodule-check.sh
 
@@ -139,7 +150,9 @@ jobs:
           # Issue の作成だけは GITHUB_TOKEN（App に Issues の権限を足さないため）
           ISSUE_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          LATEST_REF: ${{ needs.check.outputs.latest_ref }}
           LATEST_TAG: ${{ needs.check.outputs.latest_tag }}
+          LATEST_VERSION: ${{ needs.check.outputs.latest_version }}
           LATEST_SHA: ${{ needs.check.outputs.latest_sha }}
           CURRENT_TAG: ${{ needs.check.outputs.current_tag }}
           CURRENT_SHA: ${{ needs.check.outputs.current_sha }}
