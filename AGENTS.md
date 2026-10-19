@@ -7,4 +7,3 @@ GitHub 上のエージェントは `.github/copilot-instructions.md`、Claude Co
 以下は同ファイルの「必ず守る規約」の写しです。作業前に参照元を必ず開いてください。**
 
 <!-- この節は .github/copilot-instructions.md から生成される。ここを直接編集しないこと。 -->
-
