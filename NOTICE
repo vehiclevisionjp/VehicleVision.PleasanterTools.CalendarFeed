@@ -26,6 +26,8 @@ Copyright (C) PMC Co.,Ltd.
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
   System.Security.Cryptography.Pkcs 10.0.13 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Pkcs
     （推移的依存の脆弱性 GHSA-846f-f764-76mx を避けるための直接参照。参照日 2026-10-14）
+  VehicleVision.PleasanterTools.Core.Mail 0.1.0-preview.2 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+    （メール送信の部品。MailKit・MimeKit・AWSSDK.SimpleEmailV2・Azure.Communication.Email・Azure.Identity などは、これが推移的に伴う）
   MailKit 4.18.1 / MIT / https://github.com/jstedfast/MailKit
     （招待メールの送信。Questionnaire の NOTICE と同じ依存・同じ版。**認証付きリレーの 587 番は Azure でブロックされない**ので、
       これ 1 本で SendGrid・Amazon SES・Azure Communication Services・Microsoft 365 へ送れる。参照日 2026-10-14）

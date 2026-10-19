@@ -1,14 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/VehicleVision.PleasanterTools.CalendarFeed.Core/VehicleVision.PleasanterTools.CalendarFeed.Core.csproj" />
-    <Project Path="src/VehicleVision.PleasanterTools.CalendarFeed.Mail/VehicleVision.PleasanterTools.CalendarFeed.Mail.csproj" />
     <Project Path="src/VehicleVision.PleasanterTools.CalendarFeed.Data/VehicleVision.PleasanterTools.CalendarFeed.Data.csproj" />
     <Project Path="src/VehicleVision.PleasanterTools.CalendarFeed.Pleasanter/VehicleVision.PleasanterTools.CalendarFeed.Pleasanter.csproj" />
     <Project Path="src/VehicleVision.PleasanterTools.CalendarFeed.Web/VehicleVision.PleasanterTools.CalendarFeed.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/VehicleVision.PleasanterTools.CalendarFeed.Core.Tests/VehicleVision.PleasanterTools.CalendarFeed.Core.Tests.csproj" />
-    <Project Path="tests/VehicleVision.PleasanterTools.CalendarFeed.Mail.Tests/VehicleVision.PleasanterTools.CalendarFeed.Mail.Tests.csproj" />
     <Project Path="tests/VehicleVision.PleasanterTools.CalendarFeed.Web.Tests/VehicleVision.PleasanterTools.CalendarFeed.Web.Tests.csproj" />
   </Folder>
 </Solution>

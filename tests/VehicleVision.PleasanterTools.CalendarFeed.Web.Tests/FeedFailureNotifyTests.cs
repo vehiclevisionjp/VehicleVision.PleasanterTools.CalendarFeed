@@ -42,7 +42,7 @@ public sealed class FeedFailureNotifyTests : IDisposable
     /// <summary>フィードを取得する（Pleasanter がどう答えるかは呼ぶ前に決める）。キャッシュを避けるため、毎回別のフィードの取得になるものは使わない。</summary>
     private async Task FetchAsync(string path) => await _app.Client().GetAsync(path);
 
-    private async Task<List<Mail.OutgoingMail>> DrainAsync()
+    private async Task<List<VehicleVision.PleasanterTools.Core.Mail.OutgoingMail>> DrainAsync()
     {
         var sender = _app.Service<MailSender>();
         while (await sender.SendOnceAsync() == SendOutcome.Sent)

@@ -70,7 +70,7 @@ public static class AdminUserEndpoints
         var mail = app.MapGroup("/admin/api/mail");
         mail.AddEndpointFilter<AdminSessionFilter>();
         mail.AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.OutboxRead));
-        mail.MapGet("/status", async (IMailOutbox outbox, VehicleVision.PleasanterTools.CalendarFeed.Mail.MailOptions options, CancellationToken ct) =>
+        mail.MapGet("/status", async (IMailOutbox outbox, VehicleVision.PleasanterTools.Core.Mail.MailOptions options, CancellationToken ct) =>
         {
             var status = await outbox.GetStatusAsync(ct);
             return Results.Ok(new
