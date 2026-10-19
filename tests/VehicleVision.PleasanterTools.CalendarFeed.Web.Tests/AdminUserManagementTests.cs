@@ -4,7 +4,7 @@ using System.Text.Json;
 using Dapper;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
-using VehicleVision.PleasanterTools.CalendarFeed.Mail;
+using VehicleVision.PleasanterTools.Core.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 

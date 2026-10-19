@@ -5,7 +5,7 @@ using System.Text;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
-using VehicleVision.PleasanterTools.CalendarFeed.Mail;
+using VehicleVision.PleasanterTools.Core.Mail;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
