@@ -18,6 +18,10 @@
 #   Dependabot などが出す PR には、許諾する著作者が居ない。
 #   **加えて Dependabot が起点の pull_request_target では GITHUB_TOKEN が
 #   読み取り専用に落とされる**ため、未署名の案内コメントはそもそも投げられない。
+#
+#   **参照サブモジュールの更新 PR を出す my-repo-automation-bot[bot] も同じ**
+#   （eference-submodule-update.yml）。中身はポインタ 1 つだけで、許諾する著作者が居ない。
+#   ⚠️ **一覧に入れ忘れると、更新のたびに CLA が落ちる。**
 
 name: CLA の確認
 
@@ -75,7 +79,7 @@ jobs:
           # ⚠️ **パターンは必ずクォートすること。** 素の dependabot[bot] は glob の
           # 文字クラスと解釈され、dependabott などにも当たる
           case "$AUTHOR" in
-            'dependabot[bot]' | 'github-actions[bot]')
+            'dependabot[bot]' | 'github-actions[bot]' | 'my-repo-automation-bot[bot]')
               echo 'signed=true' >> "$GITHUB_OUTPUT"
               echo "$AUTHOR は bot なので CLA の確認を省きます。"
               exit 0
