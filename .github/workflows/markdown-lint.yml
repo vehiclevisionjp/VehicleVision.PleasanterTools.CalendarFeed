@@ -1,0 +1,51 @@
+# Markdown の検査（markdownlint の API を直接使う。scripts/markdownlint.mjs）。
+#
+# 設定は .markdownlint-cli2.jsonc。手元でも `npm run lint:md`（検査）/ `npm run lint:md:fix`（自動修正）で同じものが動く。
+# CLI の markdownlint-cli2 は、glob の依存（micromatch → braces）に修正版の無い脆弱性があるため使わない
+# （GHSA-vfj7-8cjw-p6xm。2026-10-19 参照）。
+#
+# **必須ステータスチェックには登録していない。** 登録するなら、ジョブ名「Markdown の検査」を ruleset へ足すこと
+# （名前を変えると、必須チェックが「待ち続けるが永遠に来ない」状態になる）。
+name: Markdown の検査
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - develop
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  markdown-lint:
+    name: Markdown の検査
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          # サブモジュール（_reference）は検査の対象外。取らない
+          submodules: false
+          persist-credentials: false
+
+      - name: Node.js を用意する
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 依存を入れる
+        # package-lock.json のとおりに入れる。install スクリプトは走らせない
+        run: npm ci --ignore-scripts
+
+      - name: Markdown を検査する
+        run: npm run lint:md
