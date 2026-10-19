@@ -94,7 +94,8 @@ cd src/VehicleVision.PleasanterTools.CalendarFeed.Frontend
 npm ci && npm test && npm run build
 ```
 
-管理画面の画面の写しは [`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md)（[`tools/screenshots`](tools/screenshots/README.md) で撮り直せる）。
+管理画面の画面の写しは
+[`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md)（[`tools/screenshots`](tools/screenshots/README.md) で撮り直せる）。
 
 **実機（Pleasanter・Keycloak）での通し**は CI の「端から端まで通す試験」（`.github/workflows/e2e.yml`）で回す。手元でも
 `tools/pleasanter-testenv/sso_roundtrip.py`（Pleasanter のログイン）・`tools/saml-idp/e2e.py`（SAML）で通せる。

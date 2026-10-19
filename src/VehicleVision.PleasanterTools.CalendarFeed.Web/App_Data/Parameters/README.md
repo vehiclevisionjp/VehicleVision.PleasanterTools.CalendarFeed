@@ -16,13 +16,15 @@
 
 ## 管理画面から編集できる設定（Issue #40）
 
-**Questionnaire の「アプリケーション設定」と同じ方式。** 次の設定は DB（`AppSettings` 表）へ保管し、管理画面（`GET/PUT /admin/api/settings/`・権限 `settings.manage`＝Administrator のみ）から編集できる。
+**Questionnaire の「アプリケーション設定」と同じ方式。** 次の設定は DB（`AppSettings` 表）へ保管し、管理画面（`GET/PUT /admin/api/settings/`・権限
+`settings.manage`＝Administrator のみ）から編集できる。
 
 - **優先順位は 外部設定（このフォルダのファイル・環境変数）＞ DB ＞ 既定値。**
 - **外部設定に値があるものは「固定」**になり、画面からは変えられない（画面にも固定と出る）。**同梱のファイルは、画面から編集できる設定の値を `null` にしてある**（値を書くと固定される）。
   既定値はコードにある。運用で画面から変えさせたくない設定だけ、ここか環境変数に書く。
 - **保存したら、その台へはすぐ反映され、他の台へは 30 秒以内に反映される**（再起動は要らない）。
-- **秘密（SMTP パスワード・Pleasanter の共通 API キー）は暗号化して保管し**（`CALENDARFEED_SECRET_KEY`）、**画面へは返さない**（登録済みかどうかだけ）。保存するとき、空なら変えない。`null` なら消す。
+- **秘密（SMTP パスワード・Pleasanter の共通 API キー）は暗号化して保管し**（`CALENDARFEED_SECRET_KEY`）、**画面へは返さない**（登録済みかどうかだけ）。保存するとき、空なら変えない。
+  `null` なら消す。
   ⚠️ **秘密の鍵を失うと保管した秘密は復号できない**: 起動は止まらず、その設定は空として扱われ、画面で再入力を求める。
 - 変えた設定の**名前だけ**を監査ログへ残す（値・秘密は残さない）。
 
@@ -38,7 +40,8 @@
 
 **SAML・Pleasanter のログインの設定は、`Authentication.json` に書く**（Pleasanter 本体の `Authentication.json` の `SamlParameters`（`SPOptions`・`IdentityProviders`）に倣った階層）。
 環境変数 `CALENDARFEED_SAML_*` / `CALENDARFEED_PLEASANTERSSO_*` と同じ設定で、ファイルのキーとの対応は下の表のとおり。
-配列（`CookieNames`・`AllowedDeptIds`・`AllowedGroupIds`）は、環境変数ではカンマ区切り。複数行の証明書（`SigningCertificate`）は `Authentication.local.json` が書きやすい。
+配列（`CookieNames`・`AllowedDeptIds`・`AllowedGroupIds`）は、環境変数ではカンマ区切り。複数行の証明書（`SigningCertificate`）は
+`Authentication.local.json` が書きやすい。
 （以前の「正式名のキーを `Service.json` などへそのまま書く」書き方も、そのまま効く。）
 
 > **環境変数で指定できる設定は、すべてファイルでも指定できる**（新しい設定を足すときは、ファイルのキーへの写しも足す。`FileBackedSettingsTests` が突き合わせる。
@@ -151,13 +154,13 @@ dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web -- --gen
 > **`CALENDARFEED_SECRET_KEY` は環境変数で保持する**（Azure App Service のアプリケーション設定・Key Vault の参照など、
 > デプロイ先の秘密の保管先へ）。`Security.local.json` はローカル開発用。失うと保管した API キーを復号できないため、
 > コンテナやディスクが作り直されても残る場所に置く。
-
+>
 > ⚠️ **値が `null` や空のキーは無視する。** `ApiKey` は既定で `null`（ここへ書かせない）なので、
 > 写すと**環境変数で与えた API キーを空で塗り潰してしまう。**
-
+>
 > ⚠️ **平らなファイルの設定の環境変数は、`CALENDARFEED_*` の名前で与える**（`Pleasanter__BaseUrl` ではない。下の警告）。
 > **階層のファイル（`RateLimit.json`・`CalDav.json`）だけは、`__` が階層の標準の書き方**（`RateLimit__Policies__CalDav__Limit`）。
 > 環境変数を置く場所（systemd・IIS・Docker など）は [`導入-更新運用手順書.md`](../../../../_documents/導入-更新運用手順書.md) 4.2。
-
+>
 > ⚠️ **環境変数の名前を `Pleasanter__BaseUrl` のような .NET の階層形式で与えても効かない。**
 > 上表の `CALENDARFEED_*` を使う。
