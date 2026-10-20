@@ -20,18 +20,17 @@ public sealed class AdminStoreTests : IDisposable
         File.Delete(_sqlitePath);
     }
 
-    private DbConnectionFactory FactoryFor(DatabaseProvider provider) => new(
-        provider,
-        provider is DatabaseProvider.Sqlite
-            ? $"Data Source={_sqlitePath};Pooling=False"
-            : TestDatabases.ConnectionString(provider)!);
+    private string ConnectionStringFor(DatabaseProvider provider) =>
+        provider is DatabaseProvider.Sqlite ? $"Data Source={_sqlitePath};Pooling=False" : TestDatabases.ConnectionString(provider)!;
+
+    private DbConnectionFactory FactoryFor(DatabaseProvider provider) => new(provider, ConnectionStringFor(provider));
 
     /// <summary>ストアを用意する。**管理者の表は共有の DB なので、毎回空にする**（クラス内は直列に走る）。</summary>
     private async Task<(AdminUserStore Users, AdminSessionStore Sessions, DbConnectionFactory Factory)> SetUpAsync(
         DatabaseProvider provider)
     {
         var factory = FactoryFor(provider);
-        TestDatabases.Migrate(provider, factory.ConnectionString);
+        TestDatabases.Migrate(provider, ConnectionStringFor(provider));
         await using (var connection = factory.Create())
         {
             foreach (var table in new[] { "AdminRecoveryCodes", "AdminSessions", "AdminUsers", "AdminSetup" })

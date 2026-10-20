@@ -34,7 +34,7 @@ public static partial class ServerMessages
         [ServerMessageKeys.LastAdministrator] = "Dadurch gäbe es keinen aktiven Administrator (Administrator) mehr. Richten Sie zuerst einen weiteren Administrator ein.",
         [ServerMessageKeys.InvitationInvalid] = "Diese Einladung kann nicht verwendet werden (sie ist möglicherweise abgelaufen, bereits angenommen oder widerrufen worden). Bitten Sie den Administrator, der Sie eingeladen hat, sie erneut zu senden.",
         [ServerMessageKeys.SessionNotFound] = "Dieses Gerät wurde nicht gefunden.",
-        [ServerMessageKeys.AuditBeforeInvalid] = "Geben Sie before als Datum und Uhrzeit an (ISO 8601).",
+        [ServerMessageKeys.AuditOffsetInvalid] = "Geben Sie offset als Ganzzahl ab 0 an.",
         [ServerMessageKeys.ApiKeyNeedsSecretKey] = "Zum Speichern eines API-Schlüssels ist die Einstellung {0} erforderlich.",
         [ServerMessageKeys.ApiKeyRequired] = "Geben Sie ApiKey an (der für alle Feeds gemeinsame Standard-API-Schlüssel ist ebenfalls nicht festgelegt).",
         [ServerMessageKeys.SettingsValuesRequired] = "Geben Sie die zu ändernden Einstellungen in values an.",

@@ -62,8 +62,8 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connections, TimeP
                 invitation.InvitationId,
                 invitation.AdminUserId,
                 invitation.TokenHash,
-                ExpiresAt = DbTime.Format(invitation.ExpiresAt),
-                Now = DbTime.Format(time.GetUtcNow()),
+                ExpiresAt = DbTime.ForDb(invitation.ExpiresAt.UtcDateTime),
+                Now = DbTime.ForDb(time.GetUtcNow().UtcDateTime),
                 invitation.CreatedBy,
             },
             transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -80,8 +80,8 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connections, TimeP
         return row is null
             ? null
             : new AdminInvitation(
-                row.InvitationId, row.AdminUserId, row.TokenHash, DbTime.Parse(row.ExpiresAt)!.Value,
-                DbTime.Parse(row.UsedAt), DbTime.Parse(row.CreatedAt), row.CreatedBy);
+                row.InvitationId, row.AdminUserId, row.TokenHash, DbTime.AsUtc(row.ExpiresAt),
+                DbTime.AsUtc(row.UsedAt), DbTime.AsUtc(row.CreatedAt), row.CreatedBy);
     }
 
     public async Task<bool> TryConsumeAsync(string invitationId, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -89,7 +89,7 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connections, TimeP
         await using var connection = connections.Create();
         return await connection.ExecuteAsync(new CommandDefinition(
             Sql("UPDATE [AdminInvitations] SET [UsedAt] = @Now WHERE [InvitationId] = @InvitationId AND [UsedAt] IS NULL"),
-            new { InvitationId = invitationId, Now = DbTime.Format(now) },
+            new { InvitationId = invitationId, Now = DbTime.ForDb(now.UtcDateTime) },
             cancellationToken: cancellationToken)).ConfigureAwait(false) == 1;
     }
 
@@ -98,7 +98,7 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connections, TimeP
         await using var connection = connections.Create();
         return [.. await connection.QueryAsync<string>(new CommandDefinition(
             Sql("SELECT [AdminUserId] FROM [AdminInvitations] WHERE [UsedAt] IS NULL AND [ExpiresAt] > @Now"),
-            new { Now = DbTime.Format(now) }, cancellationToken: cancellationToken)).ConfigureAwait(false)];
+            new { Now = DbTime.ForDb(now.UtcDateTime) }, cancellationToken: cancellationToken)).ConfigureAwait(false)];
     }
 
     public async Task RevokeUnusedAsync(string adminUserId, CancellationToken cancellationToken = default)
@@ -117,11 +117,11 @@ public sealed class AdminInvitationStore(IDbConnectionFactory connections, TimeP
 
         public string TokenHash { get; set; } = "";
 
-        public string ExpiresAt { get; set; } = "";
+        public DateTime ExpiresAt { get; set; }
 
-        public string? UsedAt { get; set; }
+        public DateTime? UsedAt { get; set; }
 
-        public string? CreatedAt { get; set; }
+        public DateTime? CreatedAt { get; set; }
 
         public string? CreatedBy { get; set; }
     }

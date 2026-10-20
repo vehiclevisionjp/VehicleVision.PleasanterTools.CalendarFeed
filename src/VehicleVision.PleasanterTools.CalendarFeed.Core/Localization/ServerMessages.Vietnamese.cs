@@ -34,7 +34,7 @@ public static partial class ServerMessages
         [ServerMessageKeys.LastAdministrator] = "Thao tác này sẽ khiến không còn quản trị viên nào đang hoạt động (Administrator). Hãy chuẩn bị một quản trị viên khác trước.",
         [ServerMessageKeys.InvitationInvalid] = "Lời mời này không thể sử dụng (có thể đã hết hạn, đã được chấp nhận hoặc đã bị hủy). Hãy nhờ quản trị viên đã mời bạn gửi lại.",
         [ServerMessageKeys.SessionNotFound] = "Không tìm thấy thiết bị đó.",
-        [ServerMessageKeys.AuditBeforeInvalid] = "Hãy chỉ định before là ngày giờ (ISO 8601).",
+        [ServerMessageKeys.AuditOffsetInvalid] = "Hãy chỉ định offset là số nguyên từ 0 trở lên.",
         [ServerMessageKeys.ApiKeyNeedsSecretKey] = "Để lưu khóa API cần có thiết lập {0}.",
         [ServerMessageKeys.ApiKeyRequired] = "Hãy chỉ định ApiKey (khóa API mặc định dùng chung cho tất cả nguồn cấp cũng chưa được thiết lập).",
         [ServerMessageKeys.SettingsValuesRequired] = "Hãy chỉ định trong values các thiết lập cần thay đổi.",

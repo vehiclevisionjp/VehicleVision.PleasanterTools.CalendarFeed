@@ -19,7 +19,7 @@ public sealed class M0001_Feeds : Migration
             .WithColumn("MappingJson").AsString(int.MaxValue).NotNullable()
             .WithColumn("FiltersJson").AsString(int.MaxValue).NotNullable()
             .WithColumn("TokenHash").AsString(64).NotNullable()
-            .WithColumn("CreatedAt").AsString(40).NotNullable()
+            .WithColumn("CreatedAt").AsDateTime2().NotNullable()
             .WithColumn("IsRevoked").AsInt32().NotNullable().WithDefaultValue(0);
 
         Create.Index("IX_Feeds_TokenHash").OnTable("Feeds").OnColumn("TokenHash").Unique();

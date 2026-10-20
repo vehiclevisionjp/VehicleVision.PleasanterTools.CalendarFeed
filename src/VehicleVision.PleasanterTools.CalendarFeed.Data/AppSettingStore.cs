@@ -40,7 +40,7 @@ public sealed class AppSettingStore(IDbConnectionFactory connections) : IAppSett
             Sql("SELECT [SettingKey], [Value], [IsSecret], [UpdatedAt], [UpdatedBy] FROM [AppSettings]"),
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return [.. rows.Select(r => new AppSettingRecord(
-            r.SettingKey, r.Value, r.IsSecret != 0, DbTime.Parse(r.UpdatedAt) ?? DateTimeOffset.MinValue, r.UpdatedBy))];
+            r.SettingKey, r.Value, r.IsSecret != 0, DbTime.AsUtc(r.UpdatedAt) ?? DateTimeOffset.MinValue, r.UpdatedBy))];
     }
 
     public async Task SaveAsync(
@@ -57,7 +57,7 @@ public sealed class AppSettingStore(IDbConnectionFactory connections) : IAppSett
             SettingKey = settingKey,
             Value = value,
             IsSecret = isSecret ? 1 : 0,
-            UpdatedAt = DbTime.Format(now),
+            UpdatedAt = DbTime.ForDb(now.UtcDateTime),
             UpdatedBy = updatedByAdminUserId,
         };
 
@@ -88,7 +88,7 @@ public sealed class AppSettingStore(IDbConnectionFactory connections) : IAppSett
 
         public int IsSecret { get; set; }
 
-        public string? UpdatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
         public string? UpdatedBy { get; set; }
     }

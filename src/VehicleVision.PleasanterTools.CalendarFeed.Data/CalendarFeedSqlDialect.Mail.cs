@@ -1,10 +1,10 @@
+using static VehicleVision.PleasanterTools.Core.Data.SqlDialect;
+
 namespace VehicleVision.PleasanterTools.CalendarFeed.Data;
 
-public static partial class SqlDialect
+/// <summary>メール・管理者の確保で、RDBMS ごとに書き方が違う部分。</summary>
+public static partial class CalendarFeedSqlDialect
 {
-    /// <summary>RETURNING（または OUTPUT）で確保した行を返せる RDBMS か。MySQL だけ返せない。</summary>
-    public static bool SupportsReturning(DatabaseProvider provider) => provider is not DatabaseProvider.MySql;
-
     /// <summary>
     /// 送れる 1 通を <b>1 文で原子的に</b>確保する SQL。複数の送信ワーカーが同じ 1 通を取らない。
     /// 識別子は各 RDBMS の引用符で書いてある（<see cref="Format"/> を通さなくてよい）。

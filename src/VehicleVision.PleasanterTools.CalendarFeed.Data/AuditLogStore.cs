@@ -22,7 +22,7 @@ public sealed class AuditLogStore(IDbConnectionFactory connections) : IAuditLogS
             new
             {
                 Id = Guid.NewGuid().ToString("D"),
-                OccurredAt = DbTime.Format(entry.OccurredAt),
+                OccurredAt = DbTime.ForDb(entry.OccurredAt.UtcDateTime),
                 AdminUserId = AuditText.Safe(entry.AdminUserId, 36),
                 LoginId = AuditText.Safe(entry.LoginId, 100),
                 Action = AuditText.Safe(entry.Action, 64) ?? string.Empty,
@@ -41,12 +41,6 @@ public sealed class AuditLogStore(IDbConnectionFactory connections) : IAuditLogS
         var limit = Math.Clamp(query.Limit, 1, AuditLogQuery.MaxLimit);
         var where = new List<string>();
         var parameters = new DynamicParameters();
-        if (query.Before is { } before)
-        {
-            where.Add("[OccurredAt] < @Before");
-            parameters.Add("Before", DbTime.Format(before));
-        }
-
         if (!string.IsNullOrEmpty(query.AdminUserId))
         {
             where.Add("[AdminUserId] = @AdminUserId");
@@ -67,15 +61,20 @@ public sealed class AuditLogStore(IDbConnectionFactory connections) : IAuditLogS
         var sql = "SELECT [OccurredAt], [AdminUserId], [LoginId], [Action], [Succeeded], [TargetType], [TargetId], [Detail], [IpAddress] "
             + "FROM [AuditLogs]"
             + (where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : string.Empty)
-            + " ORDER BY [OccurredAt] DESC";
+            // **同じ秒の記録の並びを定める**（秒未満を切り捨てて持つので、時刻だけでは並びが定まらない）
+            + " ORDER BY [OccurredAt] DESC, [Id] DESC "
+            + SqlDialect.Page(connections.Provider);
+        ArgumentOutOfRangeException.ThrowIfNegative(query.Offset);
+        parameters.Add("Limit", limit);
+        parameters.Add("Offset", query.Offset);
 
         await using var connection = connections.Create();
         var rows = await connection.QueryAsync<Row>(new CommandDefinition(
-            SqlDialect.Limit(connections.Provider, Sql(sql), limit), parameters, cancellationToken: cancellationToken))
+            Sql(sql), parameters, cancellationToken: cancellationToken))
             .ConfigureAwait(false);
 
         return [.. rows.Select(r => new AuditEntry(
-            DbTime.Parse(r.OccurredAt)!.Value, r.Action, r.Succeeded != 0,
+            DbTime.AsUtc(r.OccurredAt), r.Action, r.Succeeded != 0,
             r.AdminUserId, r.LoginId, r.TargetType, r.TargetId, r.Detail, r.IpAddress))];
     }
 
@@ -84,13 +83,13 @@ public sealed class AuditLogStore(IDbConnectionFactory connections) : IAuditLogS
         await using var connection = connections.Create();
         return await connection.ExecuteAsync(new CommandDefinition(
             Sql("DELETE FROM [AuditLogs] WHERE [OccurredAt] < @Threshold"),
-            new { Threshold = DbTime.Format(threshold) },
+            new { Threshold = DbTime.ForDb(threshold.UtcDateTime) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     private sealed class Row
     {
-        public string OccurredAt { get; set; } = string.Empty;
+        public DateTime OccurredAt { get; set; }
         public string? AdminUserId { get; set; }
         public string? LoginId { get; set; }
         public string Action { get; set; } = string.Empty;

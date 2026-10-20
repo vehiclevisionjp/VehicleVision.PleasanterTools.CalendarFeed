@@ -39,10 +39,9 @@ public sealed class InvitationAndMailStoreTests : IDisposable
 
     private async Task<Stores> SetUpAsync(DatabaseProvider provider)
     {
-        var factory = new DbConnectionFactory(
-            provider,
-            provider is DatabaseProvider.Sqlite ? $"Data Source={_sqlitePath};Pooling=False" : TestDatabases.ConnectionString(provider)!);
-        TestDatabases.Migrate(provider, factory.ConnectionString);
+        var connectionString = provider is DatabaseProvider.Sqlite ? $"Data Source={_sqlitePath};Pooling=False" : TestDatabases.ConnectionString(provider)!;
+        var factory = new DbConnectionFactory(provider, connectionString);
+        TestDatabases.Migrate(provider, connectionString);
         await using (var connection = factory.Create())
         {
             foreach (var table in new[] { "AdminInvitations", "MailOutbox", "AdminRecoveryCodes", "AdminSessions", "AdminUsers", "AdminSetup" })

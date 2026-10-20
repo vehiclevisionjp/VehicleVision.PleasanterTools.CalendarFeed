@@ -22,10 +22,9 @@ public sealed class AuditLogAndFeedFetchStoreTests : IDisposable
 
     private async Task<(AuditLogStore Audit, FeedStore Feeds)> SetUpAsync(DatabaseProvider provider)
     {
-        var factory = new DbConnectionFactory(
-            provider,
-            provider is DatabaseProvider.Sqlite ? $"Data Source={_sqlitePath};Pooling=False" : TestDatabases.ConnectionString(provider)!);
-        TestDatabases.Migrate(provider, factory.ConnectionString);
+        var connectionString = provider is DatabaseProvider.Sqlite ? $"Data Source={_sqlitePath};Pooling=False" : TestDatabases.ConnectionString(provider)!;
+        var factory = new DbConnectionFactory(provider, connectionString);
+        TestDatabases.Migrate(provider, connectionString);
         await using (var connection = factory.Create())
         {
             foreach (var table in new[] { "AuditLogs", "Feeds" })
@@ -63,9 +62,9 @@ public sealed class AuditLogAndFeedFetchStoreTests : IDisposable
         Assert.All(await audit.ListAsync(new AuditLogQuery { AdminUserId = "user-a" }), e => Assert.Equal("user-a", e.AdminUserId));
         Assert.Equal(8, (await audit.ListAsync(new AuditLogQuery { Action = AuditActions.LoginSucceeded })).Count);
 
-        // ページ送り: 前のページの最後の時刻より前
+        // ページ送り: 前のページまでに読んだ件数だけ読み飛ばす（時刻で区切ると、同じ秒の記録を取りこぼす）
         var page1 = await audit.ListAsync(new AuditLogQuery { Limit = 5 });
-        var page2 = await audit.ListAsync(new AuditLogQuery { Limit = 5, Before = page1[^1].OccurredAt });
+        var page2 = await audit.ListAsync(new AuditLogQuery { Limit = 5, Offset = page1.Count });
         Assert.Equal(["id6", "id5", "id4", "id3", "id2"], page2.Select(e => e.LoginId));
 
         // 掃除: 指定より古いものだけ
@@ -95,19 +94,5 @@ public sealed class AuditLogAndFeedFetchStoreTests : IDisposable
         Assert.Null(failed.EventCount);
         Assert.DoesNotContain('\n', failed.Message!);
         Assert.Equal(500, failed.Message!.Length);
-    }
-
-    // ---- 方言 ------------------------------------------------------------------------
-
-    [Fact]
-    public void 件数の上限はSQLServerだけOFFSET_FETCHで書く()
-    {
-        Assert.EndsWith("OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY", SqlDialect.Limit(DatabaseProvider.SqlServer, "SELECT 1 ORDER BY 1", 5), StringComparison.Ordinal);
-        foreach (var provider in new[] { DatabaseProvider.Sqlite, DatabaseProvider.PostgreSql, DatabaseProvider.MySql })
-        {
-            Assert.EndsWith("LIMIT 5", SqlDialect.Limit(provider, "SELECT 1 ORDER BY 1", 5), StringComparison.Ordinal);
-        }
-
-        Assert.Throws<ArgumentOutOfRangeException>(() => SqlDialect.Limit(DatabaseProvider.Sqlite, "SELECT 1", 0));
     }
 }

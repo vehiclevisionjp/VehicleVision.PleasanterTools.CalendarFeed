@@ -19,7 +19,7 @@ public sealed class M0007_AppSettings : Migration
             .WithColumn("SettingKey").AsString(256).NotNullable().PrimaryKey()
             .WithColumn("Value").AsString(int.MaxValue).NotNullable()
             .WithColumn("IsSecret").AsInt32().NotNullable()
-            .WithColumn("UpdatedAt").AsString(32).NotNullable()
+            .WithColumn("UpdatedAt").AsDateTime2().NotNullable()
             .WithColumn("UpdatedBy").AsString(36).Nullable();
 
         // M0001 と同じ理由（MySQL は NVARCHAR が utf8mb3 になる）。表ごと utf8mb4 へ直す
