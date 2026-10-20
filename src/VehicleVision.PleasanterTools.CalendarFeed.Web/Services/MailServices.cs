@@ -262,7 +262,7 @@ public sealed class MailSenderHostedService(
                 // 確保したまま落ちた行を戻す。ワーカーが落ちてもメールは失われない
                 if (time.GetUtcNow() >= nextRelease)
                 {
-                    var released = await outbox.ReleaseExpiredLocksAsync(time.GetUtcNow(), stoppingToken).ConfigureAwait(false);
+                    var released = await outbox.ReleaseExpiredLocksAsync(stoppingToken).ConfigureAwait(false);
                     if (released > 0)
                     {
                         logger.LogWarning("期限切れの確保を {Count} 件解放しました（メール）", released);
@@ -366,7 +366,7 @@ public sealed class AdminInvitationMailer(
                 string.Format(CultureInfo.InvariantCulture, texts.Body, url, expiresAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
 
             // ここで初めて暗号化する。招待の URL が平文で DB に載る経路を作らない
-            return await outbox.EnqueueAsync(MailIdOf(token), (int)MailKind.AdminInvitation, protector.Protect(mail), cancellationToken).ConfigureAwait(false);
+            return await outbox.EnqueueAsync(MailIdOf(token), (int)MailKind.AdminInvitation, subjectId: null, protector.Protect(mail), cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -380,8 +380,8 @@ public sealed class AdminInvitationMailer(
     /// トークンから、送信待ちの識別子を決める。⚠️ **トークンそのものを識別子にしない**
     /// （送信待ちの行は管理画面から見える所にあり、招待の URL はそれだけで管理者になれる値）。出し直すたびに変わる。
     /// </summary>
-    public static string MailIdOf(string token) =>
-        new Guid(SHA256.HashData(Encoding.UTF8.GetBytes("invitation:" + token)).AsSpan(0, 16)).ToString("D");
+    public static Guid MailIdOf(string token) =>
+        new(SHA256.HashData(Encoding.UTF8.GetBytes("invitation:" + token)).AsSpan(0, 16));
 }
 
 /// <summary>招待メールの文面（7 言語）。平文で送る。</summary>

@@ -297,7 +297,7 @@ public sealed class AdminUserManagementTests : IDisposable
         // 受け取って入れば（ログインとして記録される）、片方は外せる
         Assert.Equal(HttpStatusCode.OK, (await AcceptAsync(_app.Client(), token)).StatusCode);
         Assert.Equal(AdminChangeResult.Updated, await store.SetDisabledAsync(only.Id, true));
-        Assert.Equal(AdminChangeResult.LastAdministrator, await store.SetDisabledAsync(secondId, true));
+        Assert.Equal(AdminChangeResult.LastAdministrator, await store.SetDisabledAsync(Guid.Parse(secondId), true));
     }
 
     [Fact]
@@ -452,7 +452,7 @@ public sealed class AdminInvitationMailTests : IDisposable
     {
         await using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_app.DbPath};Pooling=False");
         await connection.OpenAsync();
-        return string.Join('|', await connection.QueryAsync<string>("SELECT PayloadProtected FROM MailOutbox"));
+        return string.Join('|', await connection.QueryAsync<string>("SELECT PayloadProtected FROM Core_MailOutbox"));
     }
 
     [Fact]
@@ -549,7 +549,7 @@ public sealed class AdminInvitationMailTests : IDisposable
         await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_app.DbPath};Pooling=False"))
         {
             await connection.OpenAsync();
-            await connection.ExecuteAsync("UPDATE MailOutbox SET PayloadProtected = 'broken'");
+            await connection.ExecuteAsync("UPDATE Core_MailOutbox SET PayloadProtected = 'broken'");
         }
 
         Assert.Equal(SendOutcome.DeadLettered, await _app.Service<MailSender>().SendOnceAsync());

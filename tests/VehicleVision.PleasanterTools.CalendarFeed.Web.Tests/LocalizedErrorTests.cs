@@ -67,8 +67,8 @@ public sealed class LocalizedErrorTests : IDisposable
     [Fact]
     public async Task 権限が無いときの文言も_言語ごとに返る()
     {
-        var bob = (await _app.Service<Admin.IAdminUserStore>().CreateAsync(
-            "auditor@example.com", Security.PasswordHasher.Hash("correct horse battery staple"), Admin.AdminRoles.Auditor, "ja", _app.Time.Now))!;
+        var bob = (await _app.Service<IAdminUserStore>().CreateAsync(
+            "auditor@example.com", Security.PasswordHasher.Hash("correct horse battery staple"), Admin.AdminRoles.Auditor, "ja"))!;
         var client = _app.Client();
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/admin/api/login", new { loginId = bob.LoginId, password = "correct horse battery staple" })).StatusCode);
 

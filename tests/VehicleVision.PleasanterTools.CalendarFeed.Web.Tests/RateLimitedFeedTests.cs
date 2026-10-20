@@ -67,7 +67,7 @@ public sealed class RateLimitedFeedTests : IDisposable
     public async Task 失敗の通知のメールに_上限に達したことと対処が出る()
     {
         await _app.AdminClient().PutAsJsonAsync("/admin/api/settings/", new { values = new Dictionary<string, string?> { ["CALENDARFEED_FEED_FAILURENOTIFY"] = "true" } });
-        await _app.Service<IAdminUserStore>().CreateAsync("editor@example.com", PasswordHasher.Hash("x-unknowable-password"), AdminRoles.FeedAdministrator, "en", _app.Time.Now);
+        await _app.Service<IAdminUserStore>().CreateAsync("editor@example.com", PasswordHasher.Hash("x-unknowable-password"), AdminRoles.FeedAdministrator, "en");
         var (path, _) = await _app.CreateFeedAsync();
         _app.Pleasanter.StatusCode = HttpStatusCode.TooManyRequests;
 

@@ -3,7 +3,7 @@ using VehicleVision.PleasanterTools.CalendarFeed.Data;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Core.Tests;
 
-/// <summary>複数台で動かしたときの前提（Issue #49）: レート制限の数えの共有と、マイグレーションの排他（4 種の RDBMS）。</summary>
+/// <summary>複数台で動かしたときの前提（Issue #49）: マイグレーションの排他（レート制限の数えは Core.Data のストアになり、Core のテストが見る）（4 種の RDBMS）。</summary>
 [Collection(TestDatabases.CollectionName)]
 public sealed class MultiInstanceTests : IDisposable
 {
@@ -19,66 +19,6 @@ public sealed class MultiInstanceTests : IDisposable
         provider is DatabaseProvider.Sqlite ? $"Data Source={_sqlitePath};Pooling=False" : TestDatabases.ConnectionString(provider)!;
 
     private DbConnectionFactory FactoryFor(DatabaseProvider provider) => new(provider, ConnectionStringFor(provider));
-
-    private async Task<RateLimitStore> StoreAsync(DatabaseProvider provider)
-    {
-        var factory = FactoryFor(provider);
-        TestDatabases.Migrate(provider, ConnectionStringFor(provider));
-        await using (var connection = factory.Create())
-        {
-            await connection.ExecuteAsync(SqlDialect.Format(provider, "DELETE FROM [RateLimits]"));
-        }
-
-        return new RateLimitStore(factory);
-    }
-
-    [Theory]
-    [EnabledDatabases]
-    public async Task 同じ窓では数えが増え_窓が変わったら1に戻る(DatabaseProvider provider)
-    {
-        var store = await StoreAsync(provider);
-
-        Assert.Equal(1, await store.HitAsync("adminLogin:203.0.113.1", 1000));
-        Assert.Equal(2, await store.HitAsync("adminLogin:203.0.113.1", 1000));
-        Assert.Equal(3, await store.HitAsync("adminLogin:203.0.113.1", 1000));
-
-        // 別の鍵は別に数える
-        Assert.Equal(1, await store.HitAsync("adminLogin:203.0.113.2", 1000));
-
-        // 次の窓では 1 に戻る
-        Assert.Equal(1, await store.HitAsync("adminLogin:203.0.113.1", 1300));
-        Assert.Equal(2, await store.HitAsync("adminLogin:203.0.113.1", 1300));
-    }
-
-    [Theory]
-    [EnabledDatabases]
-    public async Task 同時に数えても数えこぼさない_台をまたいだ同時の更新を真似る(DatabaseProvider provider)
-    {
-        var store = await StoreAsync(provider);
-
-        // 別々のストア（別の台）から、同じ鍵へ同時に 30 回
-        var stores = Enumerable.Range(0, 3).Select(_ => new RateLimitStore(FactoryFor(provider))).ToArray();
-        var counts = await Task.WhenAll(Enumerable.Range(0, 30).Select(i => Task.Run(() => stores[i % 3].HitAsync("race", 5000))));
-
-        // 1 から 30 まで、重複も欠けもなく数えられている（初回の INSERT の競合も取りこぼさない）
-        Assert.Equal(Enumerable.Range(1, 30), counts.Order());
-        Assert.Equal(31, await store.HitAsync("race", 5000));
-    }
-
-    [Theory]
-    [EnabledDatabases]
-    public async Task 古い窓の行だけを消す(DatabaseProvider provider)
-    {
-        var store = await StoreAsync(provider);
-        await store.HitAsync("old", 100);
-        await store.HitAsync("new", 9000);
-
-        Assert.Equal(1, await store.PurgeAsync(5000));
-
-        // 消えたものは、また 1 から数える
-        Assert.Equal(1, await store.HitAsync("old", 100));
-        Assert.Equal(2, await store.HitAsync("new", 9000));
-    }
 
     [Theory]
     [EnabledDatabases]

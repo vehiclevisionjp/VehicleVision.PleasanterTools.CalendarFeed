@@ -1,6 +1,7 @@
 using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
+using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
@@ -105,7 +106,7 @@ public static class AdminAuthEndpoints
 
         // **管理者が 1 人も居ないときだけ通る**（原子的に 1 回だけ）。既定のパスワードを仕込むより、空の状態から作らせる
         var admin = await users.CreateFirstAsync(
-            request.LoginId!, PasswordHasher.Hash(request.Password!), request.Language ?? "ja", ct);
+            request.LoginId!, PasswordHasher.Hash(request.Password!), FeedLanguages.Normalize(request.Language ?? "ja"), ct);
         if (admin is null)
         {
             return ApiError.Of(StatusCodes.Status409Conflict, ServerMessageKeys.AdministratorAlreadyExists);
@@ -155,7 +156,7 @@ public static class AdminAuthEndpoints
 
         if (!verified)
         {
-            var failure = await users.RecordFailureAsync(user.Id, options.LockoutThreshold, options.Lockout, now, ct);
+            var failure = await users.RecordFailureAsync(user.Id, options.LockoutThreshold, options.Lockout, ct);
             await audit.WriteAsync(http, AuditActions.LoginFailed, false, user, detail: "bad-password");
             if (failure.LockedUntil is not null)
             {
@@ -175,7 +176,7 @@ public static class AdminAuthEndpoints
         // 前のセッションがあれば捨てる（ログインし直したら、前の cookie は使えない）
         await DropExistingAsync(http, sessions, ct);
 
-        return Results.Ok(new { step = await SignInAsync(http, sessions, users, user, options, audit, now, ct) });
+        return Results.Ok(new { step = await SignInAsync(http, sessions, users, user, options, audit, ct) });
     }
 
     /// <summary>
@@ -190,7 +191,6 @@ public static class AdminAuthEndpoints
         AdminUser user,
         AdminAuthOptions options,
         AuditLogService audit,
-        DateTimeOffset now,
         CancellationToken ct,
         SessionSso? sso = null)
     {
@@ -199,14 +199,14 @@ public static class AdminAuthEndpoints
         if (needsSecondFactor || mustEnroll)
         {
             var pending = await sessions.CreateAsync(
-                user.Id, AdminSessionKind.Pending, options.PendingLifetime, now, ct, Ip(http), UserAgentOf(http), sso);
+                user.Id, AdminSessionKinds.Pending, options.PendingLifetime, ct, Ip(http), UserAgentOf(http), sso);
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.SessionCookie);
             AdminSessionGuard.SetCookie(http, AdminSessionGuard.PendingCookie, pending, options.PendingLifetime);
             return needsSecondFactor ? "totp" : "enroll";
         }
 
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, sso);
+        await StartSessionAsync(http, sessions, users, user, options, audit, ct, sso);
         return "done";
     }
 
@@ -222,7 +222,7 @@ public static class AdminAuthEndpoints
         CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        if (await ResolvePendingAsync(http, sessions, users, now, ct) is not { } pending)
+        if (await ResolvePendingAsync(http, sessions, users, ct) is not { } pending)
         {
             return Unauthorized();
         }
@@ -258,7 +258,7 @@ public static class AdminAuthEndpoints
             || !await users.TryUseTotpStepAsync(user.Id, step, ct))
         {
             // 同じ時間枠の数字は二度通さない（盗み見られた数字がそのまま使えてしまう）
-            await RecordFailureAndMaybeDropAsync(http, sessions, users, options, audit, AuditActions.LoginTotpFailed, user, pendingId, now, ct);
+            await RecordFailureAndMaybeDropAsync(http, sessions, users, options, audit, AuditActions.LoginTotpFailed, user, pendingId, ct);
             return Unauthorized();
         }
 
@@ -266,7 +266,7 @@ public static class AdminAuthEndpoints
         var sso = await sessions.GetSsoAsync(pendingId, ct);
         await sessions.DeleteAsync(pendingId, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, sso);
+        await StartSessionAsync(http, sessions, users, user, options, audit, ct, sso);
         return Results.Ok(new { step = "done" });
     }
 
@@ -282,7 +282,7 @@ public static class AdminAuthEndpoints
         CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        if (await ResolvePendingAsync(http, sessions, users, now, ct) is not { } pending)
+        if (await ResolvePendingAsync(http, sessions, users, ct) is not { } pending)
         {
             return Unauthorized();
         }
@@ -295,9 +295,9 @@ public static class AdminAuthEndpoints
 
         // **復旧コードは使い切り**（使用済みの印を条件に含めた UPDATE の件数で判断する）
         if (string.IsNullOrWhiteSpace(request.Code)
-            || !await users.TryUseRecoveryCodeAsync(user.Id, RecoveryCodes.Hash(request.Code), now, ct))
+            || !await users.TryUseRecoveryCodeAsync(user.Id, RecoveryCodes.Hash(request.Code), ct))
         {
-            await RecordFailureAndMaybeDropAsync(http, sessions, users, options, audit, AuditActions.LoginRecoveryFailed, user, pendingId, now, ct);
+            await RecordFailureAndMaybeDropAsync(http, sessions, users, options, audit, AuditActions.LoginRecoveryFailed, user, pendingId, ct);
             return Unauthorized();
         }
 
@@ -307,7 +307,7 @@ public static class AdminAuthEndpoints
         var sso = await sessions.GetSsoAsync(pendingId, ct);
         await sessions.DeleteAsync(pendingId, ct);
         AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-        await StartSessionAsync(http, sessions, users, user, options, audit, now, ct, sso);
+        await StartSessionAsync(http, sessions, users, user, options, audit, ct, sso);
         return Results.Ok(new { step = "done", recoveryCodesLeft = await users.CountRecoveryCodesAsync(user.Id, ct) });
     }
 
@@ -317,7 +317,7 @@ public static class AdminAuthEndpoints
         // ログイン済みの端末からのときだけ、誰が出たかを残す（cookie が無い・切れていれば何も残さない）
         if (http.Request.Cookies.TryGetValue(AdminSessionGuard.SessionCookie, out var sessionId)
             && !string.IsNullOrEmpty(sessionId)
-            && await sessions.FindAsync(sessionId, time.GetUtcNow(), ct) is { Kind: AdminSessionKind.Session } session
+            && await sessions.FindAsync(sessionId, ct) is { Kind: AdminSessionKinds.Session } session
             && await users.FindByIdAsync(session.UserId, ct) is { } who)
         {
             await audit.WriteAsync(http, AuditActions.Logout, true, who);
@@ -375,7 +375,7 @@ public static class AdminAuthEndpoints
         {
             if (found is not null)
             {
-                await users.RecordFailureAsync(admin.User.Id, options.LockoutThreshold, options.Lockout, now, ct);
+                await users.RecordFailureAsync(admin.User.Id, options.LockoutThreshold, options.Lockout, ct);
             }
 
             await audit.WriteAsync(http, AuditActions.PasswordChangeFailed, false, admin.User, detail: "bad-current-password");
@@ -412,7 +412,7 @@ public static class AdminAuthEndpoints
             return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.TwoFactorDisabled);
         }
 
-        if (await ResolveForEnrollmentAsync(http, sessions, users, options, time.GetUtcNow(), ct) is not { } who)
+        if (await ResolveForEnrollmentAsync(http, sessions, users, options, ct) is not { } who)
         {
             return ApiError.Of(StatusCodes.Status401Unauthorized, ServerMessageKeys.LoginRequired);
         }
@@ -438,7 +438,7 @@ public static class AdminAuthEndpoints
             return ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.TwoFactorDisabled);
         }
 
-        if (await ResolveForEnrollmentAsync(http, sessions, users, options, now, ct) is not { } who)
+        if (await ResolveForEnrollmentAsync(http, sessions, users, options, ct) is not { } who)
         {
             return ApiError.Of(StatusCodes.Status401Unauthorized, ServerMessageKeys.LoginRequired);
         }
@@ -450,7 +450,7 @@ public static class AdminAuthEndpoints
 
         if (!TotpService.Verify(secret, request.Code ?? "", now.UtcDateTime, out var step))
         {
-            await users.RecordFailureAsync(who.User.Id, options.LockoutThreshold, options.Lockout, now, ct);
+            await users.RecordFailureAsync(who.User.Id, options.LockoutThreshold, options.Lockout, ct);
             await audit.WriteAsync(http, AuditActions.TotpEnrollFailed, false, who.User);
             return BadKey(ServerMessageKeys.TotpCodeMismatch);
         }
@@ -461,12 +461,12 @@ public static class AdminAuthEndpoints
         await audit.WriteAsync(http, AuditActions.TotpEnrolled, true, who.User);
 
         // 「必須で未登録」の途中（Pending）から来た人は、ここでログインが完了する
-        if (who.Kind == AdminSessionKind.Pending)
+        if (who.Kind == AdminSessionKinds.Pending)
         {
             var sso = await sessions.GetSsoAsync(who.SessionId, ct);
             await sessions.DeleteAsync(who.SessionId, ct);
             AdminSessionGuard.ClearCookie(http, AdminSessionGuard.PendingCookie);
-            await StartSessionAsync(http, sessions, users, who.User, options, audit, now, ct, sso);
+            await StartSessionAsync(http, sessions, users, who.User, options, audit, ct, sso);
         }
 
         return Results.Ok(new { recoveryCodes = codes });
@@ -498,7 +498,7 @@ public static class AdminAuthEndpoints
         {
             if (found is not null)
             {
-                await users.RecordFailureAsync(admin.User.Id, options.LockoutThreshold, options.Lockout, now, ct);
+                await users.RecordFailureAsync(admin.User.Id, options.LockoutThreshold, options.Lockout, ct);
             }
 
             await audit.WriteAsync(http, AuditActions.TotpDisableFailed, false, admin.User, detail: "bad-password");
@@ -520,15 +520,14 @@ public static class AdminAuthEndpoints
         AdminUser user,
         AdminAuthOptions options,
         AuditLogService audit,
-        DateTimeOffset now,
         CancellationToken ct,
         SessionSso? sso = null)
     {
         var sessionId = await sessions.CreateAsync(
-            user.Id, AdminSessionKind.Session, options.SessionLifetime, now, ct, Ip(http), UserAgentOf(http), sso);
+            user.Id, AdminSessionKinds.Session, options.SessionLifetime, ct, Ip(http), UserAgentOf(http), sso);
         AdminSessionGuard.SetCookie(http, AdminSessionGuard.SessionCookie, sessionId, options.SessionLifetime);
-        await users.RecordSuccessAsync(user.Id, now, ct);
-        await sessions.DeleteExpiredAsync(now, ct);
+        await users.RecordSuccessAsync(user.Id, ct);
+        await sessions.DeleteExpiredAsync(ct);
         await audit.WriteAsync(http, AuditActions.LoginSucceeded, true, user);
     }
 
@@ -549,11 +548,10 @@ public static class AdminAuthEndpoints
         HttpContext http,
         IAdminSessionStore sessions,
         IAdminUserStore users,
-        DateTimeOffset now,
         CancellationToken ct)
     {
         if (!http.Request.Cookies.TryGetValue(AdminSessionGuard.PendingCookie, out var id) || string.IsNullOrEmpty(id)
-            || await sessions.FindAsync(id, now, ct) is not { Kind: AdminSessionKind.Pending } session
+            || await sessions.FindAsync(id, ct) is not { Kind: AdminSessionKinds.Pending } session
             || await users.FindByIdAsync(session.UserId, ct) is not { } user)
         {
             return null;
@@ -568,24 +566,23 @@ public static class AdminAuthEndpoints
         IAdminSessionStore sessions,
         IAdminUserStore users,
         AdminAuthOptions options,
-        DateTimeOffset now,
         CancellationToken ct)
     {
         if (http.Request.Cookies.TryGetValue(AdminSessionGuard.SessionCookie, out var sessionId)
             && !string.IsNullOrEmpty(sessionId)
-            && await sessions.FindAsync(sessionId, now, ct) is { Kind: AdminSessionKind.Session } session
+            && await sessions.FindAsync(sessionId, ct) is { Kind: AdminSessionKinds.Session } session
             && await users.FindByIdAsync(session.UserId, ct) is { IsDisabled: false } user)
         {
-            return new AdminContext(user, sessionId, AdminSessionKind.Session);
+            return new AdminContext(user, sessionId, AdminSessionKinds.Session);
         }
 
         // 途中の人が登録できるのは、**必須で、まだ登録していないとき**だけ（登録済みの人の鍵を差し替えさせない）
         if (options.TwoFactor == TwoFactorMode.Required
-            && await ResolvePendingAsync(http, sessions, users, now, ct) is { } pending
+            && await ResolvePendingAsync(http, sessions, users, ct) is { } pending
             && !pending.User.IsDisabled
             && !pending.User.TotpEnabled)
         {
-            return new AdminContext(pending.User, pending.SessionId, AdminSessionKind.Pending);
+            return new AdminContext(pending.User, pending.SessionId, AdminSessionKinds.Pending);
         }
 
         return null;
@@ -601,10 +598,9 @@ public static class AdminAuthEndpoints
         string action,
         AdminUser user,
         string pendingId,
-        DateTimeOffset now,
         CancellationToken ct)
     {
-        var failure = await users.RecordFailureAsync(user.Id, options.LockoutThreshold, options.Lockout, now, ct);
+        var failure = await users.RecordFailureAsync(user.Id, options.LockoutThreshold, options.Lockout, ct);
         await audit.WriteAsync(http, action, false, user);
         if (failure.LockedUntil is not null)
         {

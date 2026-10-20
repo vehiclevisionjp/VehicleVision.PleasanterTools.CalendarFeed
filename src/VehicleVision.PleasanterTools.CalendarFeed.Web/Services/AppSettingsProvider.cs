@@ -33,7 +33,7 @@ public interface IAppSettingsProvider
     /// <returns>保存後の設定と、実際に変わったキー。</returns>
     Task<(AppSettingsSnapshot Snapshot, IReadOnlyList<string> ChangedKeys)> SaveAsync(
         IReadOnlyDictionary<string, string?> values,
-        string? updatedByAdminUserId,
+        Guid? updatedByAdminUserId,
         CancellationToken cancellationToken = default);
 }
 
@@ -131,7 +131,7 @@ public sealed class AppSettingsProvider(
 
     public async Task<(AppSettingsSnapshot Snapshot, IReadOnlyList<string> ChangedKeys)> SaveAsync(
         IReadOnlyDictionary<string, string?> values,
-        string? updatedByAdminUserId,
+        Guid? updatedByAdminUserId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(values);
@@ -217,7 +217,7 @@ public sealed class AppSettingsProvider(
                 var definition = AppSettingDefinitions.ByKey[key];
                 await store.SaveAsync(
                     key, definition.IsSecret ? protector.Protect(value, ContextOf(key)) : value, definition.IsSecret,
-                    updatedByAdminUserId, now, cancellationToken).ConfigureAwait(false);
+                    updatedByAdminUserId, cancellationToken).ConfigureAwait(false);
             }
 
             foreach (var key in toReset)

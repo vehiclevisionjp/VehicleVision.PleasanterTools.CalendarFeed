@@ -30,7 +30,7 @@ public sealed class FeedFailureNotifyTests : IDisposable
     private async Task<AdminUser> AddUserAsync(string loginId, string role, string language = "ja", bool disabled = false)
     {
         var users = _app.Service<IAdminUserStore>();
-        var user = (await users.CreateAsync(loginId, PasswordHasher.Hash("x-unknowable-password"), role, language, _app.Time.Now))!;
+        var user = (await users.CreateAsync(loginId, PasswordHasher.Hash("x-unknowable-password"), role, language))!;
         if (disabled)
         {
             await users.SetDisabledAsync(user.Id, true);

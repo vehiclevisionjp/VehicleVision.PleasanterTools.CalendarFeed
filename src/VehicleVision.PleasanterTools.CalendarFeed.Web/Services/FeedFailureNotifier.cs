@@ -98,8 +98,8 @@ public sealed class FeedFailureNotifier(
             var mail = new OutgoingMail(user.LoginId, string.Format(CultureInfo.InvariantCulture, subject, name), body);
 
             // 通知の 1 回ごとに識別子を変える（同じ人・同じフィード・同じ時刻の重複だけを防ぐ）
-            var mailId = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes($"feed-notify:{kind}:{feed.Id}:{user.Id}:{result.At.UtcTicks}")).AsSpan(0, 16)).ToString("D");
-            await outbox.EnqueueAsync(mailId, (int)kind, protector.Protect(mail)).ConfigureAwait(false);
+            var mailId = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes($"feed-notify:{kind}:{feed.Id}:{user.Id}:{result.At.UtcTicks}")).AsSpan(0, 16));
+            await outbox.EnqueueAsync(mailId, (int)kind, subjectId: null, protector.Protect(mail)).ConfigureAwait(false);
         }
     }
 }
