@@ -57,10 +57,10 @@ builder.Services.AddSingleton<FeedService>();
 builder.Services.AddSingleton(sp =>
 {
     var configuration = sp.GetRequiredService<IConfiguration>();
-    var provider = CalendarFeedDatabase.ParseProvider(AppSettings.Text(configuration, AppSettings.DbProvider));
+    var provider = CalendarFeedDatabase.Instance.ParseProvider(AppSettings.Text(configuration, AppSettings.DbProvider), DatabaseProvider.Sqlite);
     return new DatabaseConnectionInfo(
         provider,
-        CalendarFeedDatabase.ResolveConnectionString(
+        CalendarFeedDatabase.Instance.ResolveConnectionString(
             provider,
             AppSettings.Text(configuration, AppSettings.DbConnectionString),
             sp.GetRequiredService<IHostEnvironment>().ContentRootPath));
@@ -166,7 +166,7 @@ if (MigrationCommand.IsRequested(args))
 
 if (AppSettings.ReadAutoMigrate(app.Configuration))
 {
-    await CalendarFeedDatabase.Migrator.MigrateUpWithLockAsync(db.Provider, db.ConnectionString, fixedParameters.MigrationLockTimeout);
+    await CalendarFeedDatabase.Instance.Migrator.MigrateUpWithLockAsync(db.Provider, db.ConnectionString, fixedParameters.MigrationLockTimeout);
 }
 else
 {
@@ -223,7 +223,7 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
     .DisableRateLimiting();
 app.MapGet("/ready", async (DatabaseConnectionInfo database, CancellationToken cancellationToken) =>
 {
-    var failure = await CalendarFeedDatabase.Migrator.WaitForDatabaseAsync(
+    var failure = await CalendarFeedDatabase.Instance.Migrator.WaitForDatabaseAsync(
         database.Provider, database.ConnectionString, TimeSpan.Zero, cancellationToken);
     return failure is null
         ? Results.Ok(new { status = "ready" })
