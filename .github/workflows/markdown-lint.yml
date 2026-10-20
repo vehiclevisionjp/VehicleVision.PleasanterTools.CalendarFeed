@@ -6,7 +6,7 @@
 #
 # **必須ステータスチェックには登録していない。** 登録するなら、ジョブ名「Markdown の検査」を ruleset へ足すこと
 # （名前を変えると、必須チェックが「待ち続けるが永遠に来ない」状態になる）。
-name: Markdown の検査
+name: Markdown Lint
 
 on:
   push:
@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   markdown-lint:
-    name: Markdown の検査
+    name: markdown-lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
