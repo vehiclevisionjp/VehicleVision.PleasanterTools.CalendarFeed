@@ -2,6 +2,7 @@ using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
+using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
@@ -27,6 +28,12 @@ public static class AdminUserEndpoints
     private static IResult Bad(string error) => Results.Json(new { error }, statusCode: StatusCodes.Status400BadRequest);
 
     private static IResult BadKey(string key, params object[] args) => ApiError.Of(StatusCodes.Status400BadRequest, key, args);
+
+    /// <summary>
+    /// ルートの ID（"D" 形式の Guid）を読む。<b>形式が不正なら <see cref="Guid.Empty"/></b>（存在しない ID と同じ扱いにして、
+    /// 以降の判定・404 を旧と同じ流れで通す）。
+    /// </summary>
+    private static Guid ParseId(string id) => Guid.TryParseExact(id, "D", out var parsed) ? parsed : Guid.Empty;
 
     private static IResult NotFound() => ApiError.Of(StatusCodes.Status404NotFound, ServerMessageKeys.AdminUserNotFound);
 
@@ -90,7 +97,7 @@ public static class AdminUserEndpoints
         IAdminUserStore store, IAdminInvitationStore invitations, AdminAuthOptions options, TimeProvider time, bool? staleOnly, CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        var pending = (await invitations.ListPendingAdminUserIdsAsync(now, ct)).ToHashSet();
+        var pending = (await invitations.ListPendingAdminUserIdsAsync(ct)).ToHashSet();
         var rows = (await store.ListAsync(ct))
             .Select(u => new
             {
@@ -137,13 +144,13 @@ public static class AdminUserEndpoints
 
         // 誰も知らない値でハッシュを埋める（既定のパスワードを配らない。資格情報ではない）
         var created = await store.CreateAsync(
-            request.LoginId!, PasswordHasher.Hash(Guid.NewGuid().ToString()), request.Role!, request.Language ?? actor.Language, now, ct);
+            request.LoginId!, PasswordHasher.Hash(Guid.NewGuid().ToString()), request.Role!, FeedLanguages.Normalize(request.Language ?? actor.Language), ct);
         if (created is null)
         {
             return ApiError.Of(StatusCodes.Status409Conflict, ServerMessageKeys.DuplicateLoginId);
         }
 
-        await audit.WriteAsync(http, AuditActions.UserInvited, true, actor, targetType: "AdminUser", targetId: created.Id, detail: $"role={request.Role}");
+        await audit.WriteAsync(http, AuditActions.UserInvited, true, actor, targetType: "AdminUser", targetId: created.Id.ToString("D"), detail: $"role={request.Role}");
 
         var invitation = await IssueAsync(actor, created, invitations, mailer, options, settings, http, now, ct);
         return Results.Created($"/admin/api/users/{created.Id}", new { user = new { created.Id, created.LoginId, created.Role }, invitation });
@@ -161,7 +168,7 @@ public static class AdminUserEndpoints
         AuditLogService audit,
         CancellationToken ct)
     {
-        if (await store.FindByIdAsync(id, ct) is not { } target)
+        if (await store.FindByIdAsync(ParseId(id), ct) is not { } target)
         {
             return NotFound();
         }
@@ -175,7 +182,7 @@ public static class AdminUserEndpoints
         var actor = AdminContext.Of(http).User;
         // **出し直しはパスワードの決め直しでもある**（受け取ると、以前のパスワードで張られたセッションはすべて失効する）
         var invitation = await IssueAsync(actor, target, invitations, mailer, options, settings, http, time.GetUtcNow(), ct);
-        await audit.WriteAsync(http, AuditActions.UserInviteReissued, true, actor, targetType: "AdminUser", targetId: id);
+        await audit.WriteAsync(http, AuditActions.UserInviteReissued, true, actor, targetType: "AdminUser", targetId: target.Id.ToString("D"));
         return Results.Ok(new { invitation });
     }
 
@@ -194,7 +201,7 @@ public static class AdminUserEndpoints
         var token = InviteTokens.Generate();
         var expires = now + options.InvitationLifetime;
         await invitations.ReplaceAsync(
-            new AdminInvitation(Guid.NewGuid().ToString("D"), target.Id, InviteTokens.Hash(token), expires, CreatedBy: actor.Id), ct);
+            new AdminInvitation(Guid.NewGuid(), target.Id, InviteTokens.Hash(token), expires, CreatedBy: actor.Id), ct);
 
         // 本人へ直接送る。招いた側の言語で書く
         var mailSent = await mailer.TryEnqueueAsync(target.LoginId, token, expires, actor.Language, ct);
@@ -216,13 +223,14 @@ public static class AdminUserEndpoints
         string id, bool disabled, HttpContext http, IAdminUserStore store, IAdminInvitationStore invitations, IAdminSessionStore sessions, AuditLogService audit, CancellationToken ct)
     {
         var self = AdminContext.Of(http).User;
+        var userId = ParseId(id);
         // 自分は止めさせない。手が滑ったときに自分では戻せない
-        if (disabled && id == self.Id)
+        if (disabled && userId == self.Id)
         {
             return BadKey(ServerMessageKeys.SelfDisableNotAllowed);
         }
 
-        if (Reject(await store.SetDisabledAsync(id, disabled, ct)) is { } rejected)
+        if (Reject(await store.SetDisabledAsync(userId, disabled, ct)) is { } rejected)
         {
             return rejected;
         }
@@ -230,11 +238,11 @@ public static class AdminUserEndpoints
         if (disabled)
         {
             // 止めた相手は、その場で追い出す。宛ての未使用の招待は取り消す（止めたのにパスワードを決められては困る）
-            await sessions.DeleteForUserAsync(id, null, ct);
-            await invitations.RevokeUnusedAsync(id, ct);
+            await sessions.DeleteForUserAsync(userId, null, ct);
+            await invitations.RevokeUnusedAsync(userId, ct);
         }
 
-        await audit.WriteAsync(http, disabled ? AuditActions.UserDisabled : AuditActions.UserEnabled, true, self, targetType: "AdminUser", targetId: id);
+        await audit.WriteAsync(http, disabled ? AuditActions.UserDisabled : AuditActions.UserEnabled, true, self, targetType: "AdminUser", targetId: userId.ToString("D"));
         return Results.NoContent();
     }
 
@@ -248,12 +256,13 @@ public static class AdminUserEndpoints
         }
 
         // 自分の役割は変えさせない。降ろした瞬間に戻す権限を失う
-        if (id == self.Id)
+        var userId = ParseId(id);
+        if (userId == self.Id)
         {
             return BadKey(ServerMessageKeys.SelfRoleChangeNotAllowed);
         }
 
-        if (Reject(await store.SetRoleAsync(id, request.Role!, ct)) is { } rejected)
+        if (Reject(await store.SetRoleAsync(userId, request.Role!, ct)) is { } rejected)
         {
             return rejected;
         }
@@ -266,21 +275,22 @@ public static class AdminUserEndpoints
         string id, HttpContext http, IAdminUserStore store, IAdminSessionStore sessions, AuditLogService audit, CancellationToken ct)
     {
         var self = AdminContext.Of(http).User;
-        if (id == self.Id)
+        var userId = ParseId(id);
+        if (userId == self.Id)
         {
             return BadKey(ServerMessageKeys.SelfTotpResetNotAllowed);
         }
 
-        if (await store.FindByIdAsync(id, ct) is null)
+        if (await store.FindByIdAsync(userId, ct) is null)
         {
             return NotFound();
         }
 
         // 端末を失った人の救済。**必須の設定でも、解除できる**（本人は次のログインで登録し直す）。
         // 失くした端末が盗まれていることも考え、ログイン中の端末も失効させる
-        await store.DisableTotpAsync(id, ct);
-        await sessions.DeleteForUserAsync(id, null, ct);
-        await audit.WriteAsync(http, AuditActions.UserTotpReset, true, self, targetType: "AdminUser", targetId: id);
+        await store.DisableTotpAsync(userId, ct);
+        await sessions.DeleteForUserAsync(userId, null, ct);
+        await audit.WriteAsync(http, AuditActions.UserTotpReset, true, self, targetType: "AdminUser", targetId: userId.ToString("D"));
         return Results.NoContent();
     }
 
@@ -288,18 +298,19 @@ public static class AdminUserEndpoints
         string id, HttpContext http, IAdminUserStore store, IAdminSessionStore sessions, AuditLogService audit, CancellationToken ct)
     {
         var self = AdminContext.Of(http).User;
-        if (id == self.Id)
+        var userId = ParseId(id);
+        if (userId == self.Id)
         {
             return BadKey(ServerMessageKeys.SelfSessionRevokeNotAllowed);
         }
 
-        if (await store.FindByIdAsync(id, ct) is null)
+        if (await store.FindByIdAsync(userId, ct) is null)
         {
             return NotFound();
         }
 
-        await sessions.DeleteForUserAsync(id, null, ct);
-        await audit.WriteAsync(http, AuditActions.UserSessionsRevoked, true, self, targetType: "AdminUser", targetId: id);
+        await sessions.DeleteForUserAsync(userId, null, ct);
+        await audit.WriteAsync(http, AuditActions.UserSessionsRevoked, true, self, targetType: "AdminUser", targetId: userId.ToString("D"));
         return Results.NoContent();
     }
 
@@ -343,7 +354,7 @@ public static class AdminUserEndpoints
         }
 
         // **先に使い切る。** パスワードを入れてから印を付けると、同時に来た 2 つが両方通る
-        if (!await invitations.TryConsumeAsync(invitation.InvitationId, now, ct))
+        if (!await invitations.TryConsumeAsync(invitation.InvitationId, ct))
         {
             return InvitationInvalid();
         }
@@ -352,10 +363,10 @@ public static class AdminUserEndpoints
 
         // **招待の出し直しはパスワードの決め直しでもある。** 以前のパスワードで張られた通常・途中のセッションをすべて失効させる
         await sessions.DeleteForUserAsync(user.Id, null, ct);
-        await audit.WriteAsync(http, AuditActions.UserInviteAccepted, true, user, targetType: "AdminUser", targetId: user.Id);
+        await audit.WriteAsync(http, AuditActions.UserInviteAccepted, true, user, targetType: "AdminUser", targetId: user.Id.ToString("D"));
 
         // 2 要素の方針に従う（登録済みならまず 2 要素、必須ならその場で登録、それ以外はそのまま入れる）
-        return Results.Ok(new { next = await AdminAuthEndpoints.SignInAsync(http, sessions, store, user, options, audit, now, ct) });
+        return Results.Ok(new { next = await AdminAuthEndpoints.SignInAsync(http, sessions, store, user, options, audit, ct) });
     }
 
     private static IResult InvitationInvalid() =>
@@ -364,11 +375,11 @@ public static class AdminUserEndpoints
     // ---- 自分の端末 ------------------------------------------------------------------
 
     private static async Task<IResult> MySessions(
-        HttpContext http, IAdminSessionStore sessions, TimeProvider time, CancellationToken ct)
+        HttpContext http, IAdminSessionStore sessions, CancellationToken ct)
     {
         var admin = AdminContext.Of(http);
         var current = sessions.HandleOf(admin.SessionId);
-        return Results.Ok((await sessions.ListForUserAsync(admin.User.Id, time.GetUtcNow(), ct)).Select(s => new
+        return Results.Ok((await sessions.ListForUserAsync(admin.User.Id, ct)).Select(s => new
         {
             s.Handle,
             isCurrent = s.Handle == current,
@@ -382,14 +393,15 @@ public static class AdminUserEndpoints
 
     /// <summary>管理者が見る、利用者のログイン中の端末（入った方式つき。セッション ID の現物は出さない）。</summary>
     private static async Task<IResult> UserSessions(
-        string id, IAdminUserStore store, IAdminSessionStore sessions, TimeProvider time, CancellationToken ct)
+        string id, IAdminUserStore store, IAdminSessionStore sessions, CancellationToken ct)
     {
-        if (await store.FindByIdAsync(id, ct) is null)
+        var userId = ParseId(id);
+        if (await store.FindByIdAsync(userId, ct) is null)
         {
             return NotFound();
         }
 
-        return Results.Ok((await sessions.ListForUserAsync(id, time.GetUtcNow(), ct)).Select(s => new
+        return Results.Ok((await sessions.ListForUserAsync(userId, ct)).Select(s => new
         {
             s.Handle,
             s.CreatedAt,
@@ -405,17 +417,18 @@ public static class AdminUserEndpoints
         string id, string handle, HttpContext http, IAdminUserStore store, IAdminSessionStore sessions, AuditLogService audit, CancellationToken ct)
     {
         var self = AdminContext.Of(http).User;
-        if (id == self.Id)
+        var userId = ParseId(id);
+        if (userId == self.Id)
         {
             return BadKey(ServerMessageKeys.SelfSessionRevokeNotAllowed);
         }
 
-        if (await store.FindByIdAsync(id, ct) is null || !await sessions.DeleteByHandleAsync(id, handle, ct))
+        if (await store.FindByIdAsync(userId, ct) is null || !await sessions.DeleteByHandleAsync(userId, handle, ct))
         {
             return NotFound();
         }
 
-        await audit.WriteAsync(http, AuditActions.UserSessionRevoked, true, self, targetType: "AdminUser", targetId: id);
+        await audit.WriteAsync(http, AuditActions.UserSessionRevoked, true, self, targetType: "AdminUser", targetId: userId.ToString("D"));
         return Results.NoContent();
     }
 

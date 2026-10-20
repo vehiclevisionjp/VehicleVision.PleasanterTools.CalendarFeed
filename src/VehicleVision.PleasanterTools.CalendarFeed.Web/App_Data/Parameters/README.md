@@ -16,7 +16,7 @@
 
 ## 管理画面から編集できる設定（Issue #40）
 
-**Questionnaire の「アプリケーション設定」と同じ方式。** 次の設定は DB（`AppSettings` 表）へ保管し、管理画面（`GET/PUT /admin/api/settings/`・権限
+**Questionnaire の「アプリケーション設定」と同じ方式。** 次の設定は DB（`Core_AppSettings` 表）へ保管し、管理画面（`GET/PUT /admin/api/settings/`・権限
 `settings.manage`＝Administrator のみ）から編集できる。
 
 - **優先順位は 外部設定（このフォルダのファイル・環境変数）＞ DB ＞ 既定値。**

@@ -32,12 +32,13 @@ public sealed class AuditLogService(IAuditLogStore store, TimeProvider time, ILo
                     time.GetUtcNow(),
                     action,
                     succeeded,
-                    actor?.Id,
-                    actor?.LoginId ?? loginId,
-                    targetType,
-                    targetId,
-                    detail,
-                    http.Connection.RemoteIpAddress?.ToString()),
+                    ActorKey: actor?.Id.ToString("D"),
+                    ActorLoginId: AuditText.Safe(actor?.LoginId ?? loginId, 100),
+                    TargetType: targetType,
+                    TargetId: targetId,
+                    // 補足は短い文字列で持つ（制御文字を落とし、500 文字へ切り詰める。Core.Data は補足を JSON として無加工で持つため、ここで揃える）
+                    DetailJson: AuditText.Safe(detail, 500),
+                    IpAddress: http.Connection.RemoteIpAddress?.ToString()),
                 CancellationToken.None);
         }
         catch (Exception ex)

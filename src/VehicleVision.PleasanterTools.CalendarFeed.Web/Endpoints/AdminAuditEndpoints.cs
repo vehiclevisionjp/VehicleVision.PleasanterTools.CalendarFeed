@@ -37,7 +37,7 @@ public static class AdminAuditEndpoints
                 {
                     Limit = limit ?? 100,
                     Offset = offset ?? 0,
-                    AdminUserId = admin,
+                    ActorKey = admin,
                     Action = action,
                     FailedOnly = failed ?? false,
                 },
@@ -48,11 +48,11 @@ public static class AdminAuditEndpoints
                 occurredAt = e.OccurredAt.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'", CultureInfo.InvariantCulture),
                 e.Action,
                 succeeded = e.Succeeded,
-                adminUserId = e.AdminUserId,
-                e.LoginId,
+                adminUserId = e.ActorKey,
+                loginId = e.ActorLoginId,
                 e.TargetType,
                 e.TargetId,
-                e.Detail,
+                detail = e.DetailJson,
                 e.IpAddress,
             }));
         });

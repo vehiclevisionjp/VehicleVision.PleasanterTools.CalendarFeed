@@ -276,8 +276,8 @@ public sealed class SamlTests : IDisposable
         Assert.Equal("/admin/?samlError=unknown-user", LocationOf(acs));
         Assert.False(jar.Cookies.ContainsKey(AdminSessionGuard.SessionCookie));
         var failed = (await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.SamlLoginFailed })).Single();
-        Assert.Equal("unknown-user", failed.Detail);
-        Assert.Equal("stranger@example.com", failed.LoginId);
+        Assert.Equal("unknown-user", failed.DetailJson);
+        Assert.Equal("stranger@example.com", failed.ActorLoginId);
         Assert.Single(await _app.Service<IAdminUserStore>().ListAsync());
     }
 
@@ -297,7 +297,7 @@ public sealed class SamlTests : IDisposable
         Assert.Equal(AdminRoles.Auditor, user.Role);
         var me = await (await client.SendAsync(jar.Request(HttpMethod.Get, "/admin/api/me/"))).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(AdminRoles.Auditor, me.GetProperty("role").GetString());
-        Assert.Contains(await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.SamlRegistered }), e => e.TargetId == user.Id);
+        Assert.Contains(await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.SamlRegistered }), e => e.TargetId == user.Id.ToString("D"));
 
         // 誰も知らないパスワードなので、パスワードでは入れない（空・推測）
         Assert.Equal(HttpStatusCode.Unauthorized, (await _app.Client().PostAsJsonAsync("/admin/api/login", new { loginId = "newbie@example.com", password = "" })).StatusCode);
@@ -385,7 +385,7 @@ public sealed class SamlTests : IDisposable
         await PostAcsAsync(client, jar, _idp.Response(requestId, TestApp.AdminLoginId, audience: "https://x.test/"));
 
         var failed = (await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.SamlLoginFailed })).Single();
-        Assert.Equal("invalid-response", failed.Detail);
+        Assert.Equal("invalid-response", failed.DetailJson);
         Assert.False(failed.Succeeded);
     }
 

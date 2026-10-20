@@ -100,7 +100,7 @@ public static class AdminSettingsEndpoints
                     var texts = TestMailTexts.For(actor.Language);
                     var mail = new OutgoingMail(actor.LoginId, texts.Subject, texts.Body);
                     queued = await outbox.EnqueueAsync(
-                        Guid.NewGuid().ToString("D"), (int)MailKind.SettingsTest, protector.Protect(mail), ct);
+                        Guid.NewGuid(), (int)MailKind.SettingsTest, subjectId: null, protector.Protect(mail), ct);
                     reason = queued ? null : "queue-failed";
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)

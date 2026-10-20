@@ -232,7 +232,7 @@ public sealed class AppSettingsTests : IDisposable
     public async Task 他のインスタンスの保存は読み直しで取り込む()
     {
         // 別のインスタンスが DB へ直接書いたことを模す
-        await _app.Service<IAppSettingStore>().SaveAsync(Cache, "45", false, null, DateTimeOffset.UtcNow);
+        await _app.Service<IAppSettingStore>().SaveAsync(Cache, "45", false, null);
         Assert.Equal(300, _app.Service<RuntimeSettings>().Current.Feed.CacheSeconds);
 
         await _app.Service<AppSettingsMonitor>().RefreshAsync(CancellationToken.None);
@@ -276,9 +276,9 @@ public sealed class AppSettingsTests : IDisposable
         var log = (await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.SettingsUpdated })).ToList();
 
         Assert.Equal(2, log.Count);
-        Assert.Contains(log, e => e.Detail!.Contains(Cache) && e.Detail.Contains("CALENDARFEED_PLEASANTER_APIKEY"));
-        Assert.Contains(log, e => e.Detail == "no-change");
-        Assert.DoesNotContain(log, e => e.Detail!.Contains("61") && !e.Detail.Contains(Cache) || e.Detail!.Contains("audit-secret-key"));
+        Assert.Contains(log, e => e.DetailJson!.Contains(Cache) && e.DetailJson.Contains("CALENDARFEED_PLEASANTER_APIKEY"));
+        Assert.Contains(log, e => e.DetailJson == "no-change");
+        Assert.DoesNotContain(log, e => e.DetailJson!.Contains("61") && !e.DetailJson.Contains(Cache) || e.DetailJson!.Contains("audit-secret-key"));
     }
 
     // ---- メール ----------------------------------------------------------------------
