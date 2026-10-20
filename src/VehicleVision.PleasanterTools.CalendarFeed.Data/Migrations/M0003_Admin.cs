@@ -26,9 +26,9 @@ public sealed class M0003_Admin : Migration
             .WithColumn("Role").AsString(32).NotNullable().WithDefaultValue("Administrator")
             .WithColumn("IsDisabled").AsInt32().NotNullable().WithDefaultValue(0)
             .WithColumn("FailedLoginCount").AsInt32().NotNullable().WithDefaultValue(0)
-            .WithColumn("LockedUntil").AsString(32).Nullable()
-            .WithColumn("LastLoginAt").AsString(32).Nullable()
-            .WithColumn("CreatedAt").AsString(32).NotNullable()
+            .WithColumn("LockedUntil").AsDateTime2().Nullable()
+            .WithColumn("LastLoginAt").AsDateTime2().Nullable()
+            .WithColumn("CreatedAt").AsDateTime2().NotNullable()
             .WithColumn("TotpSecretCipher").AsString(int.MaxValue).Nullable()
             .WithColumn("TotpPendingCipher").AsString(int.MaxValue).Nullable()
             .WithColumn("TotpLastTimeStep").AsInt64().Nullable()
@@ -45,14 +45,14 @@ public sealed class M0003_Admin : Migration
             .WithColumn("Id").AsString(64).NotNullable().PrimaryKey()
             .WithColumn("UserId").AsString(36).NotNullable()
             .WithColumn("Kind").AsString(16).NotNullable()
-            .WithColumn("CreatedAt").AsString(32).NotNullable()
-            .WithColumn("ExpiresAt").AsString(32).NotNullable();
+            .WithColumn("CreatedAt").AsDateTime2().NotNullable()
+            .WithColumn("ExpiresAt").AsDateTime2().NotNullable();
         Create.Index("IX_AdminSessions_UserId").OnTable("AdminSessions").OnColumn("UserId");
 
         Create.Table("AdminRecoveryCodes")
             .WithColumn("UserId").AsString(36).NotNullable().PrimaryKey()
             .WithColumn("CodeHash").AsString(64).NotNullable().PrimaryKey()
-            .WithColumn("UsedAt").AsString(32).Nullable();
+            .WithColumn("UsedAt").AsDateTime2().Nullable();
 
         // M0001 と同じ理由（MySQL は NVARCHAR が utf8mb3 になる）。表ごと utf8mb4 へ直す
         foreach (var table in new[] { "AdminUsers", "AdminSessions", "AdminRecoveryCodes" })

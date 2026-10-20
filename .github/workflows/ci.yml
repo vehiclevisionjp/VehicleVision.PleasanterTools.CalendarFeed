@@ -33,7 +33,7 @@ env:
 
 jobs:
   build-test:
-    name: ビルドと単体テスト
+    name: build-test
     runs-on: ubuntu-latest
     steps:
       - name: ソースを取得する
@@ -65,7 +65,7 @@ jobs:
   # 管理画面（Svelte）の型検査・単体テスト・組み立て。組み立てた成果物は配布物（.Web の wwwroot/admin）へ入る。
   # ジョブ名は Questionnaire と同じ「フロントエンド」（必須ステータスチェックの名前をそろえる）
   admin-ui:
-    name: フロントエンド
+    name: frontend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -96,7 +96,7 @@ jobs:
         run: npx vite build
 
   license-check:
-    name: ライセンス検査
+    name: license-check
     runs-on: ubuntu-latest
     steps:
       - name: ソースを取得する

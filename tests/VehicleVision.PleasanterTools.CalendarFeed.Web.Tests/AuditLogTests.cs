@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -31,8 +32,8 @@ public sealed class AuditLogTests : IDisposable
 
         var log = await app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery());
 
-        Assert.Contains(log, e => e.Action == AuditActions.AdminSetup && e.Succeeded && e.LoginId == TestApp.AdminLoginId);
-        Assert.Contains(log, e => e.Action == AuditActions.LoginSucceeded && e.Succeeded && e.AdminUserId is not null);
+        Assert.Contains(log, e => e.Action == AuditActions.AdminSetup && e.Succeeded && e.ActorLoginId == TestApp.AdminLoginId);
+        Assert.Contains(log, e => e.Action == AuditActions.LoginSucceeded && e.Succeeded && e.ActorKey is not null);
     }
 
     [Fact]
@@ -47,8 +48,8 @@ public sealed class AuditLogTests : IDisposable
 
         Assert.Equal(await unknown.Content.ReadAsStringAsync(), await bad.Content.ReadAsStringAsync());
         var failed = (await ListAsync(new AuditLogQuery { FailedOnly = true })).Where(e => e.Action == AuditActions.LoginFailed).ToList();
-        Assert.Contains(failed, e => e.Detail == "unknown-user" && e.LoginId == "nobody" && e.AdminUserId is null);
-        Assert.Contains(failed, e => e.Detail == "bad-password" && e.LoginId == TestApp.AdminLoginId && e.AdminUserId is not null);
+        Assert.Contains(failed, e => e.DetailJson == "unknown-user" && e.ActorLoginId == "nobody" && e.ActorKey is null);
+        Assert.Contains(failed, e => e.DetailJson == "bad-password" && e.ActorLoginId == TestApp.AdminLoginId && e.ActorKey is not null);
     }
 
     [Fact]
@@ -129,11 +130,12 @@ public sealed class AuditLogTests : IDisposable
         var one = await admin.GetFromJsonAsync<JsonElement>($"/admin/api/audit-logs/?action={AuditActions.FeedCreated}&limit=1");
         Assert.Single(one.EnumerateArray());
 
-        var before = all[0].GetProperty("occurredAt").GetString();
-        var older = await admin.GetFromJsonAsync<JsonElement>($"/admin/api/audit-logs/?before={Uri.EscapeDataString(before!)}");
+        // ページ送り: 読んだ件数だけ読み飛ばす。最新の 1 件を飛ばせば、その記録は出てこない
+        var older = await admin.GetFromJsonAsync<JsonElement>("/admin/api/audit-logs/?offset=1");
+        Assert.Equal(all.GetArrayLength() - 1, older.GetArrayLength());
         Assert.DoesNotContain(older.EnumerateArray(), e => e.GetProperty("action").GetString() == AuditActions.FeedCreated);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/admin/api/audit-logs/?before=not-a-date")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/admin/api/audit-logs/?offset=-1")).StatusCode);
     }
 
     [Fact]
@@ -164,14 +166,16 @@ public sealed class AuditLogTests : IDisposable
     [Fact]
     public async Task 長い値と制御文字は切り詰めて落とす()
     {
-        var store = _app.Service<IAuditLogStore>();
-        await store.WriteAsync(new AuditEntry(_app.Time.Now, "x\r\ninjected", true, LoginId: new string('a', 500) + "\nfake line", Detail: new string('d', 900)));
+        // 窓口（AuditLogService）を通す。保管（Core.Data）は補足を無加工で持つので、旧と同じ形（補足 500 文字・ログイン ID 100 文字・制御文字なし）は窓口が保つ
+        await _app.Service<AuditLogService>().WriteAsync(
+            new DefaultHttpContext(), "x\r\ninjected", true, loginId: new string('a', 500) + "\nfake line", detail: new string('d', 900) + "\nfake line");
 
         var entry = Assert.Single(await ListAsync());
 
         Assert.DoesNotContain('\n', entry.Action);
-        Assert.Equal(100, entry.LoginId!.Length);
-        Assert.Equal(500, entry.Detail!.Length);
+        Assert.Equal(100, entry.ActorLoginId!.Length);
+        Assert.Equal(500, entry.DetailJson!.Length);
+        Assert.DoesNotContain('\n', entry.DetailJson);
     }
 }
 

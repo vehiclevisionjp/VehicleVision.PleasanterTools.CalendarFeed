@@ -11,7 +11,7 @@
 # ⚠️ **e2e.yml の paths を変えたら、こちらの paths-ignore も同じ内容へ揃えること。**
 # 片方だけ直すと、両方起動する（二重に報告される）か、どちらも起動しない（Pending で止まる）。
 # **e2e.yml のジョブを足したら、こちらにも同名のジョブを足すこと。**
-name: 端から端まで通す試験（対象外）
+name: E2E Tests Skip
 
 on:
   pull_request:
@@ -31,7 +31,7 @@ permissions:
 jobs:
   pleasanter:
     # **e2e.yml のジョブ名と 1 文字も違えないこと。** 必須チェックは名前で照合する
-    name: 端から端まで通す試験（Pleasanter）
+    name: e2e / pleasanter
     runs-on: ubuntu-latest
     steps:
       - name: 回さない理由を残す
@@ -39,7 +39,7 @@ jobs:
         run: echo "No runtime code changed in this pull request. Skipping the end-to-end suite."
 
   saml:
-    name: 端から端まで通す試験（SAML）
+    name: e2e / saml
     runs-on: ubuntu-latest
     steps:
       - name: 回さない理由を残す

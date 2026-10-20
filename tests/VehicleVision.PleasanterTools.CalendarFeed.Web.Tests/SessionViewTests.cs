@@ -14,10 +14,10 @@ public sealed class SessionViewTests : IDisposable
     public void Dispose() => _app.Dispose();
 
     private async Task<AdminUser> AddUserAsync(string loginId = "bob") =>
-        (await _app.Service<IAdminUserStore>().CreateAsync(loginId, PasswordHasher.Hash("x-unknowable-password"), AdminRoles.Editor, "ja", _app.Time.Now))!;
+        (await _app.Service<IAdminUserStore>().CreateAsync(loginId, PasswordHasher.Hash("x-unknowable-password"), AdminRoles.Editor, "ja"))!;
 
     private Task<string> SessionOfAsync(AdminUser user, SessionSso? sso = null) =>
-        _app.Service<IAdminSessionStore>().CreateAsync(user.Id, AdminSessionKind.Session, TimeSpan.FromHours(8), _app.Time.Now, default, "203.0.113.5", "TestAgent", sso);
+        _app.Service<IAdminSessionStore>().CreateAsync(user.Id, AdminSessionKinds.Session, TimeSpan.FromHours(8), default, "203.0.113.5", "TestAgent", sso);
 
     private async Task<JsonElement> ListAsync(AdminUser user) =>
         await _app.AdminClient().GetFromJsonAsync<JsonElement>($"/admin/api/users/{user.Id}/sessions");
@@ -58,7 +58,7 @@ public sealed class SessionViewTests : IDisposable
         Assert.Equal(1, (await ListAsync(bob)).GetArrayLength());
         Assert.Contains(
             await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.UserSessionRevoked }),
-            e => e.TargetId == bob.Id);
+            e => e.TargetId == bob.Id.ToString("D"));
     }
 
     [Fact]

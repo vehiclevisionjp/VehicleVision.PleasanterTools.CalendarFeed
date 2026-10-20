@@ -22,10 +22,21 @@ Copyright (C) PMC Co.,Ltd.
   FluentMigrator.Runner.MySql 8.0.1 / Apache-2.0
   FluentMigrator.Runner.SQLite 8.0.1 / Apache-2.0
   Microsoft.Data.SqlClient 7.1.1 / MIT / https://www.nuget.org/packages/Microsoft.Data.SqlClient
+  Microsoft.Data.SqlClient.SNI.runtime 7.1.0 / Microsoft Software License Terms（MICROSOFT.DATA.SQLCLIENT.SNI LIBRARY。**MIT・BSD・Apache-2.0 ではない独自の許諾**） / https://www.nuget.org/packages/Microsoft.Data.SqlClient.SNI.runtime/7.1.0
+    （Microsoft.Data.SqlClient が推移的に伴う、Windows 向けのネイティブ SNI。パッケージ内の LICENSE.txt、参照日 2026-10-20。
+      **再頒布の条件**: アプリの一部としてのみ頒布する（単体で頒布しない）／頒布先に、逆コンパイルの禁止・著作権表示の保全・
+      単体での再配布の禁止・保証の否認・責任の制限・輸出規制の遵守など、この許諾と同程度に守る条件へ同意させる／
+      アプリの頒布・利用に関する請求から Microsoft を補償する（改変していない SNI だけに基づく請求を除く）。
+      **2026-10-20 の決定**: 条件を明記したうえで許容し、「依存は寛容ライセンスに限る」の例外として扱う。
+      頒布するときは、上の条件を利用許諾（商用条件・EULA）へ反映する。法務の確認は別途）
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
   System.Security.Cryptography.Pkcs 10.0.13 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Pkcs
     （推移的依存の脆弱性 GHSA-846f-f764-76mx を避けるための直接参照。参照日 2026-10-14）
+  VehicleVision.PleasanterTools.Core.Data 0.1.0-preview.6 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+    （DB の基盤。接続・DbTime・マイグレーションと排他・SqlDialect の汎用部分。Dapper・FluentMigrator・DB ドライバは、これが推移的に伴う）
+  VehicleVision.PleasanterTools.Core.Mail 0.1.0-preview.4 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+    （メール送信の部品。MailKit・MimeKit・AWSSDK.SimpleEmailV2・Azure.Communication.Email・Azure.Identity などは、これが推移的に伴う）
   MailKit 4.18.1 / MIT / https://github.com/jstedfast/MailKit
     （招待メールの送信。Questionnaire の NOTICE と同じ依存・同じ版。**認証付きリレーの 587 番は Azure でブロックされない**ので、
       これ 1 本で SendGrid・Amazon SES・Azure Communication Services・Microsoft 365 へ送れる。参照日 2026-10-14）

@@ -36,7 +36,7 @@ public sealed record SamlResolveResult(SamlResolveOutcome Outcome, AdminUser? Us
 /// **登録済みの 2 要素は、IdP 経由でも省かせない**（2 要素の続きは <c>AdminAuthEndpoints.SignInAsync</c> が方針に従って決める）。
 /// </para>
 /// </remarks>
-public sealed class SamlAuthenticator(IAdminUserStore users, TimeProvider time, ILogger<SamlAuthenticator> logger)
+public sealed class SamlAuthenticator(IAdminUserStore users, ILogger<SamlAuthenticator> logger)
 {
     /// <summary>ログイン ID から管理者を決める。</summary>
     public async Task<SamlResolveResult> ResolveAsync(string loginId, SamlOptions options, CancellationToken cancellationToken = default)
@@ -59,7 +59,7 @@ public sealed class SamlAuthenticator(IAdminUserStore users, TimeProvider time, 
 
             // 推測できない値。誰にも渡さないので、パスワードでは入れない
             var unknowable = Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-            user = await users.CreateAsync(trimmed, PasswordHasher.Hash(unknowable), options.RegisterRole, "ja", time.GetUtcNow(), cancellationToken).ConfigureAwait(false);
+            user = await users.CreateAsync(trimmed, PasswordHasher.Hash(unknowable), options.RegisterRole, "ja", cancellationToken).ConfigureAwait(false);
             if (user is null)
             {
                 // 同時に同じ人が来て、先に作られた。作られた方を使う

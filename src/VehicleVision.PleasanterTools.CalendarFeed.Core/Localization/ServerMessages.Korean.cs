@@ -34,7 +34,7 @@ public static partial class ServerMessages
         [ServerMessageKeys.LastAdministrator] = "활성 관리자(Administrator)가 한 명도 없게 되므로 할 수 없습니다. 먼저 다른 관리자를 준비해 주세요.",
         [ServerMessageKeys.InvitationInvalid] = "이 초대는 사용할 수 없습니다(만료되었거나, 이미 수락되었거나, 취소되었을 수 있습니다). 초대한 관리자에게 다시 보내 달라고 요청해 주세요.",
         [ServerMessageKeys.SessionNotFound] = "해당 기기를 찾을 수 없습니다.",
-        [ServerMessageKeys.AuditBeforeInvalid] = "before는 날짜와 시각(ISO 8601)으로 지정해 주세요.",
+        [ServerMessageKeys.AuditOffsetInvalid] = "offset은 0 이상의 정수로 지정하세요.",
         [ServerMessageKeys.ApiKeyNeedsSecretKey] = "API 키를 저장하려면 {0} 설정이 필요합니다.",
         [ServerMessageKeys.ApiKeyRequired] = "ApiKey를 지정해 주세요(모든 피드 공통 기본 API 키도 설정되어 있지 않습니다).",
         [ServerMessageKeys.SettingsValuesRequired] = "values에 변경할 설정을 지정해 주세요.",

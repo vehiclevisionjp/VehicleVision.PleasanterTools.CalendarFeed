@@ -96,7 +96,7 @@ public sealed class PleasanterSsoTests : IDisposable
     private async Task<AdminUser> AddUserAsync(string loginId, string role = AdminRoles.Editor, bool disabled = false)
     {
         var users = _app.Service<IAdminUserStore>();
-        var user = (await users.CreateAsync(loginId, PasswordHasher.Hash("x-unknowable-password"), role, "ja", _app.Time.Now))!;
+        var user = (await users.CreateAsync(loginId, PasswordHasher.Hash("x-unknowable-password"), role, "ja"))!;
         if (disabled)
         {
             await users.SetDisabledAsync(user.Id, true);
@@ -223,8 +223,8 @@ public sealed class PleasanterSsoTests : IDisposable
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("unknown-user", CodeOf(await response.Content.ReadFromJsonAsync<JsonElement>()));
         var failed = (await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.PleasanterSsoFailed })).Single();
-        Assert.Equal("unknown-user", failed.Detail);
-        Assert.Equal("stranger", failed.LoginId);
+        Assert.Equal("unknown-user", failed.DetailJson);
+        Assert.Equal("stranger", failed.ActorLoginId);
     }
 
     [Fact]
@@ -289,7 +289,7 @@ public sealed class PleasanterSsoTests : IDisposable
         var created = (await _app.Service<IAdminUserStore>().FindForLoginAsync("newcomer"))!.Value.User;
         Assert.Equal(AdminRoles.Auditor, created.Role);
         Assert.Equal(HttpStatusCode.OK, await browser.MeAsync());
-        Assert.Contains(await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.PleasanterSsoRegistered }), e => e.TargetId == created.Id);
+        Assert.Contains(await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.PleasanterSsoRegistered }), e => e.TargetId == created.Id.ToString("D"));
     }
 
     [Fact]

@@ -41,7 +41,7 @@ public static class MigrationCommand
         if (wait > TimeSpan.Zero)
         {
             Console.WriteLine($"Waiting for the database (up to {wait.TotalSeconds:0}s)...");
-            var failure = await DatabaseMigrator
+            var failure = await CalendarFeedDatabase.Instance.Migrator
                 .WaitForDatabaseAsync(provider, connectionString, wait, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -55,7 +55,9 @@ public static class MigrationCommand
         }
 
         // 複数台が同時に当てても 1 台だけが当て、残りは待つ（DB の排他ロック）。当て済みなら何もしない
-        DatabaseMigrator.Migrate(provider, connectionString, lockTimeout ?? DatabaseMigrator.LockTimeout);
+        await CalendarFeedDatabase.Instance.Migrator.MigrateUpWithLockAsync(
+            provider, connectionString, lockTimeout ?? AppDatabase.DefaultMigrationLockTimeout, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
         Console.WriteLine($"All migrations are applied ({provider}).");
         return 0;
     }

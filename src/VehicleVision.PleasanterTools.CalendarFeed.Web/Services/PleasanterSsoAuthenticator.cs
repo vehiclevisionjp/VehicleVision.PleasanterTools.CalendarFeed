@@ -35,7 +35,7 @@ public sealed record PleasanterSsoResolveResult(
 /// 未設定のまま自動登録すると、Pleasanter の全利用者が管理画面へ入れてしまう。
 /// </para>
 /// </remarks>
-public sealed class PleasanterSsoAuthenticator(IAdminUserStore users, TimeProvider time, ILogger<PleasanterSsoAuthenticator> logger)
+public sealed class PleasanterSsoAuthenticator(IAdminUserStore users, ILogger<PleasanterSsoAuthenticator> logger)
 {
     /// <summary>ログイン ID から管理者を決める。居なければ設定に従って作るか断る。</summary>
     public async Task<PleasanterSsoResolveResult> ResolveAsync(
@@ -64,7 +64,7 @@ public sealed class PleasanterSsoAuthenticator(IAdminUserStore users, TimeProvid
 
             // 推測できない値。誰にも渡さないので、パスワードでは入れない
             var unknowable = Convert.ToBase64String(Guid.NewGuid().ToByteArray()) + Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-            user = await users.CreateAsync(trimmed, PasswordHasher.Hash(unknowable), options.RegisterRole, "ja", time.GetUtcNow(), cancellationToken)
+            user = await users.CreateAsync(trimmed, PasswordHasher.Hash(unknowable), options.RegisterRole, "ja", cancellationToken)
                 .ConfigureAwait(false);
             if (user is null)
             {

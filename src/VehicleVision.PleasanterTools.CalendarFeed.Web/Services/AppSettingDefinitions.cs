@@ -3,7 +3,7 @@ using System.Collections.Frozen;
 using System.Globalization;
 using System.Net.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
-using VehicleVision.PleasanterTools.CalendarFeed.Mail;
+using VehicleVision.PleasanterTools.Core.Mail;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
