@@ -42,7 +42,7 @@ public static class TestDatabases
     {
         lock (MigrationLock)
         {
-            CalendarFeedDatabase.Migrator.MigrateUp(provider, connectionString);
+            CalendarFeedDatabase.Instance.Migrator.MigrateUp(provider, connectionString);
         }
     }
 
@@ -332,8 +332,8 @@ public sealed class FeedStoreTests : IDisposable
     {
         var connectionString = ConnectionStringFor(DatabaseProvider.Sqlite);
 
-        CalendarFeedDatabase.Migrator.MigrateUp(DatabaseProvider.Sqlite, connectionString);
-        CalendarFeedDatabase.Migrator.MigrateUp(DatabaseProvider.Sqlite, connectionString);
+        CalendarFeedDatabase.Instance.Migrator.MigrateUp(DatabaseProvider.Sqlite, connectionString);
+        CalendarFeedDatabase.Instance.Migrator.MigrateUp(DatabaseProvider.Sqlite, connectionString);
     }
 }
 
@@ -360,13 +360,13 @@ public sealed class SqlDialectTests
     [InlineData("SqlServer", DatabaseProvider.SqlServer)]
     [InlineData(" mysql ", DatabaseProvider.MySql)]
     public void providerを読む(string? value, DatabaseProvider expected) =>
-        Assert.Equal(expected, CalendarFeedDatabase.ParseProvider(value));
+        Assert.Equal(expected, CalendarFeedDatabase.Instance.ParseProvider(value, DatabaseProvider.Sqlite));
 
     [Theory]
     [InlineData("oracle")]
     [InlineData("99")]
     public void 読めないproviderは黙って落とさず止める(string value) =>
-        Assert.Throws<InvalidOperationException>(() => CalendarFeedDatabase.ParseProvider(value));
+        Assert.Throws<InvalidOperationException>(() => CalendarFeedDatabase.Instance.ParseProvider(value, DatabaseProvider.Sqlite));
 
     [Fact]
     public void SQL_Serverは暗号化を強制する()
@@ -381,5 +381,5 @@ public sealed class SqlDialectTests
     [Fact]
     public void SQLite以外は接続文字列が無ければ止める() =>
         Assert.Throws<InvalidOperationException>(() =>
-            CalendarFeedDatabase.ResolveConnectionString(DatabaseProvider.PostgreSql, null, Path.GetTempPath()));
+            CalendarFeedDatabase.Instance.ResolveConnectionString(DatabaseProvider.PostgreSql, null, Path.GetTempPath()));
 }
