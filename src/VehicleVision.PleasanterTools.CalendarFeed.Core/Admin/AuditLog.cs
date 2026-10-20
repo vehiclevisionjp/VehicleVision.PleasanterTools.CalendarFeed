@@ -81,8 +81,11 @@ public sealed record AuditLogQuery
     /// <summary>読む件数の上限（1〜<see cref="MaxLimit"/>）。</summary>
     public int Limit { get; init; } = 100;
 
-    /// <summary>この時刻より前だけ（ページ送り。前のページの最後の <c>OccurredAt</c> を渡す）。</summary>
-    public DateTimeOffset? Before { get; init; }
+    /// <summary>
+    /// 読み飛ばす件数（ページ送り。前のページまでに読んだ件数を渡す）。
+    /// **時刻では区切らない。** DB へ渡す時刻は秒未満を切り捨てるので、同じ秒の記録が複数あり、時刻で区切ると取りこぼす。
+    /// </summary>
+    public int Offset { get; init; }
 
     /// <summary>この管理者の操作だけ。</summary>
     public string? AdminUserId { get; init; }

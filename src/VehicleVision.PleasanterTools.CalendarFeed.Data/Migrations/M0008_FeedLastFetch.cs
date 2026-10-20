@@ -9,7 +9,7 @@ public sealed class M0008_FeedLastFetch : Migration
     public override void Up()
     {
         Alter.Table("Feeds")
-            .AddColumn("LastFetchAt").AsString(32).Nullable()
+            .AddColumn("LastFetchAt").AsDateTime2().Nullable()
             .AddColumn("LastFetchStatus").AsString(32).Nullable()
             .AddColumn("LastFetchMessage").AsString(500).Nullable()
             .AddColumn("LastFetchEventCount").AsInt32().Nullable();

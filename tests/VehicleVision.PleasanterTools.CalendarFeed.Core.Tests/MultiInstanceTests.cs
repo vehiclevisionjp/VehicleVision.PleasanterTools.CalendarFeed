@@ -15,16 +15,15 @@ public sealed class MultiInstanceTests : IDisposable
         File.Delete(_sqlitePath);
     }
 
-    private DbConnectionFactory FactoryFor(DatabaseProvider provider) => new(
-        provider,
-        provider is DatabaseProvider.Sqlite
-            ? $"Data Source={_sqlitePath};Pooling=False"
-            : TestDatabases.ConnectionString(provider)!);
+    private string ConnectionStringFor(DatabaseProvider provider) =>
+        provider is DatabaseProvider.Sqlite ? $"Data Source={_sqlitePath};Pooling=False" : TestDatabases.ConnectionString(provider)!;
+
+    private DbConnectionFactory FactoryFor(DatabaseProvider provider) => new(provider, ConnectionStringFor(provider));
 
     private async Task<RateLimitStore> StoreAsync(DatabaseProvider provider)
     {
         var factory = FactoryFor(provider);
-        TestDatabases.Migrate(provider, factory.ConnectionString);
+        TestDatabases.Migrate(provider, ConnectionStringFor(provider));
         await using (var connection = factory.Create())
         {
             await connection.ExecuteAsync(SqlDialect.Format(provider, "DELETE FROM [RateLimits]"));
@@ -83,47 +82,54 @@ public sealed class MultiInstanceTests : IDisposable
 
     [Theory]
     [EnabledDatabases]
-    public void マイグレーションのロックは同時に1台だけが持ち_手放せば次の台が取れる(DatabaseProvider provider)
+    public async Task マイグレーションのロックは同時に1台だけが持ち_手放せば次の台が取れる(DatabaseProvider provider)
     {
-        var connectionString = FactoryFor(provider).ConnectionString;
+        var connectionString = ConnectionStringFor(provider);
         TestDatabases.Migrate(provider, connectionString);
 
-        using var first = MigrationLock.Acquire(provider, connectionString, TimeSpan.FromSeconds(5));
-
-        if (provider is DatabaseProvider.Sqlite)
+        var first = await AcquireLockAsync(provider, connectionString, TimeSpan.FromSeconds(5));
+        try
         {
-            // SQLite は、1 つのファイルを複数のホストで共有しない前提でロックしない
-            using var second = MigrationLock.Acquire(provider, connectionString, TimeSpan.FromSeconds(1));
-            return;
+            // 持っている間、別の台は待ち切れずに諦める
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => AcquireLockAsync(provider, connectionString, TimeSpan.FromSeconds(1)));
+        }
+        finally
+        {
+            await first.DisposeAsync();
         }
 
-        // 持っている間、別の台は待ち切れずに諦める
-        Assert.Throws<TimeoutException>(() => MigrationLock.Acquire(provider, connectionString, TimeSpan.FromSeconds(1)));
-
-        first.Dispose();
-
         // 手放したら、次の台が取れる
-        using var next = MigrationLock.Acquire(provider, connectionString, TimeSpan.FromSeconds(5));
+        await using var next = await AcquireLockAsync(provider, connectionString, TimeSpan.FromSeconds(5));
     }
 
     [Theory]
     [EnabledDatabases]
-    public void ロックを持つ台が居る間でも_当て終わった後のマイグレーションは待ってから何もしない(DatabaseProvider provider)
+    public async Task ロックを持つ台が居る間でも_当て終わった後のマイグレーションは待ってから何もしない(DatabaseProvider provider)
     {
-        var connectionString = FactoryFor(provider).ConnectionString;
+        var connectionString = ConnectionStringFor(provider);
         TestDatabases.Migrate(provider, connectionString);
-        if (provider is DatabaseProvider.Sqlite)
-        {
-            return;
-        }
 
         // 別の台がロックを持って当てている最中を真似る。後から来た台は待つ（待てなければ TimeoutException）
-        using (MigrationLock.Acquire(provider, connectionString, TimeSpan.FromSeconds(5)))
+        await using (await AcquireLockAsync(provider, connectionString, TimeSpan.FromSeconds(5)))
         {
-            Assert.Throws<TimeoutException>(() => DatabaseMigrator.Migrate(provider, connectionString, TimeSpan.FromSeconds(1)));
+            await Assert.ThrowsAsync<TimeoutException>(
+                () => CalendarFeedDatabase.Migrator.MigrateUpWithLockAsync(provider, connectionString, TimeSpan.FromSeconds(1)));
         }
 
         // 手放したら、当て終わっているので何も起きずに戻る
-        DatabaseMigrator.Migrate(provider, connectionString, TimeSpan.FromSeconds(10));
+        var result = await CalendarFeedDatabase.Migrator.MigrateUpWithLockAsync(provider, connectionString, TimeSpan.FromSeconds(10));
+        Assert.Equal(0, result.AppliedCount);
     }
+
+    private static Task<DatabaseMigrationLock> AcquireLockAsync(
+        DatabaseProvider provider,
+        string connectionString,
+        TimeSpan timeout) =>
+        DatabaseMigrationLock.AcquireAsync(
+            provider,
+            connectionString,
+            CalendarFeedDatabase.MigrationLockName,
+            timeout,
+            CancellationToken.None);
 }

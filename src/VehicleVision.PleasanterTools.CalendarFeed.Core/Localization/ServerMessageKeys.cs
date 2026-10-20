@@ -35,7 +35,7 @@ public static class ServerMessageKeys
     public const string LastAdministrator = "lastAdministrator";
     public const string InvitationInvalid = "invitationInvalid";
     public const string SessionNotFound = "sessionNotFound";
-    public const string AuditBeforeInvalid = "auditBeforeInvalid";
+    public const string AuditOffsetInvalid = "auditOffsetInvalid";
     public const string ApiKeyNeedsSecretKey = "apiKeyNeedsSecretKey";
     public const string ApiKeyRequired = "apiKeyRequired";
     public const string SettingsValuesRequired = "settingsValuesRequired";
@@ -119,7 +119,7 @@ public static class ServerMessageKeys
         EnrollmentBeginRequired, TotpCodeMismatch, LoginIdInvalid, PasswordTooShort, PasswordTooLong,
         PasswordSameAsLoginId, PasswordPolicyMismatch, AdminUserNotFound, RoleNotSupported, DuplicateLoginId,
         InviteDisabledUser, SelfDisableNotAllowed, SelfRoleChangeNotAllowed, SelfTotpResetNotAllowed,
-        SelfSessionRevokeNotAllowed, LastAdministrator, InvitationInvalid, SessionNotFound, AuditBeforeInvalid,
+        SelfSessionRevokeNotAllowed, LastAdministrator, InvitationInvalid, SessionNotFound, AuditOffsetInvalid,
         ApiKeyNeedsSecretKey, ApiKeyRequired, SettingsValuesRequired, SecretSettingNeedsSecretKey, SamlNeedsSecretKey,
         FeedRangeInvalid, FeedNameInvalid, FeedSiteIdInvalid, FeedFiltersInvalid, FeedApiKeyInvalid, FeedTimeZoneInvalid, FeedLanguageInvalid,
         MappingSummaryColumnInvalid, MappingColumnInvalid, MappingDateColumnNoFormat, MappingDateColumnKind,

@@ -14,7 +14,7 @@ public sealed class M0010_SessionPleasanterSso : Migration
         Alter.Table("AdminSessions")
             .AddColumn("PleasanterTenantId").AsInt32().Nullable()
             .AddColumn("PleasanterUserId").AsInt32().Nullable()
-            .AddColumn("PleasanterVerifiedAt").AsString(32).Nullable();
+            .AddColumn("PleasanterVerifiedAt").AsDateTime2().Nullable();
 
     public override void Down()
     {

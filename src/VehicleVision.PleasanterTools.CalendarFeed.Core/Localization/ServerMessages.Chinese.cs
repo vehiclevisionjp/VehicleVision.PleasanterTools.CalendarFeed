@@ -34,7 +34,7 @@ public static partial class ServerMessages
         [ServerMessageKeys.LastAdministrator] = "这样会导致没有任何有效的管理员（Administrator），因此无法执行。请先准备另一位管理员。",
         [ServerMessageKeys.InvitationInvalid] = "此邀请无法使用（可能已过期、已被接受或已被取消）。请联系邀请您的管理员重新发送。",
         [ServerMessageKeys.SessionNotFound] = "未找到该设备。",
-        [ServerMessageKeys.AuditBeforeInvalid] = "请将 before 指定为日期和时间（ISO 8601）。",
+        [ServerMessageKeys.AuditOffsetInvalid] = "offset 必须为 0 或更大的整数。",
         [ServerMessageKeys.ApiKeyNeedsSecretKey] = "保存 API 密钥需要设置 {0}。",
         [ServerMessageKeys.ApiKeyRequired] = "请指定 ApiKey（所有订阅源共用的默认 API 密钥也未设置）。",
         [ServerMessageKeys.SettingsValuesRequired] = "请在 values 中指定要更改的设置。",

@@ -104,7 +104,7 @@ public sealed class MailOutbox(IDbConnectionFactory connections, TimeProvider ti
         ArgumentException.ThrowIfNullOrWhiteSpace(mailId);
         ArgumentException.ThrowIfNullOrWhiteSpace(payloadProtected);
 
-        var now = DbTime.Format(time.GetUtcNow());
+        var now = DbTime.ForDb(time.GetUtcNow().UtcDateTime);
         await using var connection = connections.Create();
         try
         {
@@ -137,24 +137,24 @@ public sealed class MailOutbox(IDbConnectionFactory connections, TimeProvider ti
             SendingStatus = (int)MailStatus.Sending,
             PendingStatus = (int)MailStatus.Pending,
             LockedBy = $"{owner}:{Guid.NewGuid():N}",
-            LockedUntil = DbTime.Format(now + lockDuration),
-            Now = DbTime.Format(now),
+            LockedUntil = DbTime.ForDb((now + lockDuration).UtcDateTime),
+            Now = DbTime.ForDb(now.UtcDateTime),
         };
 
         await using var connection = connections.Create();
         if (SqlDialect.SupportsReturning(Provider))
         {
             return (await connection.QueryFirstOrDefaultAsync<ClaimedRow>(new CommandDefinition(
-                SqlDialect.ClaimPendingMail(Provider), parameters, cancellationToken: cancellationToken)).ConfigureAwait(false))?.ToPending();
+                CalendarFeedSqlDialect.ClaimPendingMail(Provider), parameters, cancellationToken: cancellationToken)).ConfigureAwait(false))?.ToPending();
         }
 
         // MySQL は RETURNING が無いので、確保してから読み直す
         var affected = await connection.ExecuteAsync(new CommandDefinition(
-            SqlDialect.ClaimPendingMail(Provider), parameters, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            CalendarFeedSqlDialect.ClaimPendingMail(Provider), parameters, cancellationToken: cancellationToken)).ConfigureAwait(false);
         return affected == 0
             ? null
             : (await connection.QueryFirstOrDefaultAsync<ClaimedRow>(new CommandDefinition(
-                SqlDialect.ReadClaimedMailForMySql, parameters, cancellationToken: cancellationToken)).ConfigureAwait(false))?.ToPending();
+                CalendarFeedSqlDialect.ReadClaimedMailForMySql, parameters, cancellationToken: cancellationToken)).ConfigureAwait(false))?.ToPending();
     }
 
     public async Task CompleteAsync(string mailId, CancellationToken cancellationToken = default)
@@ -180,9 +180,9 @@ public sealed class MailOutbox(IDbConnectionFactory connections, TimeProvider ti
             {
                 MailId = mailId,
                 PendingStatus = (int)MailStatus.Pending,
-                NextAttemptAt = DbTime.Format(nextAttemptAt),
+                NextAttemptAt = DbTime.ForDb(nextAttemptAt.UtcDateTime),
                 Error = Truncate(error),
-                Now = DbTime.Format(time.GetUtcNow()),
+                Now = DbTime.ForDb(time.GetUtcNow().UtcDateTime),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -198,7 +198,7 @@ public sealed class MailOutbox(IDbConnectionFactory connections, TimeProvider ti
                 MailId = mailId,
                 DeadLetterStatus = (int)MailStatus.DeadLetter,
                 Error = Truncate(error),
-                Now = DbTime.Format(time.GetUtcNow()),
+                Now = DbTime.ForDb(time.GetUtcNow().UtcDateTime),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
@@ -209,7 +209,7 @@ public sealed class MailOutbox(IDbConnectionFactory connections, TimeProvider ti
         return await connection.ExecuteAsync(new CommandDefinition(
             Sql("UPDATE [MailOutbox] SET [Status] = @PendingStatus, [LockedBy] = NULL, [LockedUntil] = NULL, [UpdatedAt] = @Now "
                 + "WHERE [Status] = @SendingStatus AND [LockedUntil] < @Now"),
-            new { PendingStatus = (int)MailStatus.Pending, SendingStatus = (int)MailStatus.Sending, Now = DbTime.Format(now) },
+            new { PendingStatus = (int)MailStatus.Pending, SendingStatus = (int)MailStatus.Sending, Now = DbTime.ForDb(now.UtcDateTime) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -222,7 +222,7 @@ public sealed class MailOutbox(IDbConnectionFactory connections, TimeProvider ti
                 + "COUNT(CASE WHEN [Status] = @DeadLetterStatus THEN 1 END) AS [DeadLetterCount] FROM [MailOutbox]"),
             new { DeadLetterStatus = (int)MailStatus.DeadLetter },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
-        return new MailOutboxStatus((int)row.PendingCount, DbTime.Parse(row.OldestPendingAt), (int)row.DeadLetterCount);
+        return new MailOutboxStatus((int)row.PendingCount, DbTime.AsUtc(row.OldestPendingAt), (int)row.DeadLetterCount);
     }
 
     private static string? Truncate(string? error) =>
@@ -246,7 +246,7 @@ public sealed class MailOutbox(IDbConnectionFactory connections, TimeProvider ti
     {
         public long PendingCount { get; set; }
 
-        public string? OldestPendingAt { get; set; }
+        public DateTime? OldestPendingAt { get; set; }
 
         public long DeadLetterCount { get; set; }
     }

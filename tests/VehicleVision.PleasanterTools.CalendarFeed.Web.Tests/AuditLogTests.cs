@@ -129,11 +129,12 @@ public sealed class AuditLogTests : IDisposable
         var one = await admin.GetFromJsonAsync<JsonElement>($"/admin/api/audit-logs/?action={AuditActions.FeedCreated}&limit=1");
         Assert.Single(one.EnumerateArray());
 
-        var before = all[0].GetProperty("occurredAt").GetString();
-        var older = await admin.GetFromJsonAsync<JsonElement>($"/admin/api/audit-logs/?before={Uri.EscapeDataString(before!)}");
+        // ページ送り: 読んだ件数だけ読み飛ばす。最新の 1 件を飛ばせば、その記録は出てこない
+        var older = await admin.GetFromJsonAsync<JsonElement>("/admin/api/audit-logs/?offset=1");
+        Assert.Equal(all.GetArrayLength() - 1, older.GetArrayLength());
         Assert.DoesNotContain(older.EnumerateArray(), e => e.GetProperty("action").GetString() == AuditActions.FeedCreated);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/admin/api/audit-logs/?before=not-a-date")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.GetAsync("/admin/api/audit-logs/?offset=-1")).StatusCode);
     }
 
     [Fact]

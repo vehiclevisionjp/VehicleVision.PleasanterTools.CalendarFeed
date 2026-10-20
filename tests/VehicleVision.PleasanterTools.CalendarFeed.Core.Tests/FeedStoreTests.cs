@@ -42,7 +42,7 @@ public static class TestDatabases
     {
         lock (MigrationLock)
         {
-            DatabaseMigrator.Migrate(provider, connectionString);
+            CalendarFeedDatabase.Migrator.MigrateUp(provider, connectionString);
         }
     }
 
@@ -72,17 +72,16 @@ public sealed class FeedStoreTests : IDisposable
         File.Delete(_sqlitePath);
     }
 
-    private DbConnectionFactory FactoryFor(DatabaseProvider provider) => new(
-        provider,
-        provider is DatabaseProvider.Sqlite
-            ? $"Data Source={_sqlitePath};Pooling=False"
-            : TestDatabases.ConnectionString(provider)!);
+    private string ConnectionStringFor(DatabaseProvider provider) =>
+        provider is DatabaseProvider.Sqlite ? $"Data Source={_sqlitePath};Pooling=False" : TestDatabases.ConnectionString(provider)!;
+
+    private DbConnectionFactory FactoryFor(DatabaseProvider provider) => new(provider, ConnectionStringFor(provider));
 
     /// <summary>RDBMS ごとのストアを用意し、マイグレーションを当てる。</summary>
     private FeedStore StoreFor(DatabaseProvider provider)
     {
         var factory = FactoryFor(provider);
-        TestDatabases.Migrate(provider, factory.ConnectionString);
+        TestDatabases.Migrate(provider, ConnectionStringFor(provider));
         return new FeedStore(factory, new SecretProtector(TestKey));
     }
 
@@ -174,7 +173,10 @@ public sealed class FeedStoreTests : IDisposable
     {
         var store = StoreFor(provider);
         var (first, _) = await store.CreateAsync("1", 1, new FeedMapping(), new Dictionary<string, string>());
-        await Task.Delay(20);
+
+        // **DB へ渡す時刻は秒未満を切り捨てる**（DbTime.ForDb。MySQL の datetime が秒未満を丸めて未来になるのを防ぐため）。
+        // 続けて作ると同じ秒になり、新しい順が定まらないので、秒をまたぐまで待つ
+        await Task.Delay(TimeSpan.FromMilliseconds(1100));
         var (second, _) = await store.CreateAsync("2", 1, new FeedMapping(), new Dictionary<string, string>());
 
         var ids = (await store.ListAsync()).Select(f => f.Id).ToList();
@@ -328,10 +330,10 @@ public sealed class FeedStoreTests : IDisposable
     [Fact]
     public void マイグレーションは何度当てても同じ()
     {
-        var factory = FactoryFor(DatabaseProvider.Sqlite);
+        var connectionString = ConnectionStringFor(DatabaseProvider.Sqlite);
 
-        DatabaseMigrator.Migrate(DatabaseProvider.Sqlite, factory.ConnectionString);
-        DatabaseMigrator.Migrate(DatabaseProvider.Sqlite, factory.ConnectionString);
+        CalendarFeedDatabase.Migrator.MigrateUp(DatabaseProvider.Sqlite, connectionString);
+        CalendarFeedDatabase.Migrator.MigrateUp(DatabaseProvider.Sqlite, connectionString);
     }
 }
 
@@ -358,24 +360,26 @@ public sealed class SqlDialectTests
     [InlineData("SqlServer", DatabaseProvider.SqlServer)]
     [InlineData(" mysql ", DatabaseProvider.MySql)]
     public void providerを読む(string? value, DatabaseProvider expected) =>
-        Assert.Equal(expected, DbConnectionFactory.ParseProvider(value));
+        Assert.Equal(expected, CalendarFeedDatabase.ParseProvider(value));
 
     [Theory]
     [InlineData("oracle")]
     [InlineData("99")]
     public void 読めないproviderは黙って落とさず止める(string value) =>
-        Assert.Throws<InvalidOperationException>(() => DbConnectionFactory.ParseProvider(value));
+        Assert.Throws<InvalidOperationException>(() => CalendarFeedDatabase.ParseProvider(value));
 
     [Fact]
     public void SQL_Serverは暗号化を強制する()
     {
         var factory = new DbConnectionFactory(DatabaseProvider.SqlServer, "Server=x;Database=y;Encrypt=False");
 
-        Assert.Contains("Encrypt=True", factory.ConnectionString, StringComparison.OrdinalIgnoreCase);
+        // 接続文字列は Core.Data のファクトリが持つ。作った接続から読む
+        using var connection = factory.Create();
+        Assert.Contains("Encrypt=True", connection.ConnectionString, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public void SQLite以外は接続文字列が無ければ止める() =>
         Assert.Throws<InvalidOperationException>(() =>
-            DbConnectionFactory.ResolveConnectionString(DatabaseProvider.PostgreSql, null, Path.GetTempPath()));
+            CalendarFeedDatabase.ResolveConnectionString(DatabaseProvider.PostgreSql, null, Path.GetTempPath()));
 }

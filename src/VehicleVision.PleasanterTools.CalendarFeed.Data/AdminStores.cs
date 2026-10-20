@@ -76,7 +76,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
                 LoginIdKey = KeyOf(loginId),
                 PasswordHash = passwordHash,
                 Role = AdminRoles.Administrator,
-                CreatedAt = DbTime.Format(DateTimeOffset.UtcNow),
+                CreatedAt = DbTime.ForDb(DateTimeOffset.UtcNow.UtcDateTime),
                 Language = FeedLanguages.Normalize(language),
             },
             transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -144,7 +144,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
                     LoginIdKey = KeyOf(loginId),
                     PasswordHash = passwordHash,
                     Role = role,
-                    CreatedAt = DbTime.Format(now),
+                    CreatedAt = DbTime.ForDb(now.UtcDateTime),
                     Language = FeedLanguages.Normalize(language),
                 },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -199,7 +199,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
         if (leavesAdministrator)
         {
             await connection.ExecuteAsync(new CommandDefinition(
-                SqlDialect.LockAdministrators(connections.Provider),
+                CalendarFeedSqlDialect.LockAdministrators(connections.Provider),
                 new { Admin = AdminRoles.Administrator }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
 
@@ -241,7 +241,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
         var until = now + lockout;
         await connection.ExecuteAsync(new CommandDefinition(
             Sql("UPDATE [AdminUsers] SET [FailedLoginCount] = 0, [LockedUntil] = @Until WHERE [Id] = @Id"),
-            new { Id = id, Until = DbTime.Format(until) },
+            new { Id = id, Until = DbTime.ForDb(until.UtcDateTime) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return new AdminFailure(0, until);
     }
@@ -251,7 +251,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
         await using var connection = connections.Create();
         await connection.ExecuteAsync(new CommandDefinition(
             Sql("UPDATE [AdminUsers] SET [FailedLoginCount] = 0, [LockedUntil] = NULL, [LastLoginAt] = @Now WHERE [Id] = @Id"),
-            new { Id = id, Now = DbTime.Format(now) },
+            new { Id = id, Now = DbTime.ForDb(now.UtcDateTime) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -356,7 +356,7 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
         return await connection.ExecuteAsync(new CommandDefinition(
             Sql("UPDATE [AdminRecoveryCodes] SET [UsedAt] = @Now "
                 + "WHERE [UserId] = @Id AND [CodeHash] = @Hash AND [UsedAt] IS NULL"),
-            new { Id = id, Hash = codeHash, Now = DbTime.Format(now) },
+            new { Id = id, Hash = codeHash, Now = DbTime.ForDb(now.UtcDateTime) },
             cancellationToken: cancellationToken)).ConfigureAwait(false) > 0;
     }
 
@@ -380,11 +380,11 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
 
         public int FailedLoginCount { get; set; }
 
-        public string? LockedUntil { get; set; }
+        public DateTime? LockedUntil { get; set; }
 
-        public string? LastLoginAt { get; set; }
+        public DateTime? LastLoginAt { get; set; }
 
-        public string CreatedAt { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
 
         public string? TotpSecretCipher { get; set; }
 
@@ -398,9 +398,9 @@ public sealed class AdminUserStore(IDbConnectionFactory connections, ISecretProt
             Role,
             IsDisabled != 0,
             FailedLoginCount,
-            DbTime.Parse(LockedUntil),
-            DbTime.Parse(LastLoginAt),
-            DbTime.Parse(CreatedAt)!.Value,
+            DbTime.AsUtc(LockedUntil),
+            DbTime.AsUtc(LastLoginAt),
+            DbTime.AsUtc(CreatedAt),
             !string.IsNullOrEmpty(TotpSecretCipher),
             Language);
     }
@@ -444,15 +444,15 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
                 Id = IdHash(sessionId),
                 UserId = userId,
                 Kind = kind.ToString(),
-                CreatedAt = DbTime.Format(now),
-                ExpiresAt = DbTime.Format(now + lifetime),
+                CreatedAt = DbTime.ForDb(now.UtcDateTime),
+                ExpiresAt = DbTime.ForDb((now + lifetime).UtcDateTime),
                 IpAddress = AuditText.Safe(ipAddress, 45),
                 UserAgent = AuditText.Safe(userAgent, 200),
                 SamlNameId = AuditText.Safe(samlKeys?.NameId, 256),
                 SamlSessionIndex = AuditText.Safe(samlKeys?.SessionIndex, 256),
                 PleasanterTenantId = pleasanter?.TenantId,
                 PleasanterUserId = pleasanter?.UserId,
-                PleasanterVerifiedAt = pleasanter is null ? null : DbTime.Format(pleasanter.VerifiedAt),
+                PleasanterVerifiedAt = pleasanter is null ? null : (DateTime?)DbTime.ForDb(pleasanter.VerifiedAt.UtcDateTime),
             },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
         return sessionId;
@@ -474,7 +474,7 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
     public async Task<SessionSso?> GetSsoAsync(string sessionId, CancellationToken cancellationToken = default)
     {
         await using var connection = connections.Create();
-        var row = await connection.QuerySingleOrDefaultAsync<(string? NameId, string? SessionIndex, int? TenantId, int? UserId, string? VerifiedAt)?>(
+        var row = await connection.QuerySingleOrDefaultAsync<(string? NameId, string? SessionIndex, int? TenantId, int? UserId, DateTime? VerifiedAt)?>(
             new CommandDefinition(
                 Sql("SELECT [SamlNameId], [SamlSessionIndex], [PleasanterTenantId], [PleasanterUserId], [PleasanterVerifiedAt] "
                     + "FROM [AdminSessions] WHERE [Id] = @Id"),
@@ -489,15 +489,15 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         return saml is null && pleasanter is null ? null : new SessionSso(saml, pleasanter);
     }
 
-    private static PleasanterSsoKeys? ToPleasanterKeys(int? tenantId, int? userId, string? verifiedAt) =>
-        tenantId is { } t && userId is { } u && DbTime.Parse(verifiedAt) is { } v ? new PleasanterSsoKeys(t, u, v) : null;
+    private static PleasanterSsoKeys? ToPleasanterKeys(int? tenantId, int? userId, DateTime? verifiedAt) =>
+        tenantId is { } t && userId is { } u && DbTime.AsUtc(verifiedAt) is { } v ? new PleasanterSsoKeys(t, u, v) : null;
 
     public async Task TouchPleasanterVerifiedAsync(string sessionId, DateTimeOffset verifiedAt, CancellationToken cancellationToken = default)
     {
         await using var connection = connections.Create();
         await connection.ExecuteAsync(new CommandDefinition(
             Sql("UPDATE [AdminSessions] SET [PleasanterVerifiedAt] = @VerifiedAt WHERE [Id] = @Id"),
-            new { Id = IdHash(sessionId), VerifiedAt = DbTime.Format(verifiedAt) },
+            new { Id = IdHash(sessionId), VerifiedAt = DbTime.ForDb(verifiedAt.UtcDateTime) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
@@ -514,14 +514,14 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         string userId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         await using var connection = connections.Create();
-        var rows = await connection.QueryAsync<(string Id, string CreatedAt, string ExpiresAt, string? IpAddress, string? UserAgent, string? SamlNameId, int? PleasanterUserId)>(
+        var rows = await connection.QueryAsync<(string Id, DateTime CreatedAt, DateTime ExpiresAt, string? IpAddress, string? UserAgent, string? SamlNameId, int? PleasanterUserId)>(
             new CommandDefinition(
                 Sql("SELECT [Id], [CreatedAt], [ExpiresAt], [IpAddress], [UserAgent], [SamlNameId], [PleasanterUserId] FROM [AdminSessions] "
                     + "WHERE [UserId] = @UserId AND [Kind] = @Kind AND [ExpiresAt] > @Now ORDER BY [CreatedAt] DESC"),
-                new { UserId = userId, Kind = nameof(AdminSessionKind.Session), Now = DbTime.Format(now) },
+                new { UserId = userId, Kind = nameof(AdminSessionKind.Session), Now = DbTime.ForDb(now.UtcDateTime) },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
         return [.. rows.Select(r => new AdminSessionInfo(
-            r.Id, DbTime.Parse(r.CreatedAt)!.Value, DbTime.Parse(r.ExpiresAt)!.Value, r.IpAddress, r.UserAgent,
+            r.Id, DbTime.AsUtc(r.CreatedAt), DbTime.AsUtc(r.ExpiresAt), r.IpAddress, r.UserAgent,
             !string.IsNullOrEmpty(r.SamlNameId) ? SessionVia.Saml : r.PleasanterUserId is not null ? SessionVia.Pleasanter : SessionVia.Password))];
     }
 
@@ -538,15 +538,15 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
         string sessionId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         await using var connection = connections.Create();
-        var row = await connection.QuerySingleOrDefaultAsync<(string UserId, string Kind, string ExpiresAt, int? TenantId, int? PleasanterUserId, string? VerifiedAt)?>(
+        var row = await connection.QuerySingleOrDefaultAsync<(string UserId, string Kind, DateTime ExpiresAt, int? TenantId, int? PleasanterUserId, DateTime? VerifiedAt)?>(
             new CommandDefinition(
                 Sql("SELECT [UserId], [Kind], [ExpiresAt], [PleasanterTenantId], [PleasanterUserId], [PleasanterVerifiedAt] "
                     + "FROM [AdminSessions] WHERE [Id] = @Id AND [ExpiresAt] > @Now"),
-                new { Id = IdHash(sessionId), Now = DbTime.Format(now) },
+                new { Id = IdHash(sessionId), Now = DbTime.ForDb(now.UtcDateTime) },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
         return row is { } r && Enum.TryParse<AdminSessionKind>(r.Kind, out var kind)
-            ? new AdminSession(r.UserId, kind, DbTime.Parse(r.ExpiresAt)!.Value, ToPleasanterKeys(r.TenantId, r.PleasanterUserId, r.VerifiedAt))
+            ? new AdminSession(r.UserId, kind, DbTime.AsUtc(r.ExpiresAt), ToPleasanterKeys(r.TenantId, r.PleasanterUserId, r.VerifiedAt))
             : null;
     }
 
@@ -574,7 +574,7 @@ public sealed class AdminSessionStore(IDbConnectionFactory connections) : IAdmin
     {
         await using var connection = connections.Create();
         return await connection.ExecuteAsync(new CommandDefinition(
-            Sql("DELETE FROM [AdminSessions] WHERE [ExpiresAt] <= @Now"), new { Now = DbTime.Format(now) },
+            Sql("DELETE FROM [AdminSessions] WHERE [ExpiresAt] <= @Now"), new { Now = DbTime.ForDb(now.UtcDateTime) },
             cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 }
