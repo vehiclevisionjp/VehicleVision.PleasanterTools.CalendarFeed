@@ -78,7 +78,7 @@ Copyright (C) PMC Co.,Ltd.
   svelte 5.57.2 / MIT / https://github.com/sveltejs/svelte
   @sveltejs/vite-plugin-svelte 7.3.1 / MIT / https://github.com/sveltejs/vite-plugin-svelte
   vite 8.3.4 / MIT / https://github.com/vitejs/vite
-  sass 1.105.1 / MIT / https://github.com/sass/dart-sass
+  sass 1.105.2 / MIT / https://github.com/sass/dart-sass
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
 
   書体とアイコン（アプリへ同梱する。コードではなくフォントのファイル。Questionnaire の Frontend と同じ版・同じ扱い）。**SIL Open Font License 1.1**
@@ -91,7 +91,7 @@ Copyright (C) PMC Co.,Ltd.
   （ビルド・試験のみ。配布物の JavaScript には含まれない。参照日 2026-10-15）
   typescript 6.0.3 / Apache-2.0 / https://www.npmjs.com/package/typescript
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://www.npmjs.com/package/@types/qrcode
-  （svelte-check 4.7.6 / MIT、vitest 5.0.5 / MIT）
+  （svelte-check 4.7.7 / MIT、vitest 5.0.5 / MIT）
 
 開発専用（画面の写しを撮る。配布物に含まれない）
 
