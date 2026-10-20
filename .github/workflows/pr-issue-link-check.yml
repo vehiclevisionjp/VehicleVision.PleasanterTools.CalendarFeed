@@ -17,7 +17,7 @@
 # ■ PR のコードは実行しない
 #   見るのは本文だけ。チェックアウトもしない。
 
-name: PR の Issue 紐付け
+name: PR Issue Link Check
 
 on:
   pull_request:
@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   check:
-    name: Issue と紐付いているか
+    name: issue-link
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
