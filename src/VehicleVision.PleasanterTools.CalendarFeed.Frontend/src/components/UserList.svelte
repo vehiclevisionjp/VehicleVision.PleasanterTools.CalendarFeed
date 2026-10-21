@@ -39,7 +39,7 @@
   }
 
   async function revokeOne(handle: string): Promise<void> {
-    if (!sessionsOf) return;
+    if (!sessionsOf) {return;}
     const result = await api.revokeUserSession(sessionsOf.user.id, handle);
     if (!result.ok) {
       error = errorText(result);
@@ -103,28 +103,28 @@
 
   async function setDisabled(user: AdminUser, disabled: boolean): Promise<void> {
     const result = await api.setUserDisabled(user.id, disabled);
-    if (!result.ok) error = errorText(result);
-    else flash = t('saved');
+    if (!result.ok) {error = errorText(result);}
+    else {flash = t('saved');}
     await load();
   }
 
   async function changeRole(user: AdminUser, role: Role): Promise<void> {
     const result = await api.setUserRole(user.id, role);
-    if (!result.ok) error = errorText(result);
-    else flash = t('saved');
+    if (!result.ok) {error = errorText(result);}
+    else {flash = t('saved');}
     await load();
   }
 
   async function runAction(): Promise<void> {
-    if (!action) return;
+    if (!action) {return;}
     busy = true;
     const { kind, user } = action;
     const result =
       kind === 'disable' ? await api.setUserDisabled(user.id, true) : kind === 'resetTotp' ? await api.resetUserTotp(user.id) : await api.revokeUserSessions(user.id);
     busy = false;
     action = null;
-    if (!result.ok) error = errorText(result);
-    else flash = t('saved');
+    if (!result.ok) {error = errorText(result);}
+    else {flash = t('saved');}
     await load();
   }
 

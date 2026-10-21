@@ -27,8 +27,8 @@
 
   async function loadSessions(): Promise<void> {
     const result = await api.mySessions();
-    if (result.ok) sessions = result.value;
-    else error = errorText(result);
+    if (result.ok) {sessions = result.value;}
+    else {error = errorText(result);}
   }
 
   $effect(() => {
@@ -37,7 +37,7 @@
 
   async function changePassword(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    if (next !== confirmNext) return;
+    if (next !== confirmNext) {return;}
     passwordBusy = true;
     passwordError = '';
     flash = '';
@@ -72,15 +72,15 @@
 
   async function revoke(handle: string): Promise<void> {
     const result = await api.revokeMySession(handle);
-    if (!result.ok) error = errorText(result);
-    else flash = t('sessionRevoked');
+    if (!result.ok) {error = errorText(result);}
+    else {flash = t('sessionRevoked');}
     await loadSessions();
   }
 
   async function revokeOthers(): Promise<void> {
     const result = await api.revokeOtherSessions();
-    if (!result.ok) error = errorText(result);
-    else flash = t('sessionRevoked');
+    if (!result.ok) {error = errorText(result);}
+    else {flash = t('sessionRevoked');}
     await loadSessions();
   }
 </script>

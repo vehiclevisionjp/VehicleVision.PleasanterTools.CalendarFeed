@@ -81,15 +81,15 @@
     }
 
     await loadMe();
-    if (phase === 'loading') phase = 'login';
+    if (phase === 'loading') {phase = 'login';}
   }
 
   function onStep(step: Step): void {
-    if (step === 'totp') phase = 'totp';
-    else if (step === 'enroll') phase = 'enroll';
+    if (step === 'totp') {phase = 'totp';}
+    else if (step === 'enroll') {phase = 'enroll';}
     else {
       // 招待の URL（トークンを含む）から離れる
-      if (location.pathname !== `${ROOT}/`) history.replaceState(null, '', `${ROOT}/`);
+      if (location.pathname !== `${ROOT}/`) {history.replaceState(null, '', `${ROOT}/`);}
       void loadMe();
     }
   }
@@ -107,13 +107,13 @@
     phase = 'login';
 
     // Pleasanter で入ったセッションは、Pleasanter のログアウト画面があれば、そこへ進む（Pleasanter に残ったログインで、すぐ入り直せてしまわないように）
-    if (viaPleasanter && pleasanterSso.logoutUrl) location.assign(pleasanterSso.logoutUrl);
+    if (viaPleasanter && pleasanterSso.logoutUrl) {location.assign(pleasanterSso.logoutUrl);}
   }
 
   $effect(() => {
     void boot();
     const onPop = (): void => {
-      if (phase === 'app') tab = tabFromPath();
+      if (phase === 'app') {tab = tabFromPath();}
     };
     addEventListener('popstate', onPop);
     return () => removeEventListener('popstate', onPop);

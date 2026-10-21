@@ -90,6 +90,9 @@ Copyright (C) PMC Co.,Ltd.
     （2 要素の登録の QR コードをブラウザの中で描く）
   （ビルド・試験のみ。配布物の JavaScript には含まれない。参照日 2026-10-15）
   typescript 6.0.3 / Apache-2.0 / https://www.npmjs.com/package/typescript
+  eslint 10.13.0 / MIT / https://www.npmjs.com/package/eslint
+  typescript-eslint 8.72.0 / MIT / https://www.npmjs.com/package/typescript-eslint
+  eslint-plugin-svelte 3.23.1 / MIT / https://www.npmjs.com/package/eslint-plugin-svelte
   @types/qrcode 1.5.6 / MIT（DefinitelyTyped） / https://www.npmjs.com/package/@types/qrcode
   （svelte-check 4.7.7 / MIT、vitest 5.0.5 / MIT）
 

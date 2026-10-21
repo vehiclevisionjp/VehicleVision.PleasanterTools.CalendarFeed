@@ -19,7 +19,7 @@
   let startedAt = 0;
 
   function stop(): void {
-    if (timer !== null) clearTimeout(timer);
+    if (timer !== null) {clearTimeout(timer);}
     timer = null;
     waiting = false;
   }
@@ -63,14 +63,14 @@
   }
 
   async function poll(): Promise<void> {
-    if (!waiting) return;
+    if (!waiting) {return;}
     if (Date.now() - startedAt > GIVE_UP_MS) {
       stop();
       error = t('pleasanterSsoTimeout');
       return;
     }
 
-    if (!(await check()) && waiting) timer = setTimeout(poll, POLL_MS);
+    if (!(await check()) && waiting) {timer = setTimeout(poll, POLL_MS);}
   }
 
   async function start(): Promise<void> {
@@ -79,7 +79,7 @@
     // まず確かめる。すでに Pleasanter にログインしていれば、別のウィンドウを開かずに入れる
     const done = await check();
     busy = false;
-    if (done) return;
+    if (done) {return;}
 
     // まだなら、Pleasanter のログイン画面を別のウィンドウで開き、済むまで確かめ続ける
     waiting = true;
