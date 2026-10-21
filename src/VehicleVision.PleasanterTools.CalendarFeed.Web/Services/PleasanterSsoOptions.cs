@@ -2,6 +2,7 @@ using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using System.Collections.Immutable;
 using System.Globalization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
+using VehicleVision.PleasanterTools.Core.Web;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
@@ -26,15 +27,19 @@ public enum PleasanterSsoUnknownUserPolicy
 /// ログイン中の本人を返させる。聞き方は標準の API（<c>POST /api/users/get</c> を利用者 ID
 /// <c>Own</c> で絞る）だけ。Pleasanter 側に何も置かなくてよく、書き込みも無い。
 /// 利用者の API 利用が禁止されていて 403 が返ったときは、本アプリの API キーで引き直す
-/// （<see cref="PleasanterSessionVerifier"/>）。
+/// （Core.Web の <see cref="PleasanterSessionVerifier"/>）。
 /// **API キーはブラウザへ渡さない**（規約 8）。cookie を転送する問い合わせには API キーを載せない。
 /// </para>
 /// <para>
 /// ⚠️ **本アプリと Pleasanter を同じホスト名で動かすことが前提。**
 /// cookie はホスト単位でしか届かない（<c>_documents/Pleasanter-SSO-運用手順書.md</c>）。
 /// </para>
+/// <para>
+/// 検証器へは <see cref="IPleasanterSsoVerificationOptions"/> として渡す（同じ名前と型のメンバーをすでに持つ）。
+/// **設定の読み取りは本アプリに残す**（設定の鍵・誤りの伝え方がアプリごとに違うため。Issue #137）。
+/// </para>
 /// </remarks>
-public sealed class PleasanterSsoOptions
+public sealed class PleasanterSsoOptions : IPleasanterSsoVerificationOptions
 {
     public const string AllowedDeptIdsKey = "CALENDARFEED_PLEASANTERSSO_ALLOWEDDEPTIDS";
     public const string AllowedGroupIdsKey = "CALENDARFEED_PLEASANTERSSO_ALLOWEDGROUPIDS";

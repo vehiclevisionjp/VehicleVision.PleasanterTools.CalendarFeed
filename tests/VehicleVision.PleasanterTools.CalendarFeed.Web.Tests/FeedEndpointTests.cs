@@ -121,7 +121,7 @@ internal sealed class TestApp : IDisposable
             {
                 services.AddHttpClient<Pleasanter.PleasanterClient>()
                     .ConfigurePrimaryHttpMessageHandler(() => Pleasanter);
-                services.AddHttpClient(Web.Services.PleasanterSessionVerifier.HttpClientName)
+                services.AddHttpClient(VehicleVision.PleasanterTools.Core.Web.PleasanterSessionVerifier.HttpClientName)
                     .ConfigurePrimaryHttpMessageHandler(() => PleasanterSso);
                 services.AddSingleton<TimeProvider>(Time);
                 services.AddSingleton<IMailTransport>(MailTransport);
