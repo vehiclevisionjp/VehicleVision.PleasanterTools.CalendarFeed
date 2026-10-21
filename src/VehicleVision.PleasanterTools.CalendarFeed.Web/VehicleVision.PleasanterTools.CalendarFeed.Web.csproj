@@ -15,8 +15,13 @@
   <ItemGroup>
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Core\VehicleVision.PleasanterTools.CalendarFeed.Core.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Data\VehicleVision.PleasanterTools.CalendarFeed.Data.csproj" />
-    <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Mail\VehicleVision.PleasanterTools.CalendarFeed.Mail.csproj" />
+    <PackageReference Include="VehicleVision.PleasanterTools.Core.Mail" Version="0.1.0-preview.4" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Pleasanter\VehicleVision.PleasanterTools.CalendarFeed.Pleasanter.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DB の基盤は Core.Data（NuGet）へ集約した。名前空間を暗黙に使えるようにする -->
+    <Using Include="VehicleVision.PleasanterTools.Core.Data" />
   </ItemGroup>
 
 </Project>

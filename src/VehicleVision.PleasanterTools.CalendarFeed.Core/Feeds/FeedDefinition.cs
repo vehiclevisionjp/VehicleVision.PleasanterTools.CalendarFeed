@@ -12,6 +12,7 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 /// <param name="ApiKeyUserTimeZoneId">API キーの利用者のタイムゾーン。<c>null</c> なら既定のタイムゾーン。</param>
 /// <param name="LastFetch">Pleasanter から最後に取りに行った結果。<c>null</c> ならまだ取りに行っていない。</param>
 /// <param name="Range">出す予定の期間（今日からの日数。無制限の側は <c>null</c>）。<c>null</c> なら既定（過去 365 日・未来は無制限）。</param>
+/// <param name="CalDavEnabled">CalDAV（カレンダーアプリからの接続）を有効にしているか。既定は無効（Issue #85）。</param>
 /// <param name="ApiKeyHint">登録した API キーの末尾（見分けるため）。<c>null</c> なら API キーは未登録。**値そのものは持たない。**</param>
 public sealed record FeedDefinition(
     Guid Id,
@@ -25,7 +26,8 @@ public sealed record FeedDefinition(
     string? ApiKeyUserTimeZoneId = null,
     string? ApiKeyHint = null,
     FeedFetchResult? LastFetch = null,
-    FeedRange? Range = null)
+    FeedRange? Range = null,
+    bool CalDavEnabled = false)
 {
     /// <summary>出す予定の期間。未指定なら既定。</summary>
     public FeedRange EffectiveRange => Range ?? FeedRange.Default;

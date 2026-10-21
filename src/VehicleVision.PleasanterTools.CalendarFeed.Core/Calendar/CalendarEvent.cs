@@ -6,6 +6,9 @@ public sealed record CalendarEvent
     /// <summary>予定の ID。**レコードごとに変わらない値**にする（購読側が更新と新規を見分ける）。</summary>
     public required string Uid { get; init; }
 
+    /// <summary>元の Pleasanter のレコード ID。CalDAV の書き込みが、予定からレコードを引くのに使う。</summary>
+    public long? RecordId { get; init; }
+
     /// <summary>件名。</summary>
     public required string Summary { get; init; }
 

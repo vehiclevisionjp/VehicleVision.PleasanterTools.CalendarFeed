@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using VehicleVision.PleasanterTools.CalendarFeed.Mail;
+using VehicleVision.PleasanterTools.Core.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
@@ -270,9 +270,21 @@ internal sealed class FakePleasanter : HttpMessageHandler
     /// <summary>表示名への解決（KeyValues ＋ Text）の要求に返す行（JSON）。</summary>
     public string ResolvedRow { get; set; } = """{ "IssueId": "5", "ClassA": "会議", "ClassB": "第一会議室" }""";
 
+    /// <summary>作成・更新（<c>Create</c> / <c>Update</c>）への応答の HTTP 状態。<c>null</c> なら <see cref="StatusCode"/>。</summary>
+    public HttpStatusCode? WriteStatusCode { get; set; }
+
+    /// <summary>レコード 1 件の取得（<c>api/items/{レコード ID}/Get</c>）への応答の HTTP 状態。<c>null</c> なら <see cref="StatusCode"/>。</summary>
+    public HttpStatusCode? RecordStatusCode { get; set; }
+
+    /// <summary>受けた要求（パス、本文）を順に。</summary>
+    public List<(string Path, string Body)> Requests { get; } = [];
+
+    /// <summary>テストのフィードのサイト ID。<b>Offset を持たない Get</b>（一覧ではない）を、レコード 1 件の取得として扱う。</summary>
+    public const long SiteId = 123;
+
     /// <summary>返すレコード 1 件（JSON）。</summary>
     public string Record { get; set; } = """
-        { "IssueId": 5, "Ver": 1, "Title": "打合せ", "Body": "議題",
+        { "SiteId": 123, "IssueId": 5, "Ver": 1, "Title": "打合せ", "ItemTitle": "打合せ", "Body": "議題",
           "StartTime": "2026-03-01T09:00:00", "CompletionTime": "2026-03-01T10:00:00" }
         """;
 
@@ -283,6 +295,33 @@ internal sealed class FakePleasanter : HttpMessageHandler
         LastRequestUri = request.RequestUri!.ToString();
         LastRequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
         Bodies.Add(LastRequestBody);
+        var path = request.RequestUri!.AbsolutePath;
+        Requests.Add((path, LastRequestBody));
+
+        // 作成・更新・削除（CalDAV の書き込み）
+        if (path.EndsWith("/Create", StringComparison.Ordinal) || path.EndsWith("/Update", StringComparison.Ordinal)
+            || path.EndsWith("/Delete", StringComparison.Ordinal))
+        {
+            var created = path.EndsWith("/Create", StringComparison.Ordinal);
+            return new HttpResponseMessage(WriteStatusCode ?? StatusCode)
+            {
+                Content = new StringContent(
+                    $$"""{ "Id": {{(created ? 6 : 5)}}, "StatusCode": 200, "Message": "ok" }""", System.Text.Encoding.UTF8, "application/json"),
+            };
+        }
+
+        // レコード 1 件の取得
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments is ["api", "items", _, "Get"] && !LastRequestBody.Contains("\"Offset\"", StringComparison.Ordinal))
+        {
+            return new HttpResponseMessage(RecordStatusCode ?? StatusCode)
+            {
+                Content = new StringContent(
+                    $$"""{ "StatusCode": 200, "Response": { "Offset": 0, "PageSize": 1, "TotalCount": 1, "Data": [ {{Record}} ] } }""",
+                    System.Text.Encoding.UTF8,
+                    "application/json"),
+            };
+        }
 
         // 表示名への解決の要求（View.ApiDataType = KeyValues）には、解決済みの行を返す
         var row = LastRequestBody.Contains("\"ApiDataType\"", StringComparison.Ordinal) ? ResolvedRow : Record;

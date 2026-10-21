@@ -61,7 +61,7 @@ public sealed class RequirePermissionFilter(string permission) : IEndpointFilter
 }
 
 /// <summary>認証済みの管理者（エンドポイントフィルタが <c>HttpContext.Items</c> へ置く）。</summary>
-public sealed record AdminContext(AdminUser User, string SessionId, AdminSessionKind Kind)
+public sealed record AdminContext(AdminUser User, string SessionId, string Kind)
 {
     public const string ItemKey = "calendarfeed.admin";
 

@@ -78,7 +78,7 @@ export interface FeedMapping {
   defaultDurationMinutes: number;
 }
 
-export type FetchStatus = 'Success' | 'Transient' | 'Unauthorized' | 'Permanent' | 'KeyError';
+export type FetchStatus = 'Success' | 'Transient' | 'Unauthorized' | 'Permanent' | 'KeyError' | 'RateLimited';
 
 export interface FeedFetchResult {
   at: string;
@@ -103,6 +103,8 @@ export interface Feed {
   lastFetch: FeedFetchResult | null;
   /** 出す予定の期間（今日からの日数。null は無制限＝開区間）。 */
   range: FeedRange;
+  /** CalDAV（カレンダーアプリからの接続）を有効にしているか。 */
+  calDavEnabled: boolean;
 }
 
 /** 出す予定の期間。null の側は無制限。 */

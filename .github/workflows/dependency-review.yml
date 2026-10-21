@@ -20,7 +20,7 @@
 #   必須にすると、その修正 PR 自体がマージできなくなる
 #   （`_documents/ブランチ運用方針.md`）。
 
-name: 依存の確認
+name: Dependency Review
 
 on:
   pull_request:
@@ -38,7 +38,7 @@ concurrency:
 
 jobs:
   dependency-review:
-    name: 入ってくる依存を見る
+    name: dependency-review
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

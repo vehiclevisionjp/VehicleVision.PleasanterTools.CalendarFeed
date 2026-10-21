@@ -17,34 +17,27 @@ public static class AdminAuditEndpoints
         group.AddEndpointFilter<AdminSessionFilter>();
         group.AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.AuditRead));
 
-        // 新しい順。ページ送りは、前のページの最後の occurredAt を before へ渡す
+        // 新しい順。ページ送りは、前のページまでに読んだ件数を offset へ渡す（時刻で区切ると、同じ秒の記録を取りこぼす）
         group.MapGet("/", async (
             IAuditLogStore store,
             int? limit,
-            string? before,
+            int? offset,
             string? admin,
             string? action,
             bool? failed,
             CancellationToken ct) =>
         {
-            DateTimeOffset? beforeTime = null;
-            if (!string.IsNullOrEmpty(before))
+            if (offset is < 0)
             {
-                if (!DateTimeOffset.TryParse(
-                        before, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed))
-                {
-                    return ApiError.Of(StatusCodes.Status400BadRequest, ServerMessageKeys.AuditBeforeInvalid);
-                }
-
-                beforeTime = parsed;
+                return ApiError.Of(StatusCodes.Status400BadRequest, ServerMessageKeys.AuditOffsetInvalid);
             }
 
             var entries = await store.ListAsync(
                 new AuditLogQuery
                 {
                     Limit = limit ?? 100,
-                    Before = beforeTime,
-                    AdminUserId = admin,
+                    Offset = offset ?? 0,
+                    ActorKey = admin,
                     Action = action,
                     FailedOnly = failed ?? false,
                 },
@@ -52,14 +45,14 @@ public static class AdminAuditEndpoints
 
             return Results.Ok(entries.Select(e => new
             {
-                occurredAt = DbTime.Format(e.OccurredAt),
+                occurredAt = e.OccurredAt.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'", CultureInfo.InvariantCulture),
                 e.Action,
                 succeeded = e.Succeeded,
-                adminUserId = e.AdminUserId,
-                e.LoginId,
+                adminUserId = e.ActorKey,
+                loginId = e.ActorLoginId,
                 e.TargetType,
                 e.TargetId,
-                e.Detail,
+                detail = e.DetailJson,
                 e.IpAddress,
             }));
         });

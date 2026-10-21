@@ -104,7 +104,8 @@ public static class EventMapper
         var updated = GetDateTime(record, "UpdatedTime");
         return new CalendarEvent
         {
-            Uid = $"{feed.SiteId}-{recordId}@{feed.Id:N}.calendarfeed",
+            Uid = DerivedUid(feed, recordId.Value),
+            RecordId = recordId,
             Summary = string.IsNullOrWhiteSpace(summary) ? FeedLanguages.Untitled(feed.Language) : summary,
             Start = startValue,
             End = endValue,
@@ -120,6 +121,9 @@ public static class EventMapper
             Sequence = Math.Max(0, (GetInt(record, "Ver") ?? 1) - 1),
         };
     }
+
+    /// <summary>レコードから導く UID（<c>{サイト ID}-{レコード ID}@{フィード ID}.calendarfeed</c>）。レコードごとに変わらない。</summary>
+    public static string DerivedUid(FeedDefinition feed, long recordId) => $"{feed.SiteId}-{recordId}@{feed.Id:N}.calendarfeed";
 
     /// <summary>
     /// 列の値を**表示用の文字**にする。

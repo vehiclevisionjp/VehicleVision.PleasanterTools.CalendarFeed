@@ -1,3 +1,4 @@
+using VehicleVision.PleasanterTools.CalendarFeed.Data;
 using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using System.Text.RegularExpressions;
@@ -166,13 +167,36 @@ public static class AdminFeedEndpoints
             return Results.NoContent();
         }).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.FeedsWrite));
 
+        // **CalDAV（カレンダーアプリからの接続）の有効・無効。** 既定は無効。有効にしたフィードだけが /caldav/ に出る
+        admin.MapPut("/{id:guid}/caldav", async (
+            Guid id,
+            SetCalDavRequest request,
+            HttpContext http,
+            IFeedStore feeds,
+            AuditLogService audit,
+            CancellationToken ct) =>
+        {
+            if (!await feeds.SetCalDavEnabledAsync(id, request.Enabled, ct))
+            {
+                return Results.NotFound();
+            }
+
+            await audit.WriteAsync(
+                http, AuditActions.FeedCalDavChanged, true, AdminContext.Of(http).User, targetType: "Feed",
+                targetId: id.ToString("D"), detail: request.Enabled ? "enabled" : "disabled");
+            return Results.NoContent();
+        }).AddEndpointFilter(RequirePermissionFilter.Of(AdminPermissions.FeedsWrite));
+
         admin.MapDelete("/{id:guid}", async (
-            Guid id, HttpContext http, IFeedStore feeds, FeedService service, AuditLogService audit, CancellationToken ct) =>
+            Guid id, HttpContext http, IFeedStore feeds, FeedService service, ICalDavStore calDav, AuditLogService audit, CancellationToken ct) =>
         {
             if (!await feeds.RevokeAsync(id, ct))
             {
                 return Results.NotFound();
             }
+
+            // CalDAV の UID の対応は、フィードと一緒に消す（無効にしただけでは残す。有効に戻したときに UID が変わらないように）
+            await calDav.DeleteFeedAsync(id, ct);
 
             service.Invalidate(id);
             await audit.WriteAsync(http, AuditActions.FeedRevoked, true, AdminContext.Of(http).User, targetType: "Feed", targetId: id.ToString("D"));
@@ -263,6 +287,9 @@ public sealed record UpdateFeedRequest(
     public string? Validate(string? language = null) => new CreateFeedRequest(Name, SiteId, Mapping, Filters, null, ApiKeyUserTimeZoneId, Language, PastDays, FutureDays).Validate(language);
 }
 
+/// <summary>CalDAV の有効・無効の要求。</summary>
+public sealed record SetCalDavRequest(bool Enabled);
+
 /// <summary>API キーの差し替えの要求。</summary>
 public sealed record SetApiKeyRequest(string ApiKey, string? ApiKeyUserTimeZoneId = null)
 {
@@ -297,9 +324,10 @@ public sealed record FeedView(
     bool HasApiKey,
     string? ApiKeyHint,
     FeedFetchResult? LastFetch,
-    FeedRange Range)
+    FeedRange Range,
+    bool CalDavEnabled)
 {
     public static FeedView From(FeedDefinition f) => new(
         f.Id, f.Name, f.SiteId, f.Mapping, f.Filters, f.CreatedAt,
-        f.Language, f.ApiKeyUserTimeZoneId, f.HasApiKey, f.ApiKeyHint, f.LastFetch, f.EffectiveRange);
+        f.Language, f.ApiKeyUserTimeZoneId, f.HasApiKey, f.ApiKeyHint, f.LastFetch, f.EffectiveRange, f.CalDavEnabled);
 }

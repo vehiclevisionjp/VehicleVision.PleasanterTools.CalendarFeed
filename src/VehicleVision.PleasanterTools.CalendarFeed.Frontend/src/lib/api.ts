@@ -95,6 +95,7 @@ export const api = {
   updateFeed: (id: string, input: Omit<FeedInput, 'apiKey'>) => put<Feed>(`/feeds/${id}`, input),
   rotateFeed: (id: string) => post<{ url: string }>(`/feeds/${id}/rotate`),
   setFeedApiKey: (id: string, apiKey: string, apiKeyUserTimeZoneId: string | null) => put<void>(`/feeds/${id}/apikey`, { apiKey, apiKeyUserTimeZoneId }),
+  setFeedCalDav: (id: string, enabled: boolean) => put<void>(`/feeds/${id}/caldav`, { enabled }),
   revokeFeed: (id: string) => del<void>(`/feeds/${id}`),
 
   // ---- 管理者 ----

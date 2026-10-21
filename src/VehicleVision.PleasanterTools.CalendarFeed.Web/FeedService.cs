@@ -101,8 +101,31 @@ public sealed class FeedService(
         return id is not null && resolved.TryGetValue(id, out var texts) ? texts : null;
     }
 
+    /// <summary>
+    /// 失敗の応答の <c>Retry-After</c>（秒）。一時的な失敗は 60 秒。<b>API の回数の上限（<see cref="PleasanterErrorKind.RateLimited"/>）は、
+    /// API キーの利用者のタイムゾーンの日付が変わるまで戻らない</b>ので、次の 0 時（＋1 分）まで。
+    /// </summary>
+    public int RetryAfterSeconds(FeedDefinition feed, PleasanterException failure)
+    {
+        if (failure.Kind is not PleasanterErrorKind.RateLimited)
+        {
+            return 60;
+        }
+
+        var zone = TimeZoneInfo.FindSystemTimeZoneById(feed.ApiKeyUserTimeZoneId ?? pleasanter.ApiKeyUserTimeZoneId);
+        var now = TimeZoneInfo.ConvertTime(time.GetUtcNow(), zone).DateTime;
+        var untilMidnight = now.Date.AddDays(1) - now + TimeSpan.FromMinutes(1);
+        return (int)Math.Clamp(untilMidnight.TotalSeconds, 60, 24 * 60 * 60);
+    }
+
     /// <summary>生成済みの .ics を捨てる。**API キーを差し替えたら呼ぶ**（古いキーで取った結果を返さない）。</summary>
-    public void Invalidate(Guid feedId) => cache.Remove(feedId);
+    public void Invalidate(Guid feedId)
+    {
+        cache.Remove(feedId);
+
+        // CalDAV の使い回しも捨てる（キャッシュの名前に入る版を進める。古い名前のものは期限で消える）
+        _versions.AddOrUpdate(feedId, 1, (_, version) => version + 1);
+    }
 
     private async Task<(string Body, int EventCount)> BuildAsync(FeedDefinition feed, CancellationToken cancellationToken)
     {
@@ -111,6 +134,54 @@ public sealed class FeedService(
             ?? pleasanter.ApiKey
             ?? throw new PleasanterException(
                 PleasanterErrorKind.Unauthorized, "フィードに API キーが登録されていません。");
+
+        var output = await FetchEventsAsync(feed, apiKey, cancellationToken).ConfigureAwait(false);
+        return (
+            ICalWriter.Write(feed.Name, output, time.GetUtcNow(), TimeSpan.FromSeconds(options.CacheSeconds)),
+            output.Count);
+    }
+
+    /// <summary>
+    /// <b>CalDAV（カレンダーアプリ）向けの予定の一覧</b>（Issue #85）。<b>利用者本人の API キー</b>で Pleasanter から取る
+    /// （フィードに登録した API キーは使わない。見える範囲は、その利用者の権限で決まる）。
+    /// 結果は <b>API キーの SHA-256 ごと</b>に <see cref="FeedOptions.CacheSeconds"/> だけ使い回す
+    /// （Pleasanter の API の回数を守る。キーそのものはキャッシュの名前にも値にも残さない）。
+    /// </summary>
+    public Task<IReadOnlyList<CalendarEvent>> GetCalDavEventsAsync(
+        FeedDefinition feed, string apiKey, CancellationToken cancellationToken) =>
+        cache.GetOrCreateAsync<IReadOnlyList<CalendarEvent>>(
+            CalDavCacheKey("events", feed.Id, apiKey),
+            async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(options.CacheSeconds);
+                return await FetchEventsAsync(feed, apiKey, cancellationToken).ConfigureAwait(false);
+            })!;
+
+    /// <summary>
+    /// 利用者の API キーで、このフィードのサイトを読めるか（<b>1 件だけ取って</b>確かめる）。読めなければ <see cref="PleasanterException"/>。
+    /// 結果は <see cref="FeedOptions.CacheSeconds"/> だけ使い回す。
+    /// </summary>
+    public async Task EnsureCalDavAccessAsync(FeedDefinition feed, string apiKey, CancellationToken cancellationToken)
+    {
+        var key = CalDavCacheKey("access", feed.Id, apiKey);
+        if (cache.TryGetValue(key, out _))
+        {
+            return;
+        }
+
+        await client.GetRecordsAsync(apiKey, feed.SiteId, 0, 1, feed.Filters, cancellationToken).ConfigureAwait(false);
+        cache.Set(key, true, TimeSpan.FromSeconds(options.CacheSeconds));
+    }
+
+    /// <summary>キャッシュの名前。<b>API キーは SHA-256 にして使う。</b>フィードごとの版（<see cref="Invalidate"/>）を含める。</summary>
+    private string CalDavCacheKey(string kind, Guid feedId, string apiKey) =>
+        $"caldav:{kind}:{feedId:D}:{_versions.GetValueOrDefault(feedId)}:"
+        + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(apiKey)));
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int> _versions = new();
+
+    private async Task<List<CalendarEvent>> FetchEventsAsync(FeedDefinition feed, string apiKey, CancellationToken cancellationToken)
+    {
         var apiUserZone = TimeZoneInfo.FindSystemTimeZoneById(
             feed.ApiKeyUserTimeZoneId ?? pleasanter.ApiKeyUserTimeZoneId);
 
@@ -161,9 +232,6 @@ public sealed class FeedService(
             }
         }
 
-        var output = events.Take(options.MaxEvents).ToList();
-        return (
-            ICalWriter.Write(feed.Name, output, time.GetUtcNow(), TimeSpan.FromSeconds(options.CacheSeconds)),
-            output.Count);
+        return events.Take(options.MaxEvents).ToList();
     }
 }

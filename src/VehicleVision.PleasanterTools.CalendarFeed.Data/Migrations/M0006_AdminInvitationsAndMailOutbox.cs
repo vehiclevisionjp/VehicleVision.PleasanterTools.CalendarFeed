@@ -22,9 +22,9 @@ public sealed class M0006_AdminInvitationsAndMailOutbox : Migration
             .WithColumn("AdminUserId").AsString(36).NotNullable()
             // トークンの SHA-256（16 進）。現物は保管しない
             .WithColumn("TokenHash").AsString(64).NotNullable()
-            .WithColumn("ExpiresAt").AsString(32).NotNullable()
-            .WithColumn("UsedAt").AsString(32).Nullable()
-            .WithColumn("CreatedAt").AsString(32).NotNullable()
+            .WithColumn("ExpiresAt").AsDateTime2().NotNullable()
+            .WithColumn("UsedAt").AsDateTime2().Nullable()
+            .WithColumn("CreatedAt").AsDateTime2().NotNullable()
             .WithColumn("CreatedBy").AsString(36).Nullable();
         Create.Index("IX_AdminInvitations_TokenHash").OnTable("AdminInvitations").OnColumn("TokenHash").Unique();
         Create.Index("IX_AdminInvitations_AdminUserId").OnTable("AdminInvitations").OnColumn("AdminUserId");
@@ -37,13 +37,13 @@ public sealed class M0006_AdminInvitationsAndMailOutbox : Migration
             .WithColumn("PayloadProtected").AsString(int.MaxValue).NotNullable()
             .WithColumn("Status").AsInt32().NotNullable()
             .WithColumn("RetryCount").AsInt32().NotNullable().WithDefaultValue(0)
-            .WithColumn("NextAttemptAt").AsString(32).NotNullable()
+            .WithColumn("NextAttemptAt").AsDateTime2().NotNullable()
             // 理由だけを入れる。宛先も本文も入れない（画面とデッドレターに残る）
             .WithColumn("LastError").AsString(1024).Nullable()
             .WithColumn("LockedBy").AsString(64).Nullable()
-            .WithColumn("LockedUntil").AsString(32).Nullable()
-            .WithColumn("CreatedAt").AsString(32).NotNullable()
-            .WithColumn("UpdatedAt").AsString(32).NotNullable();
+            .WithColumn("LockedUntil").AsDateTime2().Nullable()
+            .WithColumn("CreatedAt").AsDateTime2().NotNullable()
+            .WithColumn("UpdatedAt").AsDateTime2().NotNullable();
 
         // 送信ワーカーが「送るべき行」を探す索引
         Create.Index("IX_MailOutbox_Status_NextAttemptAt")

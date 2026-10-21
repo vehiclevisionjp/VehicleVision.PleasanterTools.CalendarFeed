@@ -27,9 +27,6 @@ public static class AdminPleasanterSsoEndpoints
     /// </remarks>
     public const string CheckRateLimitPolicy = "adminPleasanterSso";
 
-    /// <summary>5 分あたりの上限。画面の問い合わせ間隔（2 秒）に余裕を持たせる。</summary>
-    public const int CheckRequestsPer5Minutes = 300;
-
     /// <summary>入口を登録する。</summary>
     public static void MapAdminPleasanterSso(this WebApplication app)
     {
@@ -100,7 +97,7 @@ public static class AdminPleasanterSsoEndpoints
             var user = resolved.User!;
             if (resolved.Registered)
             {
-                await audit.WriteAsync(http, AuditActions.PleasanterSsoRegistered, true, user, targetType: "AdminUser", targetId: user.Id, detail: $"role={user.Role}");
+                await audit.WriteAsync(http, AuditActions.PleasanterSsoRegistered, true, user, targetType: "AdminUser", targetId: user.Id.ToString("D"), detail: $"role={user.Role}");
             }
 
             // 前のセッションがあれば捨てる（ログインし直したら、前の cookie は使えない）
@@ -115,7 +112,7 @@ public static class AdminPleasanterSsoEndpoints
             // 登録済みの 2 要素は省かせない。必須で未登録なら登録させる。それ以外はそのまま入れる
             var now = time.GetUtcNow();
             var step = await AdminAuthEndpoints.SignInAsync(
-                http, sessions, users, user, config.AdminAuth, audit, now, ct,
+                http, sessions, users, user, config.AdminAuth, audit, ct,
                 new SessionSso(Pleasanter: new PleasanterSsoKeys(identity.TenantId, identity.UserId, now)));
             return Results.Ok(new { status = "signedIn", next = step });
         }).RequirePleasanterSsoRateLimit();

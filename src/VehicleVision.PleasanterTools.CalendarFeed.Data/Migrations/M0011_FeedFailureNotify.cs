@@ -9,7 +9,7 @@ public sealed class M0011_FeedFailureNotify : Migration
     public override void Up() =>
         Alter.Table("Feeds")
             .AddColumn("ConsecutiveFailures").AsInt32().NotNullable().WithDefaultValue(0)
-            .AddColumn("FailureNotifiedAt").AsString(32).Nullable();
+            .AddColumn("FailureNotifiedAt").AsDateTime2().Nullable();
 
     public override void Down()
     {

@@ -11,7 +11,7 @@ public sealed class M0004_AuditLog : Migration
     {
         Create.Table("AuditLogs")
             .WithColumn("Id").AsString(36).NotNullable().PrimaryKey()
-            .WithColumn("OccurredAt").AsString(32).NotNullable()
+            .WithColumn("OccurredAt").AsDateTime2().NotNullable()
             .WithColumn("AdminUserId").AsString(36).Nullable()
             .WithColumn("LoginId").AsString(100).Nullable()
             .WithColumn("Action").AsString(64).NotNullable()

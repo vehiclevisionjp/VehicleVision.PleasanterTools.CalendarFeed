@@ -8,7 +8,7 @@
 #     https://learn.microsoft.com/azure/container-registry/container-registry-tasks-overview
 #   - azure/login v3.0.2
 #     https://github.com/Azure/login/releases/tag/v3.0.2
-name: AKS image
+name: AKS Image
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   publish:
-    name: ACRへ発行
+    name: publish
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: aks-production

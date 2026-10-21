@@ -5,7 +5,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Caching.Memory;
 using VehicleVision.PleasanterTools.CalendarFeed.Data;
-using VehicleVision.PleasanterTools.CalendarFeed.Mail;
+using VehicleVision.PleasanterTools.Core.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Feeds;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
@@ -16,9 +16,10 @@ using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 
 // **設定に書く鍵を作るための道。** 手で乱数を用意させると、短い値や使い回しが混ざる。
 // コンソールへ出す文字列なので英語（.github/copilot-instructions.md）
-if (args.Contains("--generate-secret-key"))
+if (SecretKeyCommand.IsRequested(args))
 {
-    Console.WriteLine(SecretProtector.GenerateKey());
+    // `--write` を付けると、Security.local.json へ書く（すでに鍵があれば断る）
+    Environment.ExitCode = SecretKeyCommand.Run(args, Console.Out, Console.Error);
     return;
 }
 
@@ -28,6 +29,10 @@ var builder = WebApplication.CreateBuilder(args);
 // **一番先に積む。** 以降の読み取りがすべてこれを見る。
 // 優先順位は {名前}.local.json ＞ 環境変数 ＞ {名前}.json（App_Data/Parameters/README.md）
 builder.Configuration.AddParameterFiles();
+
+// ---- 固定のパラメータ（上限・時間。管理画面からは編集しない。Issue #92） ----------------------------
+// **設定は DI から読む**（テストが後から足す設定も効くように）。読めない値・範囲の外の値は、起動時（Build の直後）に落とす
+builder.Services.AddSingleton(sp => FixedParameters.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 
 // ---- 設定は DI の生成時に読む（テストからの上書きを効かせるため） ---------------
 // ---- アプリケーション設定（管理画面から編集できる設定。Questionnaire に則る） -------------------------
@@ -49,20 +54,30 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<PleasanterClient>();
 builder.Services.AddSingleton<FeedFailureNotifier>();
 builder.Services.AddSingleton<FeedService>();
-builder.Services.AddSingleton<IDbConnectionFactory>(sp =>
+builder.Services.AddSingleton(sp =>
 {
     var configuration = sp.GetRequiredService<IConfiguration>();
-    var provider = DbConnectionFactory.ParseProvider(AppSettings.Text(configuration, AppSettings.DbProvider));
-    return new DbConnectionFactory(
+    var provider = CalendarFeedDatabase.Instance.ParseProvider(AppSettings.Text(configuration, AppSettings.DbProvider), DatabaseProvider.Sqlite);
+    return new DatabaseConnectionInfo(
         provider,
-        DbConnectionFactory.ResolveConnectionString(
+        CalendarFeedDatabase.Instance.ResolveConnectionString(
             provider,
             AppSettings.Text(configuration, AppSettings.DbConnectionString),
             sp.GetRequiredService<IHostEnvironment>().ContentRootPath));
 });
+builder.Services.AddSingleton<IDbConnectionFactory>(sp =>
+{
+    var database = sp.GetRequiredService<DatabaseConnectionInfo>();
+    return new DbConnectionFactory(database.Provider, database.ConnectionString);
+});
 builder.Services.AddSingleton(sp => AppSettings.ReadSecretProtector(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<IFeedStore, FeedStore>();
-builder.Services.AddSingleton<IAdminUserStore, AdminUserStore>();
+builder.Services.AddSingleton<ISecretCipher, SecretCipherAdapter>();
+builder.Services.AddSingleton<IAdminUserStore>(sp => new AdminUserStore(
+    sp.GetRequiredService<IDbConnectionFactory>(),
+    sp.GetRequiredService<ISecretCipher>(),
+    sp.GetRequiredService<TimeProvider>(),
+    CalendarFeedDatabase.Instance.AppId));
 builder.Services.AddSingleton<IAdminSessionStore, AdminSessionStore>();
 builder.Services.AddSingleton<IAuditLogStore, AuditLogStore>();
 builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
@@ -71,6 +86,8 @@ builder.Services.AddSingleton<IAdminInvitationStore, AdminInvitationStore>();
 // **無効（既定）なら何も送らない。** 招待は画面の URL を手で渡す。設定は管理画面から編集できる
 builder.Services.AddSingleton<IMailOutbox, MailOutbox>();
 builder.Services.AddSingleton<IRateLimitStore, RateLimitStore>();
+builder.Services.AddSingleton<ICalDavStore, CalDavStore>();
+builder.Services.AddSingleton<CalDavWriteService>();
 builder.Services.AddSingleton<SharedRateLimiter>();
 builder.Services.AddSingleton<RateLimitPurgeService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RateLimitPurgeService>());
@@ -108,10 +125,18 @@ builder.Services.AddRateLimiter(o =>
     // ここに残るのは、要求が多く DB への書き込みが重い購読 URL の枠（台ごとの数え）
     o.AddPolicy("feed", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
+        _ => new FixedWindowRateLimiterOptions
+        {
+            // 回数と窓は RateLimit.json の Policies:Feed（既定は IP ごとに 1 分に 60 回）
+            PermitLimit = http.RequestServices.GetRequiredService<FixedParameters>().Policy(FixedParameters.Feed).Limit,
+            Window = http.RequestServices.GetRequiredService<FixedParameters>().Policy(FixedParameters.Feed).Window,
+        }));
 });
 
 var app = builder.Build();
+
+// 固定のパラメータの読み間違いは、最初の要求ではなく起動時に分かるようにする（Issue #92）
+var fixedParameters = app.Services.GetRequiredService<FixedParameters>();
 
 // 設定の読み間違い（外部設定）は、最初の要求ではなく起動時に分かるようにする
 var runtimeSettings = app.Services.GetRequiredService<RuntimeSettings>();
@@ -121,6 +146,12 @@ app.Logger.LogInformation(
     "設定ファイルの置き場: {Directory} / 見つかったファイル: {Files}",
     app.Configuration[ParameterFiles.DirectoryKey],
     app.Configuration[ParameterFiles.FoundFilesKey]);
+if (!string.IsNullOrEmpty(app.Configuration[ParameterFiles.SecretFilesKey]))
+{
+    // **名前だけ**（値は出さない）
+    app.Logger.LogInformation("値をファイルから読んだ設定（*_FILE）: {Names}", app.Configuration[ParameterFiles.SecretFilesKey]);
+}
+
 if (string.IsNullOrEmpty(app.Configuration[ParameterFiles.FoundFilesKey]))
 {
     app.Logger.LogWarning("設定ファイルが 1 つも見つかりません。置き場を確かめてください。");
@@ -128,19 +159,19 @@ if (string.IsNullOrEmpty(app.Configuration[ParameterFiles.FoundFilesKey]))
 
 // ---- DB のマイグレーション ---------------------------------------------------------
 // 起動時に自動で当てる（CALENDARFEED_DB_AUTOMIGRATE=false で無効。その場合は手で当てる）
-var db = app.Services.GetRequiredService<IDbConnectionFactory>();
+var db = app.Services.GetRequiredService<DatabaseConnectionInfo>();
 app.Logger.LogInformation("DB: {Provider}", db.Provider);
 
 // **`--migrate` ならマイグレーションだけ当てて終わる**（AKS の起動前フック・自動適用を止めた導入先のため）
 if (MigrationCommand.IsRequested(args))
 {
-    Environment.ExitCode = await MigrationCommand.RunAsync(db.Provider, db.ConnectionString, args);
+    Environment.ExitCode = await MigrationCommand.RunAsync(db.Provider, db.ConnectionString, args, fixedParameters.MigrationLockTimeout);
     return;
 }
 
 if (AppSettings.ReadAutoMigrate(app.Configuration))
 {
-    DatabaseMigrator.Migrate(db.Provider, db.ConnectionString);
+    await CalendarFeedDatabase.Instance.Migrator.MigrateUpWithLockAsync(db.Provider, db.ConnectionString, fixedParameters.MigrationLockTimeout);
 }
 else
 {
@@ -195,9 +226,9 @@ app.UseRateLimiter();
 // **ここで見る依存先は本アプリの DB だけ。** 例外の中身は接続先や資格情報を含み得るので応答へ出さない
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
     .DisableRateLimiting();
-app.MapGet("/ready", async (IDbConnectionFactory database, CancellationToken cancellationToken) =>
+app.MapGet("/ready", async (DatabaseConnectionInfo database, CancellationToken cancellationToken) =>
 {
-    var failure = await DatabaseMigrator.WaitForDatabaseAsync(
+    var failure = await CalendarFeedDatabase.Instance.Migrator.WaitForDatabaseAsync(
         database.Provider, database.ConnectionString, TimeSpan.Zero, cancellationToken);
     return failure is null
         ? Results.Ok(new { status = "ready" })
@@ -237,9 +268,9 @@ app.MapGet("/feeds/{token}.ics", async (
     {
         // **トークンをログへ出さない。** フィード ID だけで追える
         logger.LogError("フィード {FeedId} の取得に失敗しました（{Kind}）: {Message}", feed.Id, ex.Kind, ex.Message);
-        if (ex.Kind is PleasanterErrorKind.Transient)
+        if (ex.Kind is PleasanterErrorKind.Transient or PleasanterErrorKind.RateLimited)
         {
-            http.Response.Headers.RetryAfter = "60";
+            http.Response.Headers.RetryAfter = service.RetryAfterSeconds(feed, ex).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
         }
 
@@ -272,6 +303,9 @@ app.MapAdminSettings();
 app.MapAdminSaml();
 app.MapAdminPleasanterSso();
 app.MapAdminUi();
+
+// ---- CalDAV（カレンダーアプリが直接つなぐ。いまは読み取りのみ。Issue #85） ------------------------------
+app.MapCalDav();
 
 app.Run();
 

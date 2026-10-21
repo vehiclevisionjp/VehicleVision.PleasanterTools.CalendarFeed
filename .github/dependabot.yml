@@ -1,96 +1,11 @@
-# 依存の更新を Dependabot に出させる。
-#
-# **base は develop。** 既定ブランチも develop だが、明示しておく
-# （_documents/ブランチ運用方針.md）。master へ直接 PR を向けない。
-#
-# **更新が来ても、寛容ライセンス（MIT / BSD 系 / Apache-2.0）以外は入れないこと。**
-# ライセンスが変わった依存は NOTICE を直すか、採用をやめる（LICENSING.md）。
-#
-# 参照した一次情報（2026-08-18 参照）
-#   https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+# npm と NuGet の patch 更新は Dependabot ではなく、自前のワークフロー（patch-updates.yml）が行う。
+# NOTICE とロックファイルまで 1 つの PR に揃えるため。minor・major の更新は、人が必要に応じて行う。
+# ここに残すのは GitHub Actions の更新だけ（Actions の版は NOTICE・ロックファイルに関係しない）。
 version: 2
-
 updates:
-  # ---- .NET（NuGet） -------------------------------------------------------
-  - package-ecosystem: nuget
-    # csproj は src / tests の直下 1 階層に 1 つずつ置いてある。
-    # **`directories` はワイルドカードを解釈する（`directory` は解釈しない）**
-    directories:
-      - "/src/*"
-      - "/tests/*"
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 5
-    target-branch: develop
-    labels:
-      - "2-type:dependencies"
-      - "6-eco:nuget"
-    commit-message:
-      prefix: NuGet の依存を更新する
-    groups:
-      # **試験まわりは 1 本の PR にまとめる。** 単独で上げても意味が薄い
-      test-tooling:
-        patterns:
-          - "xunit*"
-          - "Microsoft.NET.Test.Sdk"
-          - "coverlet*"
-
-  # ---- フロントエンド（npm） ------------------------------------------------
-  - package-ecosystem: npm
-    directory: /src/VehicleVision.PleasanterTools.CalendarFeed.Frontend
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 5
-    target-branch: develop
-    labels:
-      - "2-type:dependencies"
-      - "6-eco:npm"
-    commit-message:
-      prefix: npm の依存を更新する
-    ignore:
-      # **TypeScript のメジャー更新を止める。**
-      # svelte-check 4.7.6 の peerDependencies は `^5.0.0 || ^6.0.0` で、
-      # 7 系を入れると `npm ci` が依存解決で失敗する（2026-08-19 に実測）。
-      #
-      # **周辺の道具が 7 系を宣言したら、この ignore を外すこと。**
-      # 確認する場所: https://registry.npmjs.org/svelte-check の
-      # versions[latest].peerDependencies.typescript
-      - dependency-name: typescript
-        update-types:
-          - version-update:semver-major
-    groups:
-      # Svelte / Vite は道具立てとして一体で上げる
-      frontend-tooling:
-        patterns:
-          - "svelte*"
-          - "@sveltejs/*"
-          - "vite"
-          - "typescript"
-          - "sass"
-
-  # ---- GitHub Actions ------------------------------------------------------
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
     open-pull-requests-limit: 5
-    target-branch: develop
-    labels:
-      - "2-type:dependencies"
-      - "6-eco:actions"
-    commit-message:
-      prefix: Actions の依存を更新する
-    groups:
-      # **公式 actions はまとめて上げる。** 1 本ずつ来ても判断は同じ
-      github-official:
-        patterns:
-          - "actions/*"

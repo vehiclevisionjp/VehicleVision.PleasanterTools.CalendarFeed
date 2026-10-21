@@ -91,8 +91,7 @@ public static class AdminSessionGuard
 public sealed class AdminSessionFilter(
     IAdminSessionStore sessions,
     IAdminUserStore users,
-    PleasanterSsoSessionRevalidator revalidator,
-    TimeProvider time) : IEndpointFilter
+    PleasanterSsoSessionRevalidator revalidator) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
@@ -106,7 +105,7 @@ public sealed class AdminSessionFilter(
         // **2 要素の途中（Pending）では何も操作させない。** 見るのは Session だけ
         if (!http.Request.Cookies.TryGetValue(AdminSessionGuard.SessionCookie, out var sessionId)
             || string.IsNullOrEmpty(sessionId)
-            || await sessions.FindAsync(sessionId, time.GetUtcNow(), http.RequestAborted).ConfigureAwait(false) is not { Kind: AdminSessionKind.Session } session
+            || await sessions.FindAsync(sessionId, http.RequestAborted).ConfigureAwait(false) is not { Kind: AdminSessionKinds.Session } session
             || await users.FindByIdAsync(session.UserId, http.RequestAborted).ConfigureAwait(false) is not { IsDisabled: false } user)
         {
             return ApiError.Of(StatusCodes.Status401Unauthorized, ServerMessageKeys.LoginRequired);
@@ -125,7 +124,7 @@ public sealed class AdminSessionFilter(
                 return ApiError.Of(StatusCodes.Status503ServiceUnavailable, ServerMessageKeys.UpstreamSessionEnded);
         }
 
-        http.Items[AdminContext.ItemKey] = new AdminContext(user, sessionId, AdminSessionKind.Session);
+        http.Items[AdminContext.ItemKey] = new AdminContext(user, sessionId, AdminSessionKinds.Session);
         return await next(context).ConfigureAwait(false);
     }
 }

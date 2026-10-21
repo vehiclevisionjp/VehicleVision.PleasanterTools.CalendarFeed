@@ -12,7 +12,7 @@
 # 最新に追随させると、壊れた原因が自分の変更か相手の更新かを切り分けられなくなる。
 #
 # **ドキュメントだけの PR では回さない**（下の paths）。
-name: 端から端まで通す試験
+name: E2E Tests
 
 on:
   push:
@@ -52,7 +52,7 @@ env:
 
 jobs:
   pleasanter:
-    name: 端から端まで通す試験（Pleasanter）
+    name: e2e / pleasanter
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -142,7 +142,7 @@ jobs:
         run: docker compose down -v
 
   saml:
-    name: 端から端まで通す試験（SAML）
+    name: e2e / saml
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -197,3 +197,20 @@ jobs:
       - name: 後片付け
         if: always()
         run: docker compose -f tools/saml-idp/docker-compose.yml down -v
+
+  # CalDAV の実クライアント（Python の caldav・vdirsyncer）を、本アプリ（コンテナ）と実機の Pleasanter で通す。
+  # **本アプリの DB は 4 種（SQLite・SQL Server・PostgreSQL・MySQL）すべてで**通す（DB=all。約 5 分）。
+  # **必須チェックにはしていない**（実クライアントの版が変わって落ちることがある。気づくための仕掛け）。
+  # 必須にするときは、e2e-skip.yml に同名のジョブを足すこと
+  caldav:
+    name: e2e / caldav
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: ソースを取得する
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: 実クライアントで CalDAV を通す（DB 4 種）
+        run: DB=all bash tools/caldav-check/run.sh

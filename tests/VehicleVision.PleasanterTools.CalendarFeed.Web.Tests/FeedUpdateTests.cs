@@ -115,9 +115,9 @@ public sealed class FeedUpdateTests : IDisposable
 
         var log = (await _app.Service<IAuditLogStore>().ListAsync(new AuditLogQuery { Action = AuditActions.FeedUpdated, Limit = 10 })).ToList();
         Assert.Equal(2, log.Count);
-        Assert.Contains(log, e => e.Detail!.StartsWith("changed=", StringComparison.Ordinal) && e.Detail.Contains("name") && e.Detail.Contains("siteId"));
-        Assert.Contains(log, e => e.Detail == "no-change");
-        Assert.DoesNotContain(log, e => e.Detail!.Contains("秘密っぽくない名前") || e.Detail.Contains("456"));
+        Assert.Contains(log, e => e.DetailJson!.StartsWith("changed=", StringComparison.Ordinal) && e.DetailJson.Contains("name") && e.DetailJson.Contains("siteId"));
+        Assert.Contains(log, e => e.DetailJson == "no-change");
+        Assert.DoesNotContain(log, e => e.DetailJson!.Contains("秘密っぽくない名前") || e.DetailJson.Contains("456"));
         Assert.All(log, e => Assert.Equal(id, e.TargetId));
     }
 }

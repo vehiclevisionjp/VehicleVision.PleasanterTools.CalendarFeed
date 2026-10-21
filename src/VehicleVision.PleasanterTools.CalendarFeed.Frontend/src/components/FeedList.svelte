@@ -27,6 +27,22 @@
   let busy = $state(false);
   let flash = $state('');
 
+  /** CalDAV のカレンダーの URL（このページと同じオリジン）。 */
+  const calDavUrl = (feed: Feed): string => `${location.origin}/caldav/calendars/${feed.id}/`;
+
+  async function toggleCalDav(feed: Feed): Promise<void> {
+    busy = true;
+    const result = await api.setFeedCalDav(feed.id, !feed.calDavEnabled);
+    busy = false;
+    if (!result.ok) {
+      error = errorText(result);
+      return;
+    }
+
+    flash = t(feed.calDavEnabled ? 'feedCalDavDisabledDone' : 'feedCalDavEnabledDone');
+    await load();
+  }
+
   /** 期間の片側の表示。null は無制限。 */
   const days = (value: number | null): string => (value === null ? t('feedRangeUnlimited') : t('feedRangeDays', { days: value }));
 
@@ -94,7 +110,7 @@
     await load();
   }
 
-  const statusClass = (s: FetchStatus): string => (s === 'Success' ? 'ok' : s === 'Transient' ? 'warn' : 'bad');
+  const statusClass = (s: FetchStatus): string => (s === 'Success' ? 'ok' : s === 'Transient' || s === 'RateLimited' ? 'warn' : 'bad');
   const statusText = (f: Feed): string => {
     const r = f.lastFetch;
     if (!r) return '';
@@ -103,6 +119,8 @@
         return t('fetchSuccess', { count: r.eventCount ?? 0 });
       case 'Transient':
         return t('fetchTransient');
+      case 'RateLimited':
+        return t('fetchRateLimited');
       case 'Unauthorized':
         return t('fetchUnauthorized');
       case 'KeyError':
@@ -147,6 +165,11 @@
               <strong>{feed.name}</strong>
               <div class="small muted">{t('feedCreatedAt')}: {dt(feed.createdAt)}</div>
               <div class="small muted">{t('feedRangeSummary', { past: days(feed.range.pastDays), future: days(feed.range.futureDays) })}</div>
+              {#if feed.calDavEnabled}
+                <div class="small"><span class="badge ok">{t('feedCalDavOn')}</span></div>
+                <div class="small muted">{t('feedCalDavUrl')}: <span class="mono">{calDavUrl(feed)}</span></div>
+                <div class="small muted">{t('feedCalDavHint')}</div>
+              {/if}
             </td>
             <td class="mono" data-label={t('feedSiteId')}>{feed.siteId}</td>
             <td data-label={t('feedApiKey')}>
@@ -170,6 +193,9 @@
               <div class="actions">
                 {#if canWrite}
                   <button class="btn small" type="button" onclick={() => (editor = { feed })}>{t('edit')}</button>
+                  <button class="btn small" type="button" disabled={busy} onclick={() => toggleCalDav(feed)}>
+                    {feed.calDavEnabled ? t('feedCalDavDisable') : t('feedCalDavEnable')}
+                  </button>
                   <button class="btn small" type="button" onclick={() => openKey(feed)}>{t('feedSetApiKey')}</button>
                   <button class="btn small" type="button" onclick={() => (confirm = { kind: 'rotate', feed })}>{t('feedRotate')}</button>
                 {/if}

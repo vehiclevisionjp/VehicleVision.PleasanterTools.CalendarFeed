@@ -51,7 +51,7 @@
 #     https://github.com/actions/create-github-app-token
 #     **`app-id` ではなく `client-id` が推奨。** Dealer も client-id で揃えている
 #   - actions/checkout v7 は .github/workflows/ci.yml と同じ版に揃えた（勝手に上げない）
-name: リリース実行
+name: Release Run
 
 on:
   workflow_dispatch:
@@ -87,7 +87,7 @@ permissions:
 
 jobs:
   plan:
-    name: 版を採番して前提を確かめる
+    name: plan
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -225,7 +225,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   run:
-    name: リリースを通す
+    name: run
     needs: plan
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest

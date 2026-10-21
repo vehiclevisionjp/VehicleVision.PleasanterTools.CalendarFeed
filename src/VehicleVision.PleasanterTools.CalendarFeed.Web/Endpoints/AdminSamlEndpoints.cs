@@ -186,7 +186,7 @@ public static class AdminSamlEndpoints
             var user = resolved.User!;
             if (resolved.Registered)
             {
-                await audit.WriteAsync(http, AuditActions.SamlRegistered, true, user, targetType: "AdminUser", targetId: user.Id, detail: $"role={user.Role}");
+                await audit.WriteAsync(http, AuditActions.SamlRegistered, true, user, targetType: "AdminUser", targetId: user.Id.ToString("D"), detail: $"role={user.Role}");
             }
 
             // 前のセッションがあれば捨てる（ログインし直したら、前の cookie は使えない）
@@ -200,7 +200,7 @@ public static class AdminSamlEndpoints
 
             // 登録済みの 2 要素は省かせない。必須で未登録なら登録させる。それ以外はそのまま入れる
             var step = await AdminAuthEndpoints.SignInAsync(
-                http, sessions, users, user, config.AdminAuth, audit, time.GetUtcNow(), ct, new SessionSso(ReadSessionKeys(response.ClaimsIdentity)));
+                http, sessions, users, user, config.AdminAuth, audit, ct, new SessionSso(ReadSessionKeys(response.ClaimsIdentity)));
             _ = step;
             return Results.Redirect(relay.ReturnUrl);
         }).RequireAdminLoginRateLimit();

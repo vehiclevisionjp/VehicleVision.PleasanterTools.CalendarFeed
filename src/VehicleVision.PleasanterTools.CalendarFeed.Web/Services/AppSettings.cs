@@ -1,6 +1,6 @@
 using System.Net;
 using System.Globalization;
-using VehicleVision.PleasanterTools.CalendarFeed.Mail;
+using VehicleVision.PleasanterTools.Core.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
