@@ -25,6 +25,7 @@
       ⚠️ **フォント以外へこの例外を広げないこと**
 8. **Pleasanter の API キーを、購読側（カレンダークライアント）へ渡さないこと。**
    資格情報はサーバ側だけで保持する。購読 URL のトークンは Pleasanter の資格情報とは別物
+9. **`{}` を省略しない。** `if` / `else` / `for` / `foreach` / `while` / `using` / `lock` などの本文も、1 行で済む場合も同じ。C# は `.editorconfig` とビルドで、TypeScript・Svelte は ESLint の `curly` で強制する。
 
 <!-- AGENT-RULES:END -->
 
