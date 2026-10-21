@@ -10,6 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- .editorconfig の IDE 規則（{} の省略禁止など）を、ビルドで強制する -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <!-- バージョンの単一情報源。各 .csproj へ個別に書かないこと。1.0.0 未満は互換を保証しない -->
