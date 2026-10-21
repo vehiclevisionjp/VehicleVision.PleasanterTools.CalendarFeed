@@ -33,7 +33,7 @@ describe('文言', () => {
   it('日本語以外は、日本語の文字を含まない（訳し忘れの検出）', () => {
     const japanese = /[぀-ヿ一-鿿]/;
     for (const language of LANGUAGES) {
-      if (language === 'ja' || language === 'zh') continue;
+      if (language === 'ja' || language === 'zh') {continue;}
       for (const [key, text] of Object.entries(MESSAGES[language])) {
         expect(japanese.test(text), `${language}:${key}`).toBe(false);
       }

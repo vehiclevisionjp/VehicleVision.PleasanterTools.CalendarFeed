@@ -62,13 +62,13 @@
   function changes(): Record<string, string | null> {
     const out: Record<string, string | null> = {};
     for (const s of settings ?? []) {
-      if (s.isFixed) continue;
+      if (s.isFixed) {continue;}
       // 数値の入力欄は number で入ってくるので、文字列にそろえる（API は文字列だけを受ける）
       const entered = String(values[s.key] ?? '');
-      if (resets[s.key]) out[s.key] = null;
+      if (resets[s.key]) {out[s.key] = null;}
       else if (s.isSecret) {
-        if (entered) out[s.key] = entered;
-      } else if (entered !== (s.value ?? '')) out[s.key] = entered;
+        if (entered) {out[s.key] = entered;}
+      } else if (entered !== (s.value ?? '')) {out[s.key] = entered;}
     }
 
     return out;
@@ -116,7 +116,7 @@
   }
 
   const ssoTestText = $derived.by(() => {
-    if (ssoTest === null) return '';
+    if (ssoTest === null) {return '';}
     switch (ssoTest.status) {
       case 'Authenticated':
         return t('pleasanterSsoTestAuthenticated', {
@@ -142,8 +142,8 @@
       return;
     }
 
-    if (result.value.queued) flash = t('mailTestQueued');
-    else error = result.value.reason === 'mail-disabled' ? t('mailTestDisabled') : result.value.reason === 'login-id-not-email' ? t('mailTestNotEmail') : t('mailTestFailed');
+    if (result.value.queued) {flash = t('mailTestQueued');}
+    else {error = result.value.reason === 'mail-disabled' ? t('mailTestDisabled') : result.value.reason === 'login-id-not-email' ? t('mailTestNotEmail') : t('mailTestFailed');}
   }
 </script>
 

@@ -26,9 +26,9 @@ export function negotiateLanguage(
 
 /** 日時を言語に合わせて書く。壊れた値は元の文字列のまま返す。 */
 export function formatDateTime(value: string | Date | null | undefined, language: Language): string {
-  if (value === null || value === undefined) return '';
+  if (value === null || value === undefined) {return '';}
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
+  if (Number.isNaN(date.getTime())) {return String(value);}
   return new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 

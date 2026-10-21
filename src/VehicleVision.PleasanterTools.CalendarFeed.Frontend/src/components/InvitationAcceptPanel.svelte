@@ -17,7 +17,7 @@
 
   async function submit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    if (password !== confirm) return;
+    if (password !== confirm) {return;}
     busy = true;
     error = '';
     const accepted = await api.acceptInvitation(token, password);

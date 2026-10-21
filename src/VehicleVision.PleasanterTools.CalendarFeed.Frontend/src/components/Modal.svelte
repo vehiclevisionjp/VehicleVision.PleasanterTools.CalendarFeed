@@ -13,7 +13,7 @@
 
   // 表示したら、モーダルとして開く（フォーカスの閉じ込め・Esc は <dialog> が行う）
   $effect(() => {
-    if (dialog && !dialog.open) dialog.showModal();
+    if (dialog && !dialog.open) {dialog.showModal();}
   });
 </script>
 

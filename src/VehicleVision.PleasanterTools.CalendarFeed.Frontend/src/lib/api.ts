@@ -111,9 +111,9 @@ export const api = {
   // ---- 監査ログ・メール・設定 ----
   audit: (query: { before?: string; failed?: boolean; action?: string; limit?: number }) => {
     const q = new URLSearchParams();
-    if (query.before) q.set('before', query.before);
-    if (query.failed) q.set('failed', 'true');
-    if (query.action) q.set('action', query.action);
+    if (query.before) {q.set('before', query.before);}
+    if (query.failed) {q.set('failed', 'true');}
+    if (query.action) {q.set('action', query.action);}
     q.set('limit', String(query.limit ?? 50));
     return get<AuditEntry[]>(`/audit-logs/?${q}`);
   },

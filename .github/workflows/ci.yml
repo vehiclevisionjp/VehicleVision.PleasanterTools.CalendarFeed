@@ -89,6 +89,9 @@ jobs:
       - name: 型と Svelte を検査する
         run: npm run check
 
+      - name: "{} の省略が無いか検査する"
+        run: npm run lint:ts
+
       - name: 単体テストを実行する
         run: npm test
 
