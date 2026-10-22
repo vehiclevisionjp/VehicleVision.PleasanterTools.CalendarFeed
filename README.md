@@ -129,4 +129,4 @@ npm ci && npm test && npm run build
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 貢献のしかた |
 | [`.github/cla/signed.yml`](.github/cla/signed.yml)・[`.github/workflows/cla-check.yml`](.github/workflows/cla-check.yml) | CLA の署名の一覧と、PR の自動チェック（`CLA` のチェック） |
 
-Copyright (C) PMC Co.,Ltd.
+Copyright (C) PMC Co., Ltd. IT Solution Div.
