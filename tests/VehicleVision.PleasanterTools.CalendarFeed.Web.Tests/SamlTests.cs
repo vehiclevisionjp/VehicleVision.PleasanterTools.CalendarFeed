@@ -396,7 +396,7 @@ public sealed class SamlTests : IDisposable
     {
         // 管理者 A（TestApp の管理者）に 2 要素を登録する
         var admin = _app.AdminClient();
-        var begin = await (await admin.PostAsync("/admin/api/me/totp/begin", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var begin = await (await admin.PostAsJsonAsync("/admin/api/me/totp/begin", new { password = TestApp.AdminPassword })).Content.ReadFromJsonAsync<JsonElement>();
         var secret = begin.GetProperty("secret").GetString()!;
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/admin/api/me/totp/complete", new { code = TotpService.Compute(secret, _app.Time.Now.UtcDateTime) })).StatusCode);
         await EnableAsync();

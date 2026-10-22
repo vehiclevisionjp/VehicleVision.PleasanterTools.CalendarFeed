@@ -23,6 +23,12 @@ public static class AdminSessionGuard
     /// <summary>2 要素の途中の cookie。</summary>
     public const string PendingCookie = "calendarfeed_admin_pending";
 
+    /// <summary>ログイン後の登録で、パスワードを再確認した途中の cookie。</summary>
+    public const string ReenrollCookie = "calendarfeed_admin_reenroll";
+
+    /// <summary>本アプリが追加する登録途中の段階。Pending・Session としては通さない。</summary>
+    public const string ReenrollKind = "Reenroll";
+
     private const string CookiePath = "/admin";
 
     /// <summary>cookie を設定する。</summary>

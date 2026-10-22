@@ -31,6 +31,9 @@ public sealed record AdminAuthOptions(TwoFactorMode TwoFactor, AdminPasswordPoli
     /// <summary>パスワードは通ったが 2 要素がまだ、の段階の有効期間。この間は何も操作させない。</summary>
     public TimeSpan PendingLifetime { get; init; } = TimeSpan.FromMinutes(5);
 
+    /// <summary>ログイン後にパスワードを再確認した、2 要素の登録途中の有効期間。</summary>
+    public TimeSpan ReenrollLifetime { get; init; } = TimeSpan.FromMinutes(5);
+
     /// <summary>ログイン済みセッションの有効期間。</summary>
     public TimeSpan SessionLifetime { get; init; } = TimeSpan.FromHours(8);
 

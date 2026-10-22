@@ -337,7 +337,7 @@ public sealed class PleasanterSsoTests : IDisposable
     public async Task 登録済みの2要素は_Pleasanter経由でも省かせない()
     {
         var admin = _app.AdminClient();
-        var begin = await (await admin.PostAsync("/admin/api/me/totp/begin", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var begin = await (await admin.PostAsJsonAsync("/admin/api/me/totp/begin", new { password = TestApp.AdminPassword })).Content.ReadFromJsonAsync<JsonElement>();
         var secret = begin.GetProperty("secret").GetString()!;
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/admin/api/me/totp/complete", new { code = TotpService.Compute(secret, _app.Time.Now.UtcDateTime) })).StatusCode);
         await EnableAsync();
