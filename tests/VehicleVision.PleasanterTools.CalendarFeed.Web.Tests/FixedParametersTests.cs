@@ -127,7 +127,7 @@ public sealed class FileBackedSettingsTests : IDisposable
     private static IEnumerable<string> EnvironmentSettingNames()
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var type in new[] { typeof(AppSettings), typeof(AppSettingDefinitions), typeof(FixedParameters), typeof(MailSenderOptions), typeof(SamlOptions), typeof(PleasanterSsoOptions) })
+        foreach (var type in new[] { typeof(AppSettings), typeof(AppSettingDefinitions), typeof(FixedParameters), typeof(MailSenderOptions) })
         {
             foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy))
             {

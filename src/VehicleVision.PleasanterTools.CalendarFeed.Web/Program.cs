@@ -162,10 +162,12 @@ if (string.IsNullOrEmpty(app.Configuration[ParameterFiles.FoundFilesKey]))
 var db = app.Services.GetRequiredService<DatabaseConnectionInfo>();
 app.Logger.LogInformation("DB: {Provider}", db.Provider);
 
-// **`--migrate` ならマイグレーションだけ当てて終わる**（AKS の起動前フック・自動適用を止めた導入先のため）
+// --migrate は適用、--migrate-status は状態確認だけを行って終わる。
 if (MigrationCommand.IsRequested(args))
 {
-    Environment.ExitCode = await MigrationCommand.RunAsync(db.Provider, db.ConnectionString, args, fixedParameters.MigrationLockTimeout);
+    Environment.ExitCode = await MigrationCommand.RunAsync(
+        CalendarFeedDatabase.Instance.Migrator, db.Provider, db.ConnectionString, args,
+        lockTimeout: fixedParameters.MigrationLockTimeout);
     return;
 }
 
