@@ -78,7 +78,7 @@ export const api = {
   loginRecovery: (code: string) => post<{ step: Step; recoveryCodesLeft: number }>('/login/recovery', { code }),
   logout: () => post<void>('/logout'),
   me: () => get<Me>('/me/'),
-  totpBegin: () => post<{ secret: string; uri: string }>('/me/totp/begin'),
+  totpBegin: (password?: string) => post<{ secret: string; uri: string }>('/me/totp/begin', password === undefined ? {} : { password }),
   totpComplete: (code: string) => post<{ recoveryCodes: string[] }>('/me/totp/complete', { code }),
   totpDisable: (password: string) => post<void>('/me/totp/disable', { password }),
   changePassword: (currentPassword: string, newPassword: string) => post<void>('/me/password', { currentPassword, newPassword }),

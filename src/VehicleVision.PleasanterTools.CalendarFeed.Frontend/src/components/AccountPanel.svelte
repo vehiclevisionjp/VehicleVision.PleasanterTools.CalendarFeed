@@ -6,6 +6,7 @@
   import type { Me, SessionInfo } from '../lib/types';
   import EnrollPanel from './EnrollPanel.svelte';
   import Notice from './Notice.svelte';
+  import PasswordConfirmation from './PasswordConfirmation.svelte';
 
   let { me, onchanged }: { me: Me; onchanged: () => void } = $props();
 
@@ -118,6 +119,7 @@
   <h2>{t('accountTotpTitle')}</h2>
   {#if enrolling}
     <EnrollPanel
+      confirmPassword
       ondone={() => {
         enrolling = false;
         onchanged();
@@ -139,10 +141,7 @@
       {#if disabling}
         <form onsubmit={disableTotp}>
           <p class="muted">{t('accountTotpDisableLead')}</p>
-          <div class="field">
-            <label for="dis-pw">{t('password')}</label>
-            <input id="dis-pw" type="password" autocomplete="current-password" required bind:value={disablePassword} />
-          </div>
+          <PasswordConfirmation id="dis-pw" bind:value={disablePassword} />
           <button class="btn danger" type="submit">{t('accountTotpDisable')}</button>
         </form>
       {/if}
