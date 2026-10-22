@@ -59,7 +59,7 @@ curl -b jar -X POST $B/admin/api/feeds -H "Content-Type: application/json" \
 | `POST /admin/api/logout` | — | ログアウト（サーバ側のセッションを失効） |
 | `GET /admin/api/me/` | ログイン済み | 自分の情報 |
 | `POST /admin/api/me/password` | ログイン済み | パスワードの変更（他の端末のセッションを失効） |
-| `POST /admin/api/me/totp/begin` → `/complete` | ログイン済み、または必須で未登録の途中 | 2 要素の登録（復旧コード 10 本を 1 度だけ返す） |
+| `POST /admin/api/me/totp/begin` → `/complete` | 本人の再確認、または必須で未登録の途中 | 2 要素の登録・再登録 |
 | `POST /admin/api/me/totp/disable` | ログイン済み | 2 要素の解除（パスワードの再確認つき。必須では不可） |
 | `GET /admin/api/feeds/` | ログイン済み | フィードの一覧（トークンも API キーも含まない） |
 | `POST /admin/api/feeds` | ログイン済み | フィードの作成 |
@@ -75,6 +75,8 @@ curl -b jar -X POST $B/admin/api/feeds -H "Content-Type: application/json" \
 | `POST /admin/api/pleasanter-sso/check` | なし（有効なときだけ） | Pleasanter のログインで入る（Pleasanter の cookie を転送して本人を確かめる） |
 
 管理画面は `/admin/`（ブラウザ）。上の API は管理画面が使うもので、cookie ＋ 状態を変える要求は同じサイトからのものだけ受ける。
+2 要素の登録経路と再確認・レート制限の契約は
+[`管理者認証の仕様書`](_documents/管理者認証の仕様書.md)を参照する。
 
 ## 対応する RDBMS
 
