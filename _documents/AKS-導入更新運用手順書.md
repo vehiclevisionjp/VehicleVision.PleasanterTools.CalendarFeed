@@ -196,6 +196,10 @@ helm upgrade --install calendarfeed deploy/aks/calendarfeed \
 
 Helm の `pre-install` hook がマイグレーション Job を 1 Pod だけ起動し（`--migrate --wait-for-db=…`）、
 成功してから Deployment を作る。DB 接続に失敗するかマイグレーションに失敗した場合、導入は止まる。
+Core.Data preview.12 以降は未適用一覧と適用件数を出す。
+hook は出力文言を解析せず終了コードで判定するため、引数とチャートの変更は不要。
+状態確認の引数・終了コード・出力は
+[`導入-更新運用手順書.md`](導入-更新運用手順書.md#マイグレーションだけを実行する状態を見る) を参照する。
 アプリ Pod の起動時の自動適用（`CALENDARFEED_DB_AUTOMIGRATE`）は既定で有効で、チャートは既定ではこの値を渡さない。
 hook が先に当て終えているので、Pod は未適用が無いことを確かめるだけで起動する。
 複数 Pod が同時に起動しても DB の排他で 1 台だけが当てる。
