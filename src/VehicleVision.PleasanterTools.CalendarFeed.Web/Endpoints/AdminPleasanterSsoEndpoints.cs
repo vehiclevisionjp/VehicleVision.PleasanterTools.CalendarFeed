@@ -131,7 +131,7 @@ public static class AdminPleasanterSsoEndpoints
             PleasanterSsoOptions options;
             try
             {
-                options = PleasanterSsoOptions.FromValues(key => key == PleasanterSsoOptions.EnabledKey
+                options = CalendarFeedAuthenticationSettings.ReadSso(key => key == CalendarFeedAuthenticationSettings.SsoKeys.EnabledKey
                     ? "true"
                     : settings.Current.Snapshot.Values.TryGetValue(key, out var v) ? v : null);
             }
