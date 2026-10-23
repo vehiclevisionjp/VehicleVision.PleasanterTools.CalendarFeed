@@ -17,6 +17,8 @@ public static partial class ServerMessages
         [ServerMessageKeys.TwoFactorDisabled] = "Die Zwei-Faktor-Authentifizierung ist deaktiviert.",
         [ServerMessageKeys.TwoFactorRequired] = "Die Zwei-Faktor-Authentifizierung ist erforderlich und kann daher nicht entfernt werden.",
         [ServerMessageKeys.EnrollmentBeginRequired] = "Starten Sie zuerst die Registrierung (/admin/api/me/totp/begin).",
+        [ServerMessageKeys.EnrollmentRestartRequired] = "Starten Sie die Registrierung erneut und bestätigen Sie Ihr Passwort noch einmal.",
+        [ServerMessageKeys.OperationTemporarilyLocked] = "Dieser Vorgang ist nach mehreren Fehlversuchen vorübergehend gesperrt. Warten Sie etwas und versuchen Sie es erneut.",
         [ServerMessageKeys.TotpCodeMismatch] = "Der Code ist falsch. Geben Sie den 6-stelligen Code ein, der in Ihrer Authentifizierungs-App angezeigt wird.",
         [ServerMessageKeys.LoginIdInvalid] = "Die Anmelde-ID muss 1 bis 100 Zeichen lang sein (keine Steuerzeichen).",
         [ServerMessageKeys.PasswordTooShort] = "Das Passwort muss mindestens {0} Zeichen lang sein.",

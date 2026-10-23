@@ -220,6 +220,8 @@ try {
   // 8. 2 要素の登録
   await page.click('nav button:has-text("アカウント")');
   await page.click('button:has-text("2 要素認証を登録する")');
+  await page.fill('#enroll-pw', PASSWORD);
+  await page.click('button[type=submit]:has-text("2 要素認証を登録する")');
   await page.waitForSelector('[data-testid=totp-secret]');
   const totpSecret = (await page.textContent('[data-testid=totp-secret]')).trim();
   await shot(page, '2要素-登録');

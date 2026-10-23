@@ -17,6 +17,8 @@ public static partial class ServerMessages
         [ServerMessageKeys.TwoFactorDisabled] = "两步验证已被设置为禁用。",
         [ServerMessageKeys.TwoFactorRequired] = "两步验证已被设置为必需，因此无法解除。",
         [ServerMessageKeys.EnrollmentBeginRequired] = "请先开始注册（/admin/api/me/totp/begin）。",
+        [ServerMessageKeys.EnrollmentRestartRequired] = "请重新开始注册，并再次确认密码。",
+        [ServerMessageKeys.OperationTemporarilyLocked] = "由于多次失败，此操作已被暂时锁定。请稍后重试。",
         [ServerMessageKeys.TotpCodeMismatch] = "验证码不正确。请输入验证器应用中显示的 6 位验证码。",
         [ServerMessageKeys.LoginIdInvalid] = "登录 ID 须为 1 到 100 个字符（不含控制字符）。",
         [ServerMessageKeys.PasswordTooShort] = "密码至少需要 {0} 个字符。",

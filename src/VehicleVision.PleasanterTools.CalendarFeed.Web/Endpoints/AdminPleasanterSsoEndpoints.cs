@@ -102,7 +102,7 @@ public static class AdminPleasanterSsoEndpoints
             }
 
             // 前のセッションがあれば捨てる（ログインし直したら、前の cookie は使えない）
-            foreach (var name in new[] { AdminSessionGuard.SessionCookie, AdminSessionGuard.PendingCookie })
+            foreach (var name in new[] { AdminSessionGuard.SessionCookie, AdminSessionGuard.PendingCookie, AdminSessionGuard.ReenrollCookie })
             {
                 if (http.Request.Cookies.TryGetValue(name, out var existing) && !string.IsNullOrEmpty(existing))
                 {

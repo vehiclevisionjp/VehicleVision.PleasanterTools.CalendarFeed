@@ -17,6 +17,8 @@ public static partial class ServerMessages
         [ServerMessageKeys.TwoFactorDisabled] = "2단계 인증은 사용 안 함으로 설정되어 있습니다.",
         [ServerMessageKeys.TwoFactorRequired] = "2단계 인증은 필수로 설정되어 있어 해제할 수 없습니다.",
         [ServerMessageKeys.EnrollmentBeginRequired] = "먼저 등록을 시작해 주세요(/admin/api/me/totp/begin).",
+        [ServerMessageKeys.EnrollmentRestartRequired] = "등록을 다시 시작하고 비밀번호를 다시 확인해 주세요.",
+        [ServerMessageKeys.OperationTemporarilyLocked] = "실패가 반복되어 이 작업이 일시적으로 잠겼습니다. 잠시 후 다시 시도해 주세요.",
         [ServerMessageKeys.TotpCodeMismatch] = "코드가 올바르지 않습니다. 인증 앱에 표시된 6자리 코드를 입력해 주세요.",
         [ServerMessageKeys.LoginIdInvalid] = "로그인 ID는 1~100자(제어 문자 제외)로 지정해 주세요.",
         [ServerMessageKeys.PasswordTooShort] = "비밀번호는 {0}자 이상이어야 합니다.",
