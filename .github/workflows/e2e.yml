@@ -22,6 +22,7 @@ on:
   pull_request:
     branches:
       - develop
+      - master
     # **振る舞いが変わり得るものだけ。** ドキュメントや Issue テンプレートでは回さない
     paths:
       - "src/**"
