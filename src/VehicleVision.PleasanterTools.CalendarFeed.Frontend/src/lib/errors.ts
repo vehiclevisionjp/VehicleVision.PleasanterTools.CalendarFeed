@@ -20,6 +20,8 @@ export function errorText(failure: Extract<Result<unknown>, { ok: false }>): str
       return t('errorNotFound');
     case 409:
       return failure.message || t('errorConflict');
+    case 423:
+      return failure.message || t('errorTooMany');
     case 429:
       return t('errorTooMany');
     default:

@@ -334,6 +334,7 @@ export const zh: Record<MessageKey, string> = {
   accountTotpOff: '未注册。',
   accountTotpEnable: '注册两步验证',
   accountTotpReenroll: '重新注册',
+  accountConfirmPassword: '请输入当前密码以确认。',
   accountTotpDisable: '关闭两步验证',
   accountTotpDisableLead: '请再次输入密码以关闭。',
   accountTotpRequiredNoDisable: '此环境要求使用两步验证，因此无法关闭。',

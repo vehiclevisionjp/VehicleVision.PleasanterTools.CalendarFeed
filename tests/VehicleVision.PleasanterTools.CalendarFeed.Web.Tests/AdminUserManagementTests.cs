@@ -322,7 +322,7 @@ public sealed class AdminUserManagementTests : IDisposable
     public async Task 他人の2要素を解除でき_その人の端末も失効する_自分の分はこの口からは外せない()
     {
         var (bob, id) = await NewMemberAsync("bob", AdminRoles.Editor);
-        var begin = await (await bob.PostAsync("/admin/api/me/totp/begin", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var begin = await (await bob.PostAsJsonAsync("/admin/api/me/totp/begin", new { password = NewPassword })).Content.ReadFromJsonAsync<JsonElement>();
         var secret = begin.GetProperty("secret").GetString()!;
         Assert.Equal(HttpStatusCode.OK, (await bob.PostAsJsonAsync("/admin/api/me/totp/complete", new { code = TotpService.Compute(secret, _app.Time.Now.UtcDateTime) })).StatusCode);
         Assert.True((await UsersAsync()).EnumerateArray().Single(u => u.GetProperty("loginId").GetString() == "bob").GetProperty("totpEnabled").GetBoolean());

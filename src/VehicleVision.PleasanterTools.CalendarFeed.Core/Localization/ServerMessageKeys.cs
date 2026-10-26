@@ -18,6 +18,8 @@ public static class ServerMessageKeys
     public const string TwoFactorDisabled = "twoFactorDisabled";
     public const string TwoFactorRequired = "twoFactorRequired";
     public const string EnrollmentBeginRequired = "enrollmentBeginRequired";
+    public const string EnrollmentRestartRequired = "enrollmentRestartRequired";
+    public const string OperationTemporarilyLocked = "operationTemporarilyLocked";
     public const string TotpCodeMismatch = "totpCodeMismatch";
     public const string LoginIdInvalid = "loginIdInvalid";
     public const string PasswordTooShort = "passwordTooShort";
@@ -116,7 +118,8 @@ public static class ServerMessageKeys
     [
         InvalidCredentials, CrossSiteRejected, LoginRequired, UpstreamSessionEnded, PermissionRequired,
         AdministratorAlreadyExists, CurrentPasswordRejected, PasswordRejected, TwoFactorDisabled, TwoFactorRequired,
-        EnrollmentBeginRequired, TotpCodeMismatch, LoginIdInvalid, PasswordTooShort, PasswordTooLong,
+        EnrollmentBeginRequired, EnrollmentRestartRequired, OperationTemporarilyLocked,
+        TotpCodeMismatch, LoginIdInvalid, PasswordTooShort, PasswordTooLong,
         PasswordSameAsLoginId, PasswordPolicyMismatch, AdminUserNotFound, RoleNotSupported, DuplicateLoginId,
         InviteDisabledUser, SelfDisableNotAllowed, SelfRoleChangeNotAllowed, SelfTotpResetNotAllowed,
         SelfSessionRevokeNotAllowed, LastAdministrator, InvitationInvalid, SessionNotFound, AuditOffsetInvalid,

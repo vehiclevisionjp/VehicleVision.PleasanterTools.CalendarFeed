@@ -195,6 +195,26 @@ public sealed class PleasanterSsoTests : IDisposable
     }
 
     [Fact]
+    public async Task Pleasanterで入った人も共通のログアウトで再登録の途中を失効させる()
+    {
+        await EnableAsync(new() { [Prefix + "LOGOUTURL"] = "/users/logout" });
+        Pleasanter.Login("c1", new FakePleasanterSso.User(1, 10, TestApp.AdminLoginId, "管理"));
+        var browser = NewBrowser().WithPleasanterCookie("c1");
+        Assert.Equal(HttpStatusCode.OK, (await browser.CheckAsync()).StatusCode);
+        var sessionId = browser.Cookies[AdminSessionGuard.SessionCookie];
+        Assert.Equal(HttpStatusCode.OK, (await browser.SendAsync(HttpMethod.Post, "/admin/api/me/totp/begin",
+            new { password = TestApp.AdminPassword })).StatusCode);
+        var reenrollId = browser.Cookies[AdminSessionGuard.ReenrollCookie];
+
+        Assert.Equal(HttpStatusCode.NoContent, (await browser.SendAsync(HttpMethod.Post, "/admin/api/logout")).StatusCode);
+        Assert.Null(await _app.Service<IAdminSessionStore>().FindAsync(sessionId));
+        Assert.Null(await _app.Service<IAdminSessionStore>().FindAsync(reenrollId));
+        Assert.False(browser.Cookies.ContainsKey(AdminSessionGuard.SessionCookie));
+        Assert.False(browser.Cookies.ContainsKey(AdminSessionGuard.ReenrollCookie));
+        Assert.Equal(HttpStatusCode.Unauthorized, await browser.MeAsync());
+    }
+
+    [Fact]
     public async Task 転送するのは設定した名前の_cookie_だけ_本アプリのセッションと_API_キーは送らない()
     {
         await EnableAsync(new() { [Prefix + "COOKIENAMES"] = ".AspNetCore.Cookies" });
@@ -337,7 +357,7 @@ public sealed class PleasanterSsoTests : IDisposable
     public async Task 登録済みの2要素は_Pleasanter経由でも省かせない()
     {
         var admin = _app.AdminClient();
-        var begin = await (await admin.PostAsync("/admin/api/me/totp/begin", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var begin = await (await admin.PostAsJsonAsync("/admin/api/me/totp/begin", new { password = TestApp.AdminPassword })).Content.ReadFromJsonAsync<JsonElement>();
         var secret = begin.GetProperty("secret").GetString()!;
         Assert.Equal(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/admin/api/me/totp/complete", new { code = TotpService.Compute(secret, _app.Time.Now.UtcDateTime) })).StatusCode);
         await EnableAsync();
