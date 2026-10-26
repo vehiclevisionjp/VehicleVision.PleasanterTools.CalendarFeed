@@ -195,6 +195,26 @@ public sealed class PleasanterSsoTests : IDisposable
     }
 
     [Fact]
+    public async Task Pleasanterで入った人も共通のログアウトで再登録の途中を失効させる()
+    {
+        await EnableAsync(new() { [Prefix + "LOGOUTURL"] = "/users/logout" });
+        Pleasanter.Login("c1", new FakePleasanterSso.User(1, 10, TestApp.AdminLoginId, "管理"));
+        var browser = NewBrowser().WithPleasanterCookie("c1");
+        Assert.Equal(HttpStatusCode.OK, (await browser.CheckAsync()).StatusCode);
+        var sessionId = browser.Cookies[AdminSessionGuard.SessionCookie];
+        Assert.Equal(HttpStatusCode.OK, (await browser.SendAsync(HttpMethod.Post, "/admin/api/me/totp/begin",
+            new { password = TestApp.AdminPassword })).StatusCode);
+        var reenrollId = browser.Cookies[AdminSessionGuard.ReenrollCookie];
+
+        Assert.Equal(HttpStatusCode.NoContent, (await browser.SendAsync(HttpMethod.Post, "/admin/api/logout")).StatusCode);
+        Assert.Null(await _app.Service<IAdminSessionStore>().FindAsync(sessionId));
+        Assert.Null(await _app.Service<IAdminSessionStore>().FindAsync(reenrollId));
+        Assert.False(browser.Cookies.ContainsKey(AdminSessionGuard.SessionCookie));
+        Assert.False(browser.Cookies.ContainsKey(AdminSessionGuard.ReenrollCookie));
+        Assert.Equal(HttpStatusCode.Unauthorized, await browser.MeAsync());
+    }
+
+    [Fact]
     public async Task 転送するのは設定した名前の_cookie_だけ_本アプリのセッションと_API_キーは送らない()
     {
         await EnableAsync(new() { [Prefix + "COOKIENAMES"] = ".AspNetCore.Cookies" });

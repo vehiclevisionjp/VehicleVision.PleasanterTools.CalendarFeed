@@ -460,8 +460,10 @@ public static class AdminAuthEndpoints
                 await sessions.DeleteAsync(previous, ct);
             }
 
+            // cookie が届かない IdP 起点の単一ログアウトでも、再登録の途中を同じ SAML の鍵で失効させる。
             var reenrollId = await sessions.CreateAsync(
-                who.User.Id, AdminSessionGuard.ReenrollKind, options.ReenrollLifetime, ct);
+                who.User.Id, AdminSessionGuard.ReenrollKind, options.ReenrollLifetime, ct,
+                sso: await sessions.GetSsoAsync(who.SessionId, ct));
             AdminSessionGuard.SetCookie(http, AdminSessionGuard.ReenrollCookie, reenrollId, options.ReenrollLifetime);
         }
 

@@ -234,10 +234,37 @@ public sealed class AdminTotpReenrollTests : IDisposable
         var client = await EnrolledAsync();
         var begin = await BeginAsync(client);
         var id = CookieOf(begin, AdminSessionGuard.ReenrollCookie);
-        var response = path == "/saml/logout"
-            ? await client.GetAsync("/admin/api" + path)
-            : await client.PostAsJsonAsync("/admin/api" + path, new { });
-        Assert.True(response.IsSuccessStatusCode);
-        Assert.Null(await _app.Service<IAdminSessionStore>().FindAsync(id));
+        var secret = (await begin.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("secret").GetString()!;
+        var sessions = _app.Service<IAdminSessionStore>();
+        var userId = await UserIdAsync(client);
+        var sessionId = await sessions.CreateAsync(userId, AdminSessionKinds.Session, TimeSpan.FromHours(8));
+        var pendingId = await sessions.CreateAsync(userId, AdminSessionKinds.Pending, TimeSpan.FromMinutes(5));
+        using var request = new HttpRequestMessage(path == "/saml/logout" ? HttpMethod.Get : HttpMethod.Post, "/admin/api" + path);
+        request.Headers.Add("Cookie",
+            $"{AdminSessionGuard.SessionCookie}={sessionId}; {AdminSessionGuard.PendingCookie}={pendingId}; {AdminSessionGuard.ReenrollCookie}={id}");
+        var response = await _app.RawClient().SendAsync(request);
+        if (path == "/saml/logout")
+        {
+            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+            Assert.Equal("/admin/", response.Headers.Location!.OriginalString);
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        }
+
+        foreach (var name in new[] { AdminSessionGuard.SessionCookie, AdminSessionGuard.PendingCookie, AdminSessionGuard.ReenrollCookie })
+        {
+            Assert.Equal("", CookieOf(response, name));
+        }
+
+        Assert.Null(await sessions.FindAsync(sessionId));
+        Assert.Null(await sessions.FindAsync(pendingId));
+        Assert.Null(await sessions.FindAsync(id));
+        var otherSession = await sessions.CreateAsync(userId, AdminSessionKinds.Session, TimeSpan.FromHours(8));
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await RawPostAsync("/me/totp/complete",
+                $"{AdminSessionGuard.SessionCookie}={otherSession}; {AdminSessionGuard.ReenrollCookie}={id}",
+                new { code = TotpService.Compute(secret, _app.Time.Now.UtcDateTime) })).StatusCode);
     }
 }
