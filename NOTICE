@@ -60,14 +60,14 @@ Copyright (C) PMC Co.,Ltd.
   Microsoft.Extensions.Configuration 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.Extensions.Configuration/10.0.13
   Microsoft.Extensions.Configuration.Abstractions 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.Extensions.Configuration.Abstractions/10.0.13
   Microsoft.Extensions.Logging.Abstractions 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.Extensions.Logging.Abstractions/10.0.13
-  System.Security.Cryptography.Xml 10.0.13 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Xml/10.0.13
+  System.Security.Cryptography.Xml 10.0.14 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Xml/10.0.13
     （ITfoxtec.Identity.Saml2 が使う署名検証。**直接参照して版を固定している**。参照日 2026-10-15）
   Microsoft.Extensions.DependencyInjection 10.0.13 / MIT
     （Dapper 以下は Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-12）
 
 テストのみ（配布物に含まれない）
 
-  Microsoft.AspNetCore.Mvc.Testing 10.0.13 / MIT
+  Microsoft.AspNetCore.Mvc.Testing 10.0.14 / MIT
   xunit 2.9.3 / Apache-2.0
   Microsoft.NET.Test.Sdk 18.11.0 / MIT
   coverlet.collector 10.1.0 / MIT
@@ -75,7 +75,7 @@ Copyright (C) PMC Co.,Ltd.
 
 管理画面（Svelte。src/VehicleVision.PleasanterTools.CalendarFeed.Frontend）の依存 — npm。参照日 2026-10-14。いずれも寛容ライセンス（Questionnaire の Frontend と同じ版）
 
-  svelte 5.57.2 / MIT / https://github.com/sveltejs/svelte
+  svelte 5.57.3 / MIT / https://github.com/sveltejs/svelte
   @sveltejs/vite-plugin-svelte 7.3.1 / MIT / https://github.com/sveltejs/vite-plugin-svelte
   vite 8.3.5 / MIT / https://github.com/vitejs/vite
   sass 1.105.2 / MIT / https://github.com/sass/dart-sass
