@@ -16,7 +16,7 @@
 
   <!-- バージョンの単一情報源。各 .csproj へ個別に書かないこと。1.0.0 未満は互換を保証しない -->
   <PropertyGroup>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.1.1</VersionPrefix>
     <Company>PMC Co., Ltd. IT Solution Div.</Company>
     <Authors>PMC Co., Ltd. IT Solution Div.</Authors>
     <Product>VehicleVision.PleasanterTools.CalendarFeed</Product>
