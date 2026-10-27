@@ -28,7 +28,7 @@ Copyright (C) PMC Co., Ltd. IT Solution Div.
       単体での再配布の禁止・保証の否認・責任の制限・輸出規制の遵守など、この許諾と同程度に守る条件へ同意させる／
       アプリの頒布・利用に関する請求から Microsoft を補償する（改変していない SNI だけに基づく請求を除く）。
       **2026-10-20 の決定**: 条件を明記したうえで許容し、「依存は寛容ライセンスに限る」の例外として扱う。
-      頒布するときは、上の条件を利用許諾（商用条件・EULA）へ反映する。法務の確認は別途）
+      上の条件は、LICENSING.md（例外の節）と LICENSE-COMMERCIAL.md（頒布先に守っていただく条件）へ反映した。法務の確認は別途）
   Npgsql 10.0.3 / PostgreSQL License（BSD 系の寛容ライセンス） / https://www.nuget.org/packages/Npgsql
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
   System.Security.Cryptography.Pkcs 10.0.13 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Pkcs
