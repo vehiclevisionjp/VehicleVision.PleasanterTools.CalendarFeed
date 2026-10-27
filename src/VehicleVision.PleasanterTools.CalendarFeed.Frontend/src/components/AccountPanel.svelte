@@ -6,6 +6,7 @@
   import type { Me, SessionInfo } from '../lib/types';
   import EnrollPanel from './EnrollPanel.svelte';
   import Notice from './Notice.svelte';
+  import PasswordConfirmation from './PasswordConfirmation.svelte';
 
   let { me, onchanged }: { me: Me; onchanged: () => void } = $props();
 
@@ -27,8 +28,8 @@
 
   async function loadSessions(): Promise<void> {
     const result = await api.mySessions();
-    if (result.ok) sessions = result.value;
-    else error = errorText(result);
+    if (result.ok) {sessions = result.value;}
+    else {error = errorText(result);}
   }
 
   $effect(() => {
@@ -37,7 +38,7 @@
 
   async function changePassword(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    if (next !== confirmNext) return;
+    if (next !== confirmNext) {return;}
     passwordBusy = true;
     passwordError = '';
     flash = '';
@@ -72,15 +73,15 @@
 
   async function revoke(handle: string): Promise<void> {
     const result = await api.revokeMySession(handle);
-    if (!result.ok) error = errorText(result);
-    else flash = t('sessionRevoked');
+    if (!result.ok) {error = errorText(result);}
+    else {flash = t('sessionRevoked');}
     await loadSessions();
   }
 
   async function revokeOthers(): Promise<void> {
     const result = await api.revokeOtherSessions();
-    if (!result.ok) error = errorText(result);
-    else flash = t('sessionRevoked');
+    if (!result.ok) {error = errorText(result);}
+    else {flash = t('sessionRevoked');}
     await loadSessions();
   }
 </script>
@@ -118,6 +119,7 @@
   <h2>{t('accountTotpTitle')}</h2>
   {#if enrolling}
     <EnrollPanel
+      confirmPassword
       ondone={() => {
         enrolling = false;
         onchanged();
@@ -139,10 +141,7 @@
       {#if disabling}
         <form onsubmit={disableTotp}>
           <p class="muted">{t('accountTotpDisableLead')}</p>
-          <div class="field">
-            <label for="dis-pw">{t('password')}</label>
-            <input id="dis-pw" type="password" autocomplete="current-password" required bind:value={disablePassword} />
-          </div>
+          <PasswordConfirmation id="dis-pw" bind:value={disablePassword} />
           <button class="btn danger" type="submit">{t('accountTotpDisable')}</button>
         </form>
       {/if}

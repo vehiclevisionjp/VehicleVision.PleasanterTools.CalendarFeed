@@ -2,6 +2,7 @@ using VehicleVision.PleasanterTools.CalendarFeed.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Localization;
 using VehicleVision.PleasanterTools.CalendarFeed.Admin;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
+using VehicleVision.PleasanterTools.Core.Web;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Endpoints;
 
@@ -101,7 +102,7 @@ public static class AdminPleasanterSsoEndpoints
             }
 
             // 前のセッションがあれば捨てる（ログインし直したら、前の cookie は使えない）
-            foreach (var name in new[] { AdminSessionGuard.SessionCookie, AdminSessionGuard.PendingCookie })
+            foreach (var name in new[] { AdminSessionGuard.SessionCookie, AdminSessionGuard.PendingCookie, AdminSessionGuard.ReenrollCookie })
             {
                 if (http.Request.Cookies.TryGetValue(name, out var existing) && !string.IsNullOrEmpty(existing))
                 {
@@ -130,7 +131,7 @@ public static class AdminPleasanterSsoEndpoints
             PleasanterSsoOptions options;
             try
             {
-                options = PleasanterSsoOptions.FromValues(key => key == PleasanterSsoOptions.EnabledKey
+                options = CalendarFeedAuthenticationSettings.ReadSso(key => key == CalendarFeedAuthenticationSettings.SsoKeys.EnabledKey
                     ? "true"
                     : settings.Current.Snapshot.Values.TryGetValue(key, out var v) ? v : null);
             }

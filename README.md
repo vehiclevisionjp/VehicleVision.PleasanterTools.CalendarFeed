@@ -59,7 +59,7 @@ curl -b jar -X POST $B/admin/api/feeds -H "Content-Type: application/json" \
 | `POST /admin/api/logout` | — | ログアウト（サーバ側のセッションを失効） |
 | `GET /admin/api/me/` | ログイン済み | 自分の情報 |
 | `POST /admin/api/me/password` | ログイン済み | パスワードの変更（他の端末のセッションを失効） |
-| `POST /admin/api/me/totp/begin` → `/complete` | ログイン済み、または必須で未登録の途中 | 2 要素の登録（復旧コード 10 本を 1 度だけ返す） |
+| `POST /admin/api/me/totp/begin` → `/complete` | 本人の再確認、または必須で未登録の途中 | 2 要素の登録・再登録 |
 | `POST /admin/api/me/totp/disable` | ログイン済み | 2 要素の解除（パスワードの再確認つき。必須では不可） |
 | `GET /admin/api/feeds/` | ログイン済み | フィードの一覧（トークンも API キーも含まない） |
 | `POST /admin/api/feeds` | ログイン済み | フィードの作成 |
@@ -75,6 +75,8 @@ curl -b jar -X POST $B/admin/api/feeds -H "Content-Type: application/json" \
 | `POST /admin/api/pleasanter-sso/check` | なし（有効なときだけ） | Pleasanter のログインで入る（Pleasanter の cookie を転送して本人を確かめる） |
 
 管理画面は `/admin/`（ブラウザ）。上の API は管理画面が使うもので、cookie ＋ 状態を変える要求は同じサイトからのものだけ受ける。
+2 要素の登録経路と再確認・レート制限の契約は
+[`管理者認証の仕様書`](_documents/管理者認証の仕様書.md)を参照する。
 
 ## 対応する RDBMS
 
@@ -85,7 +87,6 @@ curl -b jar -X POST $B/admin/api/feeds -H "Content-Type: application/json" \
 ## 開発
 
 ```bash
-git submodule update --init --recursive   # _reference（Pleasanter 本体・参照専用）
 dotnet build
 dotnet test
 
@@ -104,6 +105,10 @@ npm ci && npm test && npm run build
 **接続文字列の環境変数を設定しないと、SQLite 以外は何も流れずに緑になる**ので、`CALENDARFEED_REQUIRE_ALL_RDBMS=1` で
 未設定を失敗にできる（CI は必ずこれを立てる）。手順は [`tools/pleasanter-testenv/README.md`](tools/pleasanter-testenv/README.md)。
 
+Pleasanter 本体は開発・CI の依存ではなく、AI の事実確認時だけ取得する非追跡の参照ソース。
+取得方法・確認した版の記録は [`_reference/README.md`](_reference/README.md)、
+規約検査は [`ブランチ運用方針`](_documents/ブランチ運用方針.md#参照ソースのオンデマンド取得) を参照する。
+
 | パス | 内容 |
 | --- | --- |
 | [`_documents/アーキテクチャ方針.md`](_documents/アーキテクチャ方針.md) | 設計 |
@@ -111,7 +116,7 @@ npm ci && npm test && npm run build
 | [`_documents/機能一覧.md`](_documents/機能一覧.md) | 機能・方式・設定・関連 Issue |
 | [`_documents/実機検証結果.md`](_documents/実機検証結果.md) | 実機（Pleasanter・Keycloak）で確かめた挙動 |
 | [`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md) | 管理画面の画面の写し |
-| `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用**）。[README](_reference/README.md) |
+| `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用・非追跡・必要時取得**）。[README](_reference/README.md) |
 | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | 開発規約（単一の参照元）。Claude Code は [`CLAUDE.md`](CLAUDE.md) から辿る |
 
 **Pleasanter 本体（AGPL v3）のコードは取り込まない。** 依存 OSS は寛容ライセンスに限定する（[`NOTICE`](NOTICE)）。
@@ -129,4 +134,4 @@ npm ci && npm test && npm run build
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 貢献のしかた |
 | [`.github/cla/signed.yml`](.github/cla/signed.yml)・[`.github/workflows/cla-check.yml`](.github/workflows/cla-check.yml) | CLA の署名の一覧と、PR の自動チェック（`CLA` のチェック） |
 
-Copyright (C) PMC Co.,Ltd.
+Copyright (C) PMC Co., Ltd. IT Solution Div.

@@ -3,7 +3,7 @@ using VehicleVision.PleasanterTools.CalendarFeed.Data;
 
 namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Tests;
 
-/// <summary>AKS のプローブ（<c>/healthz</c> <c>/ready</c>）と、<c>--migrate</c> の口（Issue #78）。</summary>
+/// <summary>AKS のプローブと、本アプリのスキーマを使う Core のマイグレーション。</summary>
 public sealed class HealthAndMigrateTests : IDisposable
 {
     private readonly TestApp _app = new();
@@ -28,28 +28,32 @@ public sealed class HealthAndMigrateTests : IDisposable
     }
 
     [Fact]
-    public void migrate_の合図を見分ける()
-    {
-        Assert.True(MigrationCommand.IsRequested(["--migrate", "--wait-for-db=30"]));
-        Assert.False(MigrationCommand.IsRequested(["--generate-secret-key"]));
-        Assert.False(MigrationCommand.IsRequested([]));
-    }
-
-    [Fact]
-    public async Task migrate_は表を作り_もう一度やっても何も壊さない()
+    public async Task migrate_status_は適用せず_適用後は未適用なしになる()
     {
         var file = Path.Combine(Path.GetTempPath(), $"calendarfeed-migrate-{Guid.NewGuid():N}.db");
         var connection = $"Data Source={file}";
         try
         {
-            Assert.Equal(0, await MigrationCommand.RunAsync(DatabaseProvider.Sqlite, connection, ["--migrate"]));
-            Assert.Equal(0, await MigrationCommand.RunAsync(DatabaseProvider.Sqlite, connection, ["--migrate"]));
+            Assert.Equal(1, await MigrationCommand.RunAsync(
+                CalendarFeedDatabase.Instance.Migrator, DatabaseProvider.Sqlite, connection, ["--migrate-status"]));
+            using (var db = new DbConnectionFactory(DatabaseProvider.Sqlite, connection).Create())
+            {
+                db.Open();
+                using var command = db.CreateCommand();
+                command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'Feeds'";
+                Assert.Equal(0L, Convert.ToInt64(command.ExecuteScalar()));
+            }
 
-            using var db = new DbConnectionFactory(DatabaseProvider.Sqlite, connection).Create();
-            db.Open();
-            using var command = db.CreateCommand();
-            command.CommandText = "SELECT COUNT(*) FROM Feeds";
-            Assert.Equal(0L, Convert.ToInt64(command.ExecuteScalar()));
+            Assert.Equal(0, await MigrationCommand.RunAsync(
+                CalendarFeedDatabase.Instance.Migrator, DatabaseProvider.Sqlite, connection, ["--migrate"]));
+            Assert.Equal(0, await MigrationCommand.RunAsync(
+                CalendarFeedDatabase.Instance.Migrator, DatabaseProvider.Sqlite, connection, ["--migrate-status"]));
+
+            using var applied = new DbConnectionFactory(DatabaseProvider.Sqlite, connection).Create();
+            applied.Open();
+            using var count = applied.CreateCommand();
+            count.CommandText = "SELECT COUNT(*) FROM Feeds";
+            Assert.Equal(0L, Convert.ToInt64(count.ExecuteScalar()));
         }
         finally
         {
@@ -65,9 +69,11 @@ public sealed class HealthAndMigrateTests : IDisposable
         var connection = $"Data Source={file}";
         try
         {
-            // 旧表を作る M0003〜M0012 が先に走り、M0016 が落とす。2 回目は何もしない
-            Assert.Equal(0, await MigrationCommand.RunAsync(DatabaseProvider.Sqlite, connection, ["--migrate"]));
-            Assert.Equal(0, await MigrationCommand.RunAsync(DatabaseProvider.Sqlite, connection, ["--migrate"]));
+            // 旧表を作る M0003〜M0012 が先に走り、M0016 が落とす。2 回目は何もしない。
+            Assert.Equal(0, await MigrationCommand.RunAsync(
+                CalendarFeedDatabase.Instance.Migrator, DatabaseProvider.Sqlite, connection, ["--migrate"]));
+            Assert.Equal(0, await MigrationCommand.RunAsync(
+                CalendarFeedDatabase.Instance.Migrator, DatabaseProvider.Sqlite, connection, ["--migrate"]));
 
             using var db = new DbConnectionFactory(DatabaseProvider.Sqlite, connection).Create();
             db.Open();
@@ -101,16 +107,5 @@ public sealed class HealthAndMigrateTests : IDisposable
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             File.Delete(file);
         }
-    }
-
-    [Fact]
-    public async Task migrate_は繋がらないDBを待ちきれなければ_終了コード2()
-    {
-        // 到達できない接続先（SQL Server の既定ポートが閉じた 127.0.0.1）。1 秒だけ待つ
-        const string unreachable = "Server=127.0.0.1,1;Database=x;User Id=sa;Password=x;Connect Timeout=1;TrustServerCertificate=True";
-
-        var code = await MigrationCommand.RunAsync(DatabaseProvider.SqlServer, unreachable, ["--migrate", "--wait-for-db=1"]);
-
-        Assert.Equal(2, code);
     }
 }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using VehicleVision.PleasanterTools.Core.Mail;
+using VehicleVision.PleasanterTools.Core.Web;
 using VehicleVision.PleasanterTools.CalendarFeed.Pleasanter;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 
@@ -108,9 +109,9 @@ public sealed class RuntimeSettings : IPleasanterOptionsSource
         };
 
         // SAML（既定は無効）。有効なのに足りない・読めない外部設定は、ここで起動を止める
-        var saml = SamlOptions.FromValues(key => snapshot.Values.TryGetValue(key, out var v) ? v : null);
+        var saml = CalendarFeedAuthenticationSettings.ReadSaml(key => snapshot.Values.TryGetValue(key, out var v) ? v : null);
 
-        var pleasanterSso = PleasanterSsoOptions.FromValues(key => snapshot.Values.TryGetValue(key, out var v) ? v : null);
+        var pleasanterSso = CalendarFeedAuthenticationSettings.ReadSso(key => snapshot.Values.TryGetValue(key, out var v) ? v : null);
 
         return new RuntimeConfig(
             snapshot,

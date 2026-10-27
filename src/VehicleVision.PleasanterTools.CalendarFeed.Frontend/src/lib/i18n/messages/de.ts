@@ -334,6 +334,7 @@ export const de: Record<MessageKey, string> = {
   accountTotpOff: 'Nicht registriert.',
   accountTotpEnable: 'Zwei-Faktor-Authentifizierung registrieren',
   accountTotpReenroll: 'Erneut registrieren',
+  accountConfirmPassword: 'Geben Sie zur Bestätigung Ihr aktuelles Passwort ein.',
   accountTotpDisable: 'Zwei-Faktor-Authentifizierung ausschalten',
   accountTotpDisableLead: 'Geben Sie zum Ausschalten erneut Ihr Passwort ein.',
   accountTotpRequiredNoDisable: 'In dieser Umgebung ist die Zwei-Faktor-Authentifizierung erforderlich und kann daher nicht ausgeschaltet werden.',

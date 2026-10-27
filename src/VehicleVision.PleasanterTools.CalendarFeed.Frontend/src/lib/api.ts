@@ -78,7 +78,7 @@ export const api = {
   loginRecovery: (code: string) => post<{ step: Step; recoveryCodesLeft: number }>('/login/recovery', { code }),
   logout: () => post<void>('/logout'),
   me: () => get<Me>('/me/'),
-  totpBegin: () => post<{ secret: string; uri: string }>('/me/totp/begin'),
+  totpBegin: (password?: string) => post<{ secret: string; uri: string }>('/me/totp/begin', password === undefined ? {} : { password }),
   totpComplete: (code: string) => post<{ recoveryCodes: string[] }>('/me/totp/complete', { code }),
   totpDisable: (password: string) => post<void>('/me/totp/disable', { password }),
   changePassword: (currentPassword: string, newPassword: string) => post<void>('/me/password', { currentPassword, newPassword }),
@@ -111,9 +111,9 @@ export const api = {
   // ---- 監査ログ・メール・設定 ----
   audit: (query: { before?: string; failed?: boolean; action?: string; limit?: number }) => {
     const q = new URLSearchParams();
-    if (query.before) q.set('before', query.before);
-    if (query.failed) q.set('failed', 'true');
-    if (query.action) q.set('action', query.action);
+    if (query.before) {q.set('before', query.before);}
+    if (query.failed) {q.set('failed', 'true');}
+    if (query.action) {q.set('action', query.action);}
     q.set('limit', String(query.limit ?? 50));
     return get<AuditEntry[]>(`/audit-logs/?${q}`);
   },

@@ -33,7 +33,7 @@ jobs:
       - name: ソースを取得する
         uses: actions/checkout@v7
         with:
-          # サブモジュール（_reference）は検査の対象外。取らない
+          # 参照ソース（_reference）は検査の対象外。取らない
           submodules: false
           persist-credentials: false
 

@@ -58,7 +58,8 @@ services:
     restart: "no"
 
   pleasanter:
-    # サブモジュール _reference/Implem.Pleasanter の固定位置（Pleasanter_1.5.9.0）に合わせる。**`codedefiner` のイメージはバージョン付きのタグが無く、取った時点の最新**（2026-10-13 に更新。1.5.9.0 と同じ世代）
+    # 実機検証用の固定版。参照ソースの main とは独立して維持する。
+    # codedefiner はバージョン付きタグが無く、取得時の最新（2026-10-13 に 1.5.9.0 と同じ世代へ更新）。
     image: implem/pleasanter:1.5.9.0
     depends_on:
       codedefiner:

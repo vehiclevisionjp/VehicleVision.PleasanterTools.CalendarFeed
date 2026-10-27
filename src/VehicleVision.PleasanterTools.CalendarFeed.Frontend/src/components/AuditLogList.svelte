@@ -64,7 +64,7 @@
   };
 
   function reasonText(detail: string | null): string {
-    if (!detail) return '';
+    if (!detail) {return '';}
     const key = REASONS[detail] ?? (detail.startsWith('idp-status=') ? 'auditReasonIdpStatus' : detail.startsWith('upstream-error:') ? 'auditReasonUpstream' : null);
     return key ? t(key) : '';
   }

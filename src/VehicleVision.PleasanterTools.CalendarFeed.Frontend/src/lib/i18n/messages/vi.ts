@@ -334,6 +334,7 @@ export const vi: Record<MessageKey, string> = {
   accountTotpOff: 'Chưa đăng ký.',
   accountTotpEnable: 'Đăng ký xác thực hai yếu tố',
   accountTotpReenroll: 'Đăng ký lại',
+  accountConfirmPassword: 'Nhập mật khẩu hiện tại của bạn để xác nhận.',
   accountTotpDisable: 'Tắt xác thực hai yếu tố',
   accountTotpDisableLead: 'Nhập lại mật khẩu của bạn để tắt.',
   accountTotpRequiredNoDisable: 'Môi trường này yêu cầu xác thực hai yếu tố nên không thể tắt.',
