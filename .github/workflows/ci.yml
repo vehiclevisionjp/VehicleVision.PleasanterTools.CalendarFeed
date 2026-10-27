@@ -111,3 +111,12 @@ jobs:
         # **デュアルライセンス（AGPL ＋ 商用）の前提を機械で守る。**
         # 取り込むと商用ライセンスでの提供ができなくなる（LICENSING.md）
         run: bash ./scripts/license-check.sh
+
+      - name: 参照ソースの隔離を検査する
+        run: bash ./scripts/reference-isolation-check.sh
+
+      - name: 参照取得スクリプトを検査する（ネットワーク不要）
+        run: bash ./scripts/test-sync-reference.sh
+
+      - name: エージェント規約の同期を検査する
+        run: bash ./scripts/sync-agents.sh --check

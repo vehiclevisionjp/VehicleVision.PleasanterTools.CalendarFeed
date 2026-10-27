@@ -14,7 +14,7 @@ Questionnaire の同名の環境に倣っている（SQL Server のみ・Securit
 | --- | --- | --- |
 | `db` | `mcr.microsoft.com/mssql/server:2025-CU8-ubuntu-24.04` | SQL Server 2025 |
 | `codedefiner` | `implem/pleasanter:codedefiner` | スキーマ作成 ＋ 90 日トライアル登録 |
-| `pleasanter` | `implem/pleasanter:1.5.9.0` | 本体。サブモジュールの固定版に合わせる |
+| `pleasanter` | `implem/pleasanter:1.5.9.0` | 実機検証用の固定版。参照ソースの `main` とは独立して維持する |
 | `verify` | `python:3.13-slim` | 検証の実行役。**ホストに python も curl も要求しない** |
 
 ## 使い方

@@ -16,7 +16,7 @@ paths-ignore:
   - "**/obj/**"
   - "**/node_modules/**"
   - "src/VehicleVision.PleasanterTools.CalendarFeed.Web/wwwroot/**"
-  # **Pleasanter 本体（AGPL v3）は解析しない。** 参照専用のサブモジュールであり、
+  # **Pleasanter 本体（AGPL v3）は解析しない。** 非追跡の参照専用ソースであり、
   # 本アプリの成果物でもない（_reference/README.md）。
   # ワークフロー側で submodules: false にしているため通常は空だが、
   # 取得された場合に備えて明示する
