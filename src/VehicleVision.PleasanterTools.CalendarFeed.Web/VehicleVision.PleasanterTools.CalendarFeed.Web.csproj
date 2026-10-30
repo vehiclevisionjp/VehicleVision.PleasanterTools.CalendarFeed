@@ -15,9 +15,9 @@
   <ItemGroup>
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Core\VehicleVision.PleasanterTools.CalendarFeed.Core.csproj" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Data\VehicleVision.PleasanterTools.CalendarFeed.Data.csproj" />
-    <PackageReference Include="VehicleVision.PleasanterTools.Core.Mail" Version="0.1.0-preview.12" />
+    <PackageReference Include="VehicleVision.PleasanterTools.Core.Mail" Version="0.1.0" />
     <!-- Pleasanter のログインの本人確認（PleasanterSessionVerifier）。AtomFeed・Questionnaire と共通の部品 -->
-    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.1.0-preview.12" />
+    <PackageReference Include="VehicleVision.PleasanterTools.Core.Web" Version="0.1.0" />
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Pleasanter\VehicleVision.PleasanterTools.CalendarFeed.Pleasanter.csproj" />
   </ItemGroup>
 
