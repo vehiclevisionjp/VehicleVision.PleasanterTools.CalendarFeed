@@ -30,11 +30,11 @@ Claude Code は `applyTo` を自動で解釈しないため、自分で開く必
 
 ## 共有メモリリポジトリ
 
-このリポジトリで作業して得た知見は、専用の共有メモリリポジトリ
-`VehicleVision.PleasanterTools.CalendarFeed.ClaudeMemory`（internal）で共有します。
-Questionnaire の
-[VehicleVision.PleasanterTools.Questionnaire.ClaudeMemory](https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Questionnaire.ClaudeMemory)
-と同じ運用です。作業ツリーはハーネスのメモリディレクトリそのものです。
+このリポジトリで作業して得た知見は、internal リポジトリ
+[VehicleVision.PleasanterTools.ClaudeMemory](https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.ClaudeMemory)
+の `CalendarFeed/` フォルダで共有します（ツールごとにリポジトリは分けず、ツール名のフォルダで分けます）。
+**そのリポジトリを 1 か所だけ clone し**、ハーネスのメモリディレクトリは、
+その `CalendarFeed/` フォルダへの Windows ジャンクションです。運用の詳細は同リポジトリの README.md を読んでください。
 
 ```text
 ~/.claude/projects/D--repos-VehicleVision-PleasanterTools-CalendarFeed/memory/
@@ -47,7 +47,7 @@ Questionnaire の
 - 書いてよいのは「コードや git 履歴を読んでも分からないこと」だけ。認証情報
   （**Pleasanter の API キーは特に**）・個人の属性は書かない
 - Pleasanter の挙動を書くときは、**確認したバージョンと参照日**を併記する
-- **Pleasanter の挙動は Questionnaire 側のメモリにも蓄積がある**（日時の扱い・API の癖など）。
+- **Pleasanter の挙動は `Questionnaire/` フォルダにも蓄積がある**（日時の扱い・API の癖など）。
   該当しそうなら先に読み、**CalendarFeed で再確認できていないものは未確認として扱う**
 
 なお共有メモリは正式な規約の置き場所ではありません。このファイルと
