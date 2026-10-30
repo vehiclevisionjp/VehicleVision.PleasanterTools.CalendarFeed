@@ -130,7 +130,7 @@ Pleasanter 本体は開発・CI の依存ではなく、AI の事実確認時だ
 | [`LICENSE`](LICENSE) | AGPL v3 の全文（GNU の公式の原文） |
 | [`LICENSING.md`](LICENSING.md) | デュアルライセンスの説明（どちらを選ぶか・Pleasanter との関係・依存） |
 | [`LICENSE-COMMERCIAL.md`](LICENSE-COMMERCIAL.md) | 商用ライセンスの概要と連絡先 |
-| [`CLA.md`](CLA.md) | コントリビューターライセンス同意書（**草案。法務の確認前**） |
+| [`CLA.md`](CLA.md) | コントリビューターライセンス同意書 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 貢献のしかた |
 | [`.github/cla/signed.yml`](.github/cla/signed.yml)・[`.github/workflows/cla-check.yml`](.github/workflows/cla-check.yml) | CLA の署名の一覧と、PR の自動チェック（`CLA` のチェック） |
 
