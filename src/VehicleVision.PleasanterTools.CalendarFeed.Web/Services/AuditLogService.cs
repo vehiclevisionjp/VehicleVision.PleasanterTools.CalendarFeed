@@ -54,11 +54,8 @@ public sealed class AuditLogRetentionService(
     IAuditLogStore store,
     RuntimeSettings settings,
     TimeProvider time,
-    ILogger<AuditLogRetentionService> logger) : BackgroundService
+    ILogger<AuditLogRetentionService> logger)
 {
-    /// <summary>掃除の間隔。消す対象は 1 日で大きく変わらないので、頻繁には走らせない。</summary>
-    private static readonly TimeSpan Interval = TimeSpan.FromHours(6);
-
     /// <summary>古い記録を消す。消した件数を返す（無効なら 0）。</summary>
     public async Task<int> SweepAsync(CancellationToken cancellationToken)
     {
@@ -76,6 +73,21 @@ public sealed class AuditLogRetentionService(
 
         return deleted;
     }
+}
+
+/// <summary>
+/// 掃除（<see cref="AuditLogRetentionService"/>）を、起動時と一定間隔で呼ぶ常駐処理。
+/// </summary>
+/// <remarks>
+/// 掃除の本体と分けてあるのは、テストが常駐処理だけを外せるようにするため。
+/// 起動直後の掃除がテストの書き込みと競合し、掃除の件数を数えるテストがまれに落ちた（Issue #179）。
+/// </remarks>
+public sealed class AuditLogRetentionWorker(
+    AuditLogRetentionService retention,
+    ILogger<AuditLogRetentionWorker> logger) : BackgroundService
+{
+    /// <summary>掃除の間隔。消す対象は 1 日で大きく変わらないので、頻繁には走らせない。</summary>
+    private static readonly TimeSpan Interval = TimeSpan.FromHours(6);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -84,7 +96,7 @@ public sealed class AuditLogRetentionService(
         {
             try
             {
-                await SweepAsync(stoppingToken);
+                await retention.SweepAsync(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
