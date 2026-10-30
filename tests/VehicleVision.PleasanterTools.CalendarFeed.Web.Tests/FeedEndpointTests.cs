@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using VehicleVision.PleasanterTools.Core.Mail;
 using VehicleVision.PleasanterTools.CalendarFeed.Security;
 using VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
@@ -119,6 +120,13 @@ internal sealed class TestApp : IDisposable
 
             builder.ConfigureTestServices(services =>
             {
+                // **監査ログの掃除の常駐処理は動かさない**（起動直後の掃除が、テストが書いた古い記録を先に消して、掃除の件数を数えるテストが落ちた。Issue #179）。
+                // 掃除そのものは AuditLogRetentionService.SweepAsync をテストが呼んで確かめる
+                foreach (var worker in services.Where(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(AuditLogRetentionWorker)).ToList())
+                {
+                    services.Remove(worker);
+                }
+
                 services.AddHttpClient<Pleasanter.PleasanterClient>()
                     .ConfigurePrimaryHttpMessageHandler(() => Pleasanter);
                 services.AddHttpClient(VehicleVision.PleasanterTools.Core.Web.PleasanterSessionVerifier.HttpClientName)

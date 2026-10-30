@@ -99,7 +99,7 @@ builder.Services.AddSingleton<AdminInvitationMailer>();
 builder.Services.AddHostedService<MailSenderHostedService>();
 builder.Services.AddSingleton<AuditLogService>();
 builder.Services.AddSingleton<AuditLogRetentionService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditLogRetentionService>());
+builder.Services.AddHostedService<AuditLogRetentionWorker>();
 builder.Services.AddSingleton<AdminSessionFilter>();
 builder.Services.AddSingleton<SamlAuthenticator>();
 builder.Services.AddSingleton<PleasanterSsoAuthenticator>();
