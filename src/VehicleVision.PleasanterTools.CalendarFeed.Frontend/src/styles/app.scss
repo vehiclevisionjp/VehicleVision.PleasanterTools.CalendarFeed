@@ -6,6 +6,13 @@
 @use 'design-reference/colors-explicit.css';
 @use 'design-reference/app-base.css';
 
+// 同梱した書体（@fontsource-variable。main.ts で読み込む）を先頭に足す。後ろは DesignReference の候補順（端末の Noto 系 → OS の書体）なので、
+// 同梱が読み込めなくても崩れない。同梱の扱いは DesignReference 側の改訂待ち（#195 では変えない）
+:root {
+  --font-sans: 'Noto Sans JP Variable', 'Noto Sans CJK JP', 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+  --font-code: 'M PLUS 1 Code Variable', 'Myrica M', 'Noto Sans Mono CJK JP', 'Cascadia Mono', Consolas, 'BIZ UDGothic', 'MS Gothic', monospace;
+}
+
 // アイコンの下地（同梱した Material Icons）。中身はアイコンの名前（リガチャで字形へ置き換わる）。
 // **意味は文字でも書くこと**（アイコンだけの釦は読み上げで何も伝わらない）。**aria-hidden="true" を必ず付ける**
 .material-icons {

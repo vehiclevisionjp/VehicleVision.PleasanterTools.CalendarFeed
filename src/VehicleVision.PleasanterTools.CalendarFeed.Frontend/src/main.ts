@@ -1,4 +1,6 @@
-// 文字の書体は同梱しない（DesignReference の決まり。端末の Noto 系 → OS の書体の順で使う）。アイコンの Material Icons だけ同梱する（CSP の font-src 'self' で配る）
+// 書体とアイコンは同梱する（端末の書体に依存させない。CSP の font-src 'self' で配る）
+import '@fontsource-variable/noto-sans-jp';
+import '@fontsource-variable/m-plus-1-code';
 import '@fontsource/material-icons';
 import { mount } from 'svelte';
 import App from './App.svelte';
