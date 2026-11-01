@@ -1,4 +1,4 @@
-/* VehicleVision.DesignReference 第 2.3 版（コミット 080f9b3、2026-11-01 参照）の css/app-base.css を、そのまま写したもの。手で直さない（直すときは DesignReference へ PR）。 */
+/* VehicleVision.DesignReference 第 2.4 版（コミット 0730ea9、2026-11-01 参照）の css/app-base.css を、そのまま写したもの。手で直さない（直すときは DesignReference へ PR）。 */
 /* VehicleVision DesignReference: アプリ(Web UI・管理画面)の基本スタイル。コピーして使う 1 ファイル。
    - 色は含めない。先に色のトークンを読み込む(アプリは css/colors-explicit.css(明示型)、サイト・公開物は css/colors.css(追従型))。
    - 書体は同梱する(css/app-fonts.css と fonts/app/。見た目を端末によらず統一する)。このファイルは書体名の候補だけを持ち、
