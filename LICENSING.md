@@ -52,8 +52,10 @@ AGPL の義務（ソースコード開示・コピーレフト）を負わずに
 
 ## Pleasanter との関係（デュアルライセンスの前提）
 
+<!-- license:begin independence=app -->
 本ソフトウェアは Pleasanter（株式会社インプリム, AGPL v3）の
 **独立した別アプリケーション**です。
+<!-- license:end independence -->
 
 - 本体のソースコードを **複製・改変・リンク・プロジェクト参照していません**。Pleasanter のアセンブリも参照しません
 - Pleasanter の派生著作物ではありません
@@ -82,10 +84,11 @@ AGPL の義務（ソースコード開示・コピーレフト）を負わずに
 ## 依存ソフトウェアについて
 
 本ソフトウェアが利用する OSS は **寛容ライセンス（MIT / BSD 系 / Apache-2.0）** に
-限定します。一覧は [`NOTICE`](NOTICE) を参照してください。推移的依存と実際の版は `packages.lock.json` にあります。
+限定します。一覧は [`NOTICE`](NOTICE) を参照してください。依存の宣言（パッケージ参照）は各 csproj にあり、
+`packages.lock.json` を置いているリポジトリでは、推移的依存と実際の版もそこで確認できます。
 
 <!-- license:begin deps-note=free -->
-本ソフトウェアには `packages.lock.json` はありません（上の文は他のツールと共通の文です）。
+本ソフトウェアには `packages.lock.json` はありません。
 直接の依存の名称と版は [`NOTICE`](NOTICE) に一覧があり、`scripts/notice-check.sh` が実際の依存との一致を検査します。
 <!-- license:end deps-note -->
 
@@ -127,8 +130,8 @@ Core は寛容ライセンスではなく、**AGPL-3.0-or-later と商用ライ�
 - **B（商用）を選ぶ場合**: Core の商用ライセンスは、本ソフトウェアの商用ライセンスに含まれます。
   Core 単独での利用は、個別に契約します
 
-Core の条件は
-[Core の LICENSING.md](https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/develop/LICENSING.md) を参照してください。
+Core の条件は、次を参照してください。
+[Core の LICENSING.md](https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/develop/LICENSING.md)
 <!-- license:end core -->
 
 ## 貢献を受け取るとき

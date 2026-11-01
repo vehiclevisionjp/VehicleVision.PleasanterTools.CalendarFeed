@@ -38,7 +38,7 @@
 未署名ならチェックが失敗し、案内コメントが付きます。
 
 Dependabot・GitHub Actions・`my-repo-automation-bot[bot]` の自動更新 PR は対象外です。
-判定の実装は [`.github/workflows/cla-check.yml`](.github/workflows/cla-check.yml) にあります。
+判定の実装は `.github/workflows/cla-check.yml` にあります。
 
 ## 作業の進め方
 
