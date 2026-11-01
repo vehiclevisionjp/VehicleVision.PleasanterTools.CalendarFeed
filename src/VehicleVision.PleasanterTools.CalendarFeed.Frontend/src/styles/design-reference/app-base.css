@@ -1,17 +1,18 @@
-/* VehicleVision.DesignReference 第 2.1 版（コミット 7c60bae、2026-11-01 参照）の css/app-base.css を、そのまま写したもの。手で直さない（直すときは DesignReference へ PR）。 */
+/* VehicleVision.DesignReference 第 2.3 版（コミット 080f9b3、2026-11-01 参照）の css/app-base.css を、そのまま写したもの。手で直さない（直すときは DesignReference へ PR）。 */
 /* VehicleVision DesignReference: アプリ(Web UI・管理画面)の基本スタイル。コピーして使う 1 ファイル。
    - 色は含めない。先に色のトークンを読み込む(アプリは css/colors-explicit.css(明示型)、サイト・公開物は css/colors.css(追従型))。
-   - 書体は同梱できない(アプリは端末の書体を使う)ので、Noto 系 → OS の書体の順にフォールバックする。
-     書体を同梱できる Web サイトは、このファイルの書体ではなく css/tokens.css と css/webfonts.css を使う。
+   - 書体は同梱する(css/app-fonts.css と fonts/app/。見た目を端末によらず統一する)。このファイルは書体名の候補だけを持ち、
+     同梱の書体が読み込めない・同梱の範囲にない字は、OS の書体にフォールバックする。
+     アプリの書体は css/app-fonts.css(文字を絞った区画)。サイト・公開物は css/tokens.css と css/webfonts.css(全文字)。
    - 値は css/tokens.css と同じ(食い違うと scripts/build-tokens.mjs が失敗する)。書体は、tokens.css の候補に OS の書体を足している。
-   読み込み順: colors-explicit.css → app-base.css → components/app-ui.css(部品を使うとき) */
+   読み込み順: colors-explicit.css → app-base.css → app-fonts.css → components/app-ui.css(部品を使うとき) */
 :root {
-  /* 書体: Noto Sans CJK JP → (Google 版の名前) → macOS → Windows → OS 標準 */
-  --font-sans: "Noto Sans CJK JP", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;      /* 本文 */
-  --font-heading: var(--font-sans);   /* 見出し・UI(太字で区別) */
-  --font-accent: "Noto Serif CJK JP", "Hiragino Mincho ProN", "Yu Mincho", serif;     /* タイトル・引用・強調(アプリでは基本使わない) */
-  --font-mono: "Noto Sans Mono CJK JP", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;   /* 等幅(数値・ログ・桁をそろえる表示) */
-  --font-code: "Myrica M", "MyricaM M", "Noto Sans Mono CJK JP", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;   /* コード */
+  /* 書体: Zen 系(同梱) → macOS → Windows → OS 標準 */
+  --font-sans: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;      /* 本文 */
+  --font-heading: "Zen Maru Gothic", var(--font-sans);   /* 見出し・UI(太字で区別) */
+  --font-accent: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;     /* タイトル・引用・強調(アプリでは基本使わない) */
+  --font-mono: "Myrica M", "MyricaM M", "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", monospace;   /* 等幅(数値・ログ・桁をそろえる表示)。コードと同じ書体 */
+  --font-code: var(--font-mono);   /* コード */
   --fs-xs: 12px;
   --fs-sm: 14px;
   --fs-md: 16px;
