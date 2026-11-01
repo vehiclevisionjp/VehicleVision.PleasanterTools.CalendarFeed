@@ -36,6 +36,7 @@ export const zh: Record<MessageKey, string> = {
 
   // ---- Sign-in / setup ----
   signOut: '退出登录',
+  skipToContent: '跳到正文',
   loginId: '登录 ID',
   password: '密码',
   newPassword: '新密码',

@@ -38,6 +38,7 @@ export const ja = {
 
   // ---- ログイン・初期設定 ----
   signOut: 'ログアウト',
+  skipToContent: '本文へ移動',
   loginId: 'ログイン ID',
   password: 'パスワード',
   newPassword: '新しいパスワード',

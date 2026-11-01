@@ -94,6 +94,12 @@
     }
   }
 
+  /** 本文へ移動する。URL のハッシュは変えず（画面の切り替えは URL のパスで行う）、本文へフォーカスを移す。 */
+  function skipToContent(event: Event): void {
+    event.preventDefault();
+    document.getElementById('main-content')?.focus();
+  }
+
   async function signOut(): Promise<void> {
     // SAML で入ったセッションは、こちらのセッションを捨てたうえで、IdP の単一ログアウトへも進む（経路はサーバが決める）
     if (me?.viaSaml) {
@@ -133,6 +139,7 @@
 {:else if phase === 'invite'}
   <InvitationAcceptPanel token={inviteToken} onstep={onStep} />
 {:else if me}
+  <a class="skip-link" href="#main-content" onclick={skipToContent}>{t('skipToContent')}</a>
   <header class="shell-header">
     <span class="brand">{t('appName')}</span>
     <nav class="nav" aria-label={t('appName')}>
@@ -146,7 +153,7 @@
       <button class="btn small" type="button" onclick={signOut}><span class="material-icons" aria-hidden="true">logout</span>{t('signOut')}</button>
     </div>
   </header>
-  <main>
+  <main id="main-content" tabindex="-1">
     {#if tab === 'feeds'}
       <FeedList permissions={me.permissions} />
     {:else if tab === 'users'}

@@ -36,6 +36,7 @@ export const ko: Record<MessageKey, string> = {
 
   // ---- Sign-in / setup ----
   signOut: '로그아웃',
+  skipToContent: '본문으로 건너뛰기',
   loginId: '로그인 ID',
   password: '비밀번호',
   newPassword: '새 비밀번호',
