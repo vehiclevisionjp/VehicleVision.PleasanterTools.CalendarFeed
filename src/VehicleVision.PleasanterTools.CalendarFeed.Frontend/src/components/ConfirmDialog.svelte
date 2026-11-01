@@ -12,7 +12,7 @@
   }: { title: string; message: string; danger?: boolean; busy?: boolean; onconfirm: () => void; oncancel: () => void } = $props();
 </script>
 
-<Modal {title} onclose={oncancel}>
+<Modal {title} {danger} onclose={oncancel}>
   <p>{message}</p>
   <div class="dialog-actions">
     <button type="button" class="btn" onclick={oncancel}>{t('cancel')}</button>

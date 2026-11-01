@@ -84,10 +84,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   sass 1.105.2 / MIT / https://github.com/sass/dart-sass
   qrcode 1.5.4 / MIT / https://github.com/soldair/node-qrcode
 
-  書体とアイコン（アプリへ同梱する。コードではなくフォントのファイル。Questionnaire の Frontend と同じ版・同じ扱い）。**SIL Open Font License 1.1**
+  書体とアイコン（アプリへ同梱する。コードではなくフォントのファイル）。**SIL Open Font License 1.1**
   （寛容ライセンスの一覧にはないが、フォントの再配布を許す。ソフトウェアとして単独で売らない限り同梱・再配布してよい。商用利用可）
-  @fontsource-variable/noto-sans-jp 5.3.1 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/noto-sans-jp
-  @fontsource-variable/m-plus-1-code 5.3.1 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource-variable/m-plus-1-code
+  書体（Noto Sans CJK JP・Noto Sans Mono CJK JP・Myrica M）は DesignReference 第 2.2 版（commit 73943fd）から scripts/fonts/sync-app-fonts.mjs で複写した、
+  文字を絞った woff2 である（src/VehicleVision.PleasanterTools.CalendarFeed.Frontend/src/fonts/app/。出どころ・SHA-256 は SOURCE.json と manifest.json）。
+  元のフォントのデザインは変えていない。ライセンスの全文は同じフォルダの licenses/ に置き、配布物（Docker イメージ・公開物）にも入る。
+  Noto Sans CJK JP / Noto Sans Mono CJK JP / SIL Open Font License 1.1 / https://github.com/notofonts/noto-cjk（licenses/NotoCJK-OFL.txt）
+  Myrica M / SIL Open Font License 1.1 + M+ FONTS LICENSE / https://myrica.estable.jp/（licenses/Myrica-LICENSE_OFL.txt・Myrica-LICENSE_M+.txt）
   @fontsource/material-icons 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/material-icons
     （Material Icons。上流（google/material-design-icons）は Apache-2.0 だが、npm パッケージは OFL-1.1 を宣言している）
     （2 要素の登録の QR コードをブラウザの中で描く）

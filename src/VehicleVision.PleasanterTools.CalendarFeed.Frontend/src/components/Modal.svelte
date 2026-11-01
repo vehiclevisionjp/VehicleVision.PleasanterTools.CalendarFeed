@@ -5,9 +5,10 @@
   let {
     title,
     wide = false,
+    danger = false,
     onclose,
     children,
-  }: { title: string; wide?: boolean; onclose: () => void; children: Snippet } = $props();
+  }: { title: string; wide?: boolean; danger?: boolean; onclose: () => void; children: Snippet } = $props();
 
   let dialog: HTMLDialogElement | undefined = $state();
 
@@ -17,7 +18,7 @@
   });
 </script>
 
-<dialog bind:this={dialog} class:wide aria-labelledby="modal-title" onclose={onclose}>
+<dialog bind:this={dialog} class:wide class:danger aria-labelledby="modal-title" onclose={onclose}>
   <h2 id="modal-title">{title}</h2>
   {@render children()}
   <span class="visually-hidden">{t('close')}</span>

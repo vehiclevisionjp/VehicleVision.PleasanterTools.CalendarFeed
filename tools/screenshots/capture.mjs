@@ -19,7 +19,8 @@ import { chromium } from 'playwright-core';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..');
-const outDir = path.join(root, '_documents', '画面の写し');
+// 出力先は、環境変数 SHOTS_OUT_DIR で変えられる（確認用に撮るとき、文書の写しを上書きしない）
+const outDir = process.env.SHOTS_OUT_DIR ?? path.join(root, '_documents', '画面の写し');
 const webProject = path.join(root, 'src', 'VehicleVision.PleasanterTools.CalendarFeed.Web');
 const APP = 'http://localhost:5099';
 const FAKE_PLEASANTER_PORT = 18080;
@@ -279,6 +280,7 @@ try {
   await page.setViewportSize({ width: 390, height: 800 });
   await shot(page, 'フィード-スマートフォン幅');
   await page.setViewportSize({ width: 1280, height: 800 });
+  // OS がダークでも、既定のライトのまま（prefers-color-scheme に自動追従しない）
   await page.emulateMedia({ colorScheme: 'dark' });
   await shot(page, 'フィード-ダークモード');
 
