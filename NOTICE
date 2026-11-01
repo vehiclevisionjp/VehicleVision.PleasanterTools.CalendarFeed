@@ -86,11 +86,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
 
   書体とアイコン（アプリへ同梱する。コードではなくフォントのファイル）。**SIL Open Font License 1.1**
   （寛容ライセンスの一覧にはないが、フォントの再配布を許す。ソフトウェアとして単独で売らない限り同梱・再配布してよい。商用利用可）
-  書体（Noto Sans CJK JP・Noto Sans Mono CJK JP・Myrica M）は DesignReference 第 2.2 版（commit 73943fd）から scripts/fonts/sync-app-fonts.mjs で複写した、
+  書体（Zen Kaku Gothic New・Zen Maru Gothic・Myrica M）は DesignReference 第 2.3 版（commit 080f9b3）から scripts/fonts/sync-app-fonts.mjs で複写した、
   文字を絞った woff2 である（src/VehicleVision.PleasanterTools.CalendarFeed.Frontend/src/fonts/app/。出どころ・SHA-256 は SOURCE.json と manifest.json）。
   元のフォントのデザインは変えていない。ライセンスの全文は同じフォルダの licenses/ に置き、配布物（Docker イメージ・公開物）にも入る。
-  Noto Sans CJK JP / Noto Sans Mono CJK JP / SIL Open Font License 1.1 / https://github.com/notofonts/noto-cjk（licenses/NotoCJK-OFL.txt）
+  Zen Kaku Gothic New / SIL Open Font License 1.1 / https://github.com/google/fonts/tree/main/ofl/zenkakugothicnew（licenses/ZenKakuGothicNew-OFL.txt）
+  Zen Maru Gothic / SIL Open Font License 1.1 / https://github.com/google/fonts/tree/main/ofl/zenmarugothic（licenses/ZenMaruGothic-OFL.txt）
   Myrica M / SIL Open Font License 1.1 + M+ FONTS LICENSE / https://myrica.estable.jp/（licenses/Myrica-LICENSE_OFL.txt・Myrica-LICENSE_M+.txt）
+  （licenses/ には複写スクリプトが DesignReference の一式を置くため、同梱していない Zen Old Mincho・Material Symbols のライセンス全文も入っている。それらの書体は含まない）
   @fontsource/material-icons 5.3.0 / SIL Open Font License 1.1 / https://www.npmjs.com/package/@fontsource/material-icons
     （Material Icons。上流（google/material-design-icons）は Apache-2.0 だが、npm パッケージは OFL-1.1 を宣言している）
     （2 要素の登録の QR コードをブラウザの中で描く）

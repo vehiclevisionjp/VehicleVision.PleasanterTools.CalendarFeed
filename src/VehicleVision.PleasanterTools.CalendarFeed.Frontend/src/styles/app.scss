@@ -1,4 +1,4 @@
-// 見た目の基準は VehicleVision.DesignReference（Web UI（アプリ・管理画面）の章。第 2.2 版）。
+// 見た目の基準は VehicleVision.DesignReference（Web UI（アプリ・管理画面）の章。第 2.3 版）。
 // - 色・書体・余白・角丸・影・フォーカスリング・動きの設定は design-reference/ の 2 ファイルにある（DesignReference の写し。ここでは直さない）。
 //   色は **明示型**: 既定はライト。OS の prefers-color-scheme には従わない（ダークの切り替えは持たない）。
 // - このファイルは、トークン（var(--color-*) など）だけで書く。**色コードは書かない**。
