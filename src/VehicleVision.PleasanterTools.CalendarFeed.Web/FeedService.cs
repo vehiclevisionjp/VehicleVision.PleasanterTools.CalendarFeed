@@ -28,6 +28,11 @@ public sealed class FeedOptions
     public TimeSpan NotifyRepeat { get; init; } = TimeSpan.FromHours(24);
 }
 
+/// <summary>組み立てた .ics と、その中の予定の最終更新の最大（条件付き取得の <c>Last-Modified</c>）。</summary>
+/// <param name="Body">.ics の本文。</param>
+/// <param name="LastModified">予定の最終更新の最大。予定が無ければ <c>null</c>。</param>
+public sealed record CalendarSnapshot(string Body, DateTimeOffset? LastModified);
+
 /// <summary>Pleasanter から取って .ics を組み立てる。</summary>
 public sealed class FeedService(
     PleasanterClient client,
@@ -42,7 +47,7 @@ public sealed class FeedService(
     private FeedOptions options => settings.Current.Feed;
 
     /// <summary>フィードの .ics を返す。キャッシュがあればそれを返す。</summary>
-    public Task<string> GetCalendarAsync(FeedDefinition feed, CancellationToken cancellationToken) =>
+    public Task<CalendarSnapshot> GetCalendarAsync(FeedDefinition feed, CancellationToken cancellationToken) =>
         cache.GetOrCreateAsync(
             feed.Id,
             async entry =>
@@ -55,13 +60,13 @@ public sealed class FeedService(
     /// 組み立てて、**Pleasanter へ取りに行った結果を残す**（管理画面の「最後の取得結果」）。
     /// 失敗は握りつぶさず、そのまま呼び出し側へ投げる（応答の状態の決め方は呼び出し側）。
     /// </summary>
-    private async Task<string> BuildAndRecordAsync(FeedDefinition feed, CancellationToken cancellationToken)
+    private async Task<CalendarSnapshot> BuildAndRecordAsync(FeedDefinition feed, CancellationToken cancellationToken)
     {
         try
         {
-            var (body, count) = await BuildAsync(feed, cancellationToken).ConfigureAwait(false);
+            var (snapshot, count) = await BuildAsync(feed, cancellationToken).ConfigureAwait(false);
             await RecordAsync(feed, new FeedFetchResult(time.GetUtcNow(), FeedFetchStatus.Success, null, count)).ConfigureAwait(false);
-            return body;
+            return snapshot;
         }
         catch (PleasanterException ex)
         {
@@ -127,7 +132,7 @@ public sealed class FeedService(
         _versions.AddOrUpdate(feedId, 1, (_, version) => version + 1);
     }
 
-    private async Task<(string Body, int EventCount)> BuildAsync(FeedDefinition feed, CancellationToken cancellationToken)
+    private async Task<(CalendarSnapshot Snapshot, int EventCount)> BuildAsync(FeedDefinition feed, CancellationToken cancellationToken)
     {
         // フィードごとの API キー。未登録なら全フィード共通の既定（任意）。どちらも無ければ止める
         var apiKey = await feeds.GetApiKeyAsync(feed.Id, cancellationToken).ConfigureAwait(false)
@@ -136,9 +141,12 @@ public sealed class FeedService(
                 PleasanterErrorKind.Unauthorized, "フィードに API キーが登録されていません。");
 
         var output = await FetchEventsAsync(feed, apiKey, cancellationToken).ConfigureAwait(false);
-        return (
-            ICalWriter.Write(feed.Name, output, time.GetUtcNow(), TimeSpan.FromSeconds(options.CacheSeconds)),
-            output.Count);
+
+        // DTSTAMP は取得時刻ではなく予定の最終更新の最大にする。**予定が変わらなければ本文（と ETag）が変わらない**
+        // ので、キャッシュが切れて作り直しても 304 が効く（予定が無ければ DTSTAMP は出ない）
+        DateTimeOffset? lastModified = output.Count == 0 ? null : output.Max(e => e.LastModified ?? e.Start);
+        var body = ICalWriter.Write(feed.Name, output, lastModified ?? time.GetUtcNow(), TimeSpan.FromSeconds(options.CacheSeconds));
+        return (new CalendarSnapshot(body, lastModified), output.Count);
     }
 
     /// <summary>
