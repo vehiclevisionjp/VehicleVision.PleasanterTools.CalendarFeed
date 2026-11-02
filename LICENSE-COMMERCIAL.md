@@ -46,8 +46,10 @@ Copyright (C) PMC Co., Ltd. IT Solution Div.
 本ソフトウェアは、当社の共通部品 Core（`VehicleVision.PleasanterTools.Core.*` の NuGet パッケージ）を利用します。
 Core は AGPL-3.0-or-later と商用ライセンスのデュアルライセンスで、著作権者は当社です
 （[`LICENSING.md`](LICENSING.md) の依存の節を参照）。
-**本ソフトウェアの商用ライセンスには、Core の商用ライセンスが含まれます。**
-Core 単独での利用は、個別に契約します。
+**本ソフトウェアの商用ライセンスは、本ソフトウェアに組み込まれた Core を含みます。**
+
+- 本ソフトウェアの商用契約を結んだ方には、組み込まれた Core を、本ソフトウェアと同じ条件で提供します
+- Core を単体で利用する場合と、当社のアプリケーション以外へ組み込む場合は、個別に契約します
 <!-- license:end core-terms -->
 
 <!-- license:begin sni-terms=on -->
