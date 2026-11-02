@@ -1,6 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <!--
+      暫定: Core.Data 0.1.0 の推移依存で、IBM Db2・Firebird のドライバ（独自許諾・IDPL 1.0）が配布物へ入る。
+      本アプリは使わないので、アセットを全て除外して publish の出力から外す。バージョンは推移依存の解決版に合わせる。
+      Core 側が依存を絞った版（vehiclevisionjp/VehicleVision.PleasanterTools.Core#151）を取り込んだら、この 2 行を外す。
+    -->
+    <PackageReference Include="Net.IBM.Data.Db2" Version="9.0.0.300" ExcludeAssets="all" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.3" ExcludeAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- 管理画面の SAML 2.0 ログイン（Questionnaire と同じ依存・同じ版）。BSD-3-Clause -->
     <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.21.0" />
     <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.21.0" />

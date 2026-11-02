@@ -1,6 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <!--
+      暫定: Core.Data 0.1.0 の推移依存で、IBM Db2・Firebird のドライバ（独自許諾・IDPL 1.0）が配布物へ入る。
+      本アプリは使わないので、アセットを全て除外して publish の出力から外す。ネイティブの clidriver/ は、このプロジェクトの出力経由で Web の publish へ入るため、Data 側でも除外する。バージョンは推移依存の解決版に合わせる。
+      Core 側が依存を絞った版（vehiclevisionjp/VehicleVision.PleasanterTools.Core#151）を取り込んだら、この 2 行を外す（Web プロジェクトの同じ 2 行も）。
+    -->
+    <PackageReference Include="Net.IBM.Data.Db2" Version="9.0.0.300" ExcludeAssets="all" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.3" ExcludeAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\VehicleVision.PleasanterTools.CalendarFeed.Core\VehicleVision.PleasanterTools.CalendarFeed.Core.csproj" />
   </ItemGroup>
 
