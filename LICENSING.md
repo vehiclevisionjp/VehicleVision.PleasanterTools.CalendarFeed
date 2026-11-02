@@ -127,8 +127,8 @@ Core は寛容ライセンスではなく、**AGPL-3.0-or-later と商用ライ�
 著作権者は本ソフトウェアと同じ、当社です。
 
 - **A（AGPL）を選ぶ場合**: Core も AGPL で利用します
-- **B（商用）を選ぶ場合**: Core の商用ライセンスは、本ソフトウェアの商用ライセンスに含まれます。
-  Core 単独での利用は、個別に契約します
+- **B（商用）を選ぶ場合**: 本ソフトウェアの商用ライセンスは、本ソフトウェアに組み込まれた Core を含みます。
+  Core を単体で利用する場合と、当社のアプリケーション以外へ組み込む場合は、個別に契約します
 
 Core の条件は、次を参照してください。
 [Core の LICENSING.md](https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core/blob/develop/LICENSING.md)
