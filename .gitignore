@@ -38,3 +38,6 @@ src/*.Web/wwwroot/admin/
 
 ## AI の事実確認専用（必要時に取得し、Git では追跡しない）
 _reference/Implem.Pleasanter/
+
+## git worktree の作業ツリー置き場（ブランチ運用方針.md）
+.worktrees/

@@ -36,6 +36,7 @@ export const de: Record<MessageKey, string> = {
 
   // ---- Sign-in / setup ----
   signOut: 'Abmelden',
+  skipToContent: 'Zum Inhalt springen',
   loginId: 'Anmelde-ID',
   password: 'Passwort',
   newPassword: 'Neues Passwort',

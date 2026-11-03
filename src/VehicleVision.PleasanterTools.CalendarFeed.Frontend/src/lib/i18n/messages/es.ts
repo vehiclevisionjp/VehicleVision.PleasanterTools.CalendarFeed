@@ -36,6 +36,7 @@ export const es: Record<MessageKey, string> = {
 
   // ---- Sign-in / setup ----
   signOut: 'Cerrar sesión',
+  skipToContent: 'Saltar al contenido',
   loginId: 'ID de inicio de sesión',
   password: 'Contraseña',
   newPassword: 'Nueva contraseña',

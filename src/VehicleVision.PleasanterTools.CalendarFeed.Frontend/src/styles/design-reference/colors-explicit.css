@@ -1,0 +1,85 @@
+/* VehicleVision.DesignReference 第 2.4 版（コミット 0730ea9、2026-11-01 参照）の css/colors-explicit.css を、そのまま写したもの。手で直さない（直すときは DesignReference へ PR）。 */
+/* 自動生成: tokens/colors.json を編集して `node scripts/build-tokens.mjs` を実行 */
+/* 明示型(アプリ向け): 既定はライト。OS の prefers-color-scheme には従わず、<html data-theme="dark"> のときだけダークにする。
+   追従型(css/colors.css)とは同時に読み込まない。使い分けは DesignReference の「Web・ライト/ダーク」を参照 */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --color-primary: #17184b; /* 鉄紺 */
+  --color-primary-hover: #0e0f33; /* 鉄紺 濃 */
+  --color-primary-subtle: #e9e9f3; /* 鉄紺 淡 */
+  --color-primary-text: #17184b; /* 鉄紺 文字 */
+  --color-primary-edge: #17184b; /* 鉄紺 縁 */
+  --color-accent: #f08300; /* 蜜柑色 */
+  --color-brand-teal: #00836a; /* 青竹色 */
+  --color-text: #0b1013; /* 黒橡 */
+  --color-text-muted: #595857; /* 墨 */
+  --color-border: #bdc0ba; /* 白鼠 */
+  --color-border-strong: #85887f; /* 鼠 */
+  --color-surface: #fffffc; /* 胡粉 */
+  --color-bg: #f3f3f2; /* 白練 */
+  --color-on-fill: #ffffff; /* 白 */
+  --color-on-accent: #0b1013; /* 黒橡 */
+  --color-on-warning: #0b1013; /* 黒橡 */
+  --color-success: #007b43; /* 常磐緑 */
+  --color-warning: #bf783a; /* 琥珀 */
+  --color-danger: #b7282e; /* 茜色 */
+  --color-success-text: #007b43; /* 常磐緑 文字 */
+  --color-success-subtle: #e4f3eb; /* 常磐緑 淡 */
+  --color-warning-text: #96560f; /* 琥珀 文字 */
+  --color-warning-subtle: #fcf0e0; /* 琥珀 淡 */
+  --color-danger-text: #b7282e; /* 茜色 文字 */
+  --color-danger-subtle: #fbeaea; /* 茜色 淡 */
+  --color-chart-1: #4a55c8; /* グラフ1 藍 */
+  --color-chart-2: #d67500; /* グラフ2 橙 */
+  --color-chart-3: #00836a; /* グラフ3 青竹 */
+  --color-chart-4: #ca73a3; /* グラフ4 紅藤 */
+  --color-chart-5: #0072b2; /* グラフ5 青 */
+  --color-chart-6: #949400; /* グラフ6 鶯 */
+  --color-chart-other: #7a7a7a; /* グラフ その他 */
+  --color-chart-seq-1: #e9e9f3; /* 連続1 */
+  --color-chart-seq-2: #b5b5c9; /* 連続2 */
+  --color-chart-seq-3: #80819f; /* 連続3 */
+  --color-chart-seq-4: #4c4c75; /* 連続4 */
+  --color-chart-seq-5: #17184b; /* 連続5 */
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-primary: #17184b; /* 鉄紺 */
+  --color-primary-hover: #0e0f33; /* 鉄紺 濃 */
+  --color-primary-subtle: #4a4f80; /* 鉄紺 淡 */
+  --color-primary-text: #d0d3ff; /* 鉄紺 文字 */
+  --color-primary-edge: #60668f; /* 鉄紺 縁 */
+  --color-accent: #f08300; /* 蜜柑色 */
+  --color-brand-teal: #00836a; /* 青竹色 */
+  --color-text: #f4f4f8; /* 黒橡 */
+  --color-text-muted: #c4c6dc; /* 墨 */
+  --color-border: #60668f; /* 白鼠 */
+  --color-border-strong: #9398c8; /* 鼠 */
+  --color-surface: #3b3f66; /* 胡粉 */
+  --color-bg: #30334f; /* 白練 */
+  --color-on-fill: #ffffff; /* 白 */
+  --color-on-accent: #0b1013; /* 黒橡 */
+  --color-on-warning: #0b1013; /* 黒橡 */
+  --color-success: #007b43; /* 常磐緑 */
+  --color-warning: #bf783a; /* 琥珀 */
+  --color-danger: #b7282e; /* 茜色 */
+  --color-success-text: #7fdcae; /* 常磐緑 文字 */
+  --color-success-subtle: #2a5a52; /* 常磐緑 淡 */
+  --color-warning-text: #f2b277; /* 琥珀 文字 */
+  --color-warning-subtle: #5a4440; /* 琥珀 淡 */
+  --color-danger-text: #ffb0b4; /* 茜色 文字 */
+  --color-danger-subtle: #5b3150; /* 茜色 淡 */
+  --color-chart-1: #858cda; /* グラフ1 藍 */
+  --color-chart-2: #f08300; /* グラフ2 橙 */
+  --color-chart-3: #00a582; /* グラフ3 青竹 */
+  --color-chart-4: #cc79a7; /* グラフ4 紅藤 */
+  --color-chart-5: #0099ef; /* グラフ5 青 */
+  --color-chart-6: #c2c200; /* グラフ6 鶯 */
+  --color-chart-other: #929292; /* グラフ その他 */
+  --color-chart-seq-1: #4a4f80; /* 連続1 */
+  --color-chart-seq-2: #6c70a0; /* 連続2 */
+  --color-chart-seq-3: #8d91c0; /* 連続3 */
+  --color-chart-seq-4: #afb2df; /* 連続4 */
+  --color-chart-seq-5: #d0d3ff; /* 連続5 */
+}

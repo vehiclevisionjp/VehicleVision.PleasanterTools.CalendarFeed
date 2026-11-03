@@ -36,6 +36,7 @@ export const vi: Record<MessageKey, string> = {
 
   // ---- Sign-in / setup ----
   signOut: 'Đăng xuất',
+  skipToContent: 'Bỏ qua để đến nội dung chính',
   loginId: 'ID đăng nhập',
   password: 'Mật khẩu',
   newPassword: 'Mật khẩu mới',
