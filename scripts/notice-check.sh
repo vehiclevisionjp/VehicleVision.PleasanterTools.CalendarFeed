@@ -28,10 +28,9 @@ trap 'rm -rf "$work"' EXIT
 fail=0
 
 # NuGet の直接依存を「名称<TAB>版」で書き出す。
-# **ExcludeAssets="all" の参照は数えない**（配布物へ入らない暫定の除外。NOTICE に載せる対象ではない）。
 # **obj/ 配下は見ない。** 復元で生成される .props にも似た記述が現れる
 find src tests -name '*.csproj' -not -path '*/obj/*' -print0 \
-    | xargs -0 grep -h '<PackageReference'     | grep -v 'ExcludeAssets="all"'     | grep -oE '<PackageReference[^>]*Include="[^"]+"[^>]*Version="[^"]+"' \
+    | xargs -0 grep -hoE '<PackageReference[^>]*Include="[^"]+"[^>]*Version="[^"]+"' \
     | sed -E 's/.*Include="([^"]+)".*Version="([^"]+)".*/\1\t\2/' \
     | sort -u > "$work/nuget.tsv"
 
