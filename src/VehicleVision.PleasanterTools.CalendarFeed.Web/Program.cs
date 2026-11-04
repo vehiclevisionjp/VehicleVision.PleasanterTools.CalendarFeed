@@ -239,7 +239,7 @@ app.MapGet("/ready", async (DatabaseConnectionInfo database, CancellationToken c
     .DisableRateLimiting();
 
 // ---- 購読フィード ----------------------------------------------------------------
-app.MapGet("/feeds/{token}.ics", async (
+app.MapMethods("/feeds/{token}.ics", ["GET", "HEAD"], async (
     string token,
     HttpContext http,
     IFeedStore feeds,
@@ -255,10 +255,10 @@ app.MapGet("/feeds/{token}.ics", async (
         return Results.NotFound();
     }
 
-    string body;
+    CalendarSnapshot snapshot;
     try
     {
-        body = await service.GetCalendarAsync(feed, cancellationToken);
+        snapshot = await service.GetCalendarAsync(feed, cancellationToken);
     }
     catch (Exception ex) when (ex is CryptographicException or InvalidOperationException)
     {
@@ -279,6 +279,8 @@ app.MapGet("/feeds/{token}.ics", async (
         return Results.StatusCode(StatusCodes.Status502BadGateway);
     }
 
+    var body = snapshot.Body;
+    var lastModified = snapshot.LastModified is { } raw ? ConditionalGet.TruncateToSeconds(raw) : (DateTimeOffset?)null;
     var etag = $"\"{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body)))[..32]}\"";
     http.Response.Headers.CacheControl = $"private, max-age={settings.Current.Feed.CacheSeconds}";
     http.Response.Headers.ETag = etag;
@@ -286,9 +288,22 @@ app.MapGet("/feeds/{token}.ics", async (
     http.Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
     http.Response.Headers["X-Content-Type-Options"] = "nosniff";
 
-    if (http.Request.Headers.IfNoneMatch == etag)
+    if (lastModified is { } modified)
+    {
+        http.Response.Headers.LastModified = modified.ToString("r", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    if (ConditionalGet.IsNotModified(http.Request.Headers, etag, lastModified))
     {
         return Results.StatusCode(StatusCodes.Status304NotModified);
+    }
+
+    if (HttpMethods.IsHead(http.Request.Method))
+    {
+        // HEAD は GET と同じヘッダで本文なし
+        http.Response.ContentType = "text/calendar; charset=utf-8";
+        http.Response.ContentLength = Encoding.UTF8.GetByteCount(body);
+        return Results.Empty;
     }
 
     return Results.Text(body, "text/calendar; charset=utf-8");

@@ -385,6 +385,84 @@ public sealed class FeedEndpointTests : IDisposable
         Assert.Equal(1, _app.Pleasanter.CallCount);
     }
 
+    private static string Http(DateTimeOffset value) => value.ToString("r", System.Globalization.CultureInfo.InvariantCulture);
+
+    [Fact]
+    public async Task 予定が変わらなければ作り直しても本文とETagが変わらない()
+    {
+        var (path, feed) = await _app.CreateFeedAsync();
+        var client = _app.Client();
+
+        var first = await client.GetAsync(path);
+        var firstBody = await first.Content.ReadAsStringAsync();
+
+        // キャッシュを捨て、時刻も進めて作り直させる
+        _app.Service<FeedService>().Invalidate(feed.GetProperty("id").GetGuid());
+        _app.Time.Advance(TimeSpan.FromHours(1));
+        var second = await client.GetAsync(path);
+
+        Assert.Equal(2, _app.Pleasanter.CallCount);
+        Assert.Equal(firstBody, await second.Content.ReadAsStringAsync());
+        Assert.Equal(first.Headers.ETag!.Tag, second.Headers.ETag!.Tag);
+    }
+
+    [Theory]
+    [InlineData("W/{0}")]
+    [InlineData("\"other\", {0}")]
+    [InlineData("*")]
+    public async Task If_None_Matchは弱いETag_リスト_アスタリスクでも304(string format)
+    {
+        var (path, _) = await _app.CreateFeedAsync();
+        var client = _app.Client();
+
+        var first = await client.GetAsync(path);
+        using var conditional = new HttpRequestMessage(HttpMethod.Get, path);
+        conditional.Headers.TryAddWithoutValidation("If-None-Match", string.Format(System.Globalization.CultureInfo.InvariantCulture, format, first.Headers.ETag!.Tag));
+
+        Assert.Equal(HttpStatusCode.NotModified, (await client.SendAsync(conditional)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Last_Modifiedを出しIf_Modified_Sinceで304を返す()
+    {
+        var (path, _) = await _app.CreateFeedAsync();
+        var client = _app.Client();
+
+        var first = await client.GetAsync(path);
+        var lastModified = first.Content.Headers.LastModified;
+        Assert.NotNull(lastModified);
+
+        using var same = new HttpRequestMessage(HttpMethod.Get, path);
+        same.Headers.TryAddWithoutValidation("If-Modified-Since", Http(lastModified!.Value));
+        Assert.Equal(HttpStatusCode.NotModified, (await client.SendAsync(same)).StatusCode);
+
+        using var older = new HttpRequestMessage(HttpMethod.Get, path);
+        older.Headers.TryAddWithoutValidation("If-Modified-Since", Http(lastModified.Value.AddDays(-1)));
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(older)).StatusCode);
+
+        using var etagWins = new HttpRequestMessage(HttpMethod.Get, path);
+        etagWins.Headers.TryAddWithoutValidation("If-None-Match", "\"nope\"");
+        etagWins.Headers.TryAddWithoutValidation("If-Modified-Since", Http(lastModified.Value));
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(etagWins)).StatusCode);
+    }
+
+    [Fact]
+    public async Task HEADは本文なしで同じヘッダを返し_不明なトークンは404()
+    {
+        var (path, _) = await _app.CreateFeedAsync();
+        var client = _app.Client();
+
+        using var head = new HttpRequestMessage(HttpMethod.Head, path);
+        var response = await client.SendAsync(head);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(response.Headers.ETag);
+        Assert.Empty(await response.Content.ReadAsStringAsync());
+
+        using var unknown = new HttpRequestMessage(HttpMethod.Head, "/feeds/unknown.ics");
+        Assert.Equal(HttpStatusCode.NotFound, (await client.SendAsync(unknown)).StatusCode);
+    }
+
     [Fact]
     public async Task 不明なトークンと失効したトークンは404()
     {
