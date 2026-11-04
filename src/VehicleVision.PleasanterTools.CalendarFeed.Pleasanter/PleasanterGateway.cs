@@ -16,6 +16,26 @@ public sealed class PleasanterOptions
     /// </summary>
     public string BaseUrl { get; init; } = string.Empty;
 
+    /// <summary>環境変数の名前。DotNetClient の <c>PleasanterOptions.FromEnvironment()</c> と同じ名前にそろえている。</summary>
+    public const string AllowInsecureHttpEnvironmentVariable = "PLEASANTER_ALLOW_INSECURE_HTTP";
+
+    /// <summary>
+    /// ループバック以外の <c>http</c> も許す。<b>検証用の環境（コンテナ間の通信など）だけで有効にすること。</b>
+    /// 有効にすると、API キーを含むリクエストの本文が<b>平文</b>で流れる。既定は無効。
+    /// 資格情報・クエリ・フラグメント・http／https 以外のスキームは、有効にしても拒否される（DotNetClient 0.3.0）。
+    /// </summary>
+    /// <remarks>
+    /// <b>管理画面・Pleasanter.json からは設定できない</b>（本番で誤って有効にされないよう、設定の項目にしない）。
+    /// 既定値は、環境変数 <c>PLEASANTER_ALLOW_INSECURE_HTTP</c> が <c>true</c> のときだけ有効。
+    /// 本アプリは接続設定を自前で組み立てて DotNetClient へ渡すので、DotNetClient 側の環境変数の読み取り
+    /// （<c>FromEnvironment()</c>）は届かない。そのため、ここで読む。
+    /// </remarks>
+    public bool AllowInsecureHttp { get; init; } = ParseAllowInsecureHttp(Environment.GetEnvironmentVariable(AllowInsecureHttpEnvironmentVariable));
+
+    /// <summary>環境変数の値を読む。<c>true</c>（大文字小文字は問わない）のときだけ有効。</summary>
+    public static bool ParseAllowInsecureHttp(string? value)
+        => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// 全フィード共通の既定の API キー（任意）。**フィードごとの API キーが未登録のときだけ使う。**
     /// サーバ側だけが持つ。購読側へ渡さない。リクエストボディに載せる方式。
@@ -104,14 +124,17 @@ public interface IPleasanterOptionsSource
 /// <c>DetectServerVersion = false</c> も指定している。
 /// </para>
 /// <para>
-/// <b>DotNetClient 0.2.0 に無いものを、ここで補っている。</b> 該当の変更を含む版へ上げたら、不要になった分を消す。
+/// HTTP が 200 でも本文の <c>StatusCode</c> が 200 以外なら失敗として扱う処理は、DotNetClient 0.3.0（#95）が行う
+/// （<see cref="Dnc.PleasanterResponse.ApplicationStatusCode"/>。分類は <see cref="Dnc.PleasanterResponse.ErrorKind"/> に反映される）。
+/// </para>
+/// <para>
+/// <b>DotNetClient 0.3.0 に無いものを、ここで補っている。</b> 該当の変更を含む版へ上げたら、不要になった分を消す。
 /// </para>
 /// <list type="bullet">
-/// <item><description>HTTP が 200 でも、本文の <c>StatusCode</c> が 200 以外なら失敗として分類する
-/// （DotNetClient #95・PR #96 は develop にあるが 0.2.0 には無い。<b>DotNetClient #95 を含む版へ上げたら、この補いは消せる</b>）</description></item>
-/// <item><description>HTTP 429 を <see cref="PleasanterErrorKind.RateLimited"/> として分ける（DotNetClient は <c>Transient</c>）。
+/// <item><description>HTTP 429（本文の <c>StatusCode</c> が 429 の場合も）を <see cref="PleasanterErrorKind.RateLimited"/> として分ける（DotNetClient は <c>Transient</c>）。
 /// 日次の上限は日付が変わるまで戻らず、購読側へ返す <c>Retry-After</c> の決め方が違うため。
-/// 本アプリは Pleasanter の <c>Retry-After</c> ヘッダを読まない（購読側へ返す待ち時間は、分類と API キーの利用者のタイムゾーンの 0 時で決める）</description></item>
+/// 本アプリは Pleasanter の <c>Retry-After</c> ヘッダを読まない（購読側へ返す待ち時間は、分類と API キーの利用者のタイムゾーンの 0 時で決める。
+/// DotNetClient の Retry-After の読み取りは 0.3.0 に入っておらず、次の版の予定）</description></item>
 /// </list>
 /// <para>ここに書いた応答の形は設計文書の推奨と参照ソースの確認に基づく。**実機の Pleasanter では未検証**（フェイクの通信とループバックのみ）。</para>
 /// </remarks>
@@ -274,7 +297,7 @@ public sealed class PleasanterGateway(HttpClient httpClient, IPleasanterOptionsS
 
     /// <summary>
     /// 標準 API へ POST し、状態を見て応答の JSON を返す。<b>API キーは本文にしか載せず（DotNetClient が <c>ApiKey</c>・<c>ApiVersion</c> を足す）、例外・ログへ出さない。</b>
-    /// HTTP が 200 でも、本文の <c>StatusCode</c> が 200 でなければ失敗として扱う。
+    /// HTTP が 200 でも本文の <c>StatusCode</c> が 200 でなければ失敗として扱う（DotNetClient 0.3.0）。
     /// </summary>
     private async Task<JsonObject> PostAsync(string path, string apiKey, JsonObject body, CancellationToken cancellationToken)
     {
@@ -293,6 +316,7 @@ public sealed class PleasanterGateway(HttpClient httpClient, IPleasanterOptionsS
             ApiVersion = current.ApiVersion,
             Timeout = TimeSpan.FromSeconds(current.TimeoutSeconds),
             DetectServerVersion = false,
+            AllowInsecureHttp = current.AllowInsecureHttp,
         };
 
         Dnc.PleasanterResponse response;
@@ -317,9 +341,16 @@ public sealed class PleasanterGateway(HttpClient httpClient, IPleasanterOptionsS
             throw new PleasanterException(PleasanterErrorKind.Transient, "Pleasanter へ接続できませんでした。");
         }
 
-        if (status == (int)HttpStatusCode.TooManyRequests)
+        // HTTP が 200 でも本文の StatusCode が 200 以外なら、DotNetClient 0.3.0 が失敗の分類にしている（ApplicationStatusCode）。
+        // 報告する状態は、HTTP が 200 のときだけ本文の StatusCode（従来と同じ）。HTTP が 200 以外なら HTTP のステータス
+        var reported = status == (int)HttpStatusCode.OK && response.ApplicationStatusCode is { } applicationStatus && applicationStatus != (int)HttpStatusCode.OK
+            ? applicationStatus
+            : status;
+
+        // 429 は専用の分類にする（DotNetClient は Transient）。HTTP でも本文の StatusCode でも同じ扱い
+        if (reported == (int)HttpStatusCode.TooManyRequests)
         {
-            throw new PleasanterException(PleasanterErrorKind.RateLimited, $"Pleasanter が HTTP {status} を返しました。", status);
+            throw new PleasanterException(PleasanterErrorKind.RateLimited, $"Pleasanter が HTTP {reported} を返しました。", reported);
         }
 
         if (!response.IsSuccess)
@@ -331,8 +362,10 @@ public sealed class PleasanterGateway(HttpClient httpClient, IPleasanterOptionsS
                     Dnc.PleasanterErrorKind.Transient or Dnc.PleasanterErrorKind.Unknown => PleasanterErrorKind.Transient,
                     _ => PleasanterErrorKind.Permanent,
                 },
-                $"Pleasanter が HTTP {status} を返しました。",
-                status);
+                reported == status
+                    ? $"Pleasanter が HTTP {status} を返しました。"
+                    : $"Pleasanter が StatusCode {reported} を返しました。",
+                reported);
         }
 
         if (response.Body is not JsonObject node)
@@ -341,26 +374,6 @@ public sealed class PleasanterGateway(HttpClient httpClient, IPleasanterOptionsS
             throw new PleasanterException(PleasanterErrorKind.Transient, "Pleasanter の応答が JSON ではありません。", status);
         }
 
-        // 応答本文の StatusCode も見る（HTTP が 200 でも本文でエラーを返す場合に備える）。
-        // DotNetClient #95 を含む版へ上げたら消せる（DotNetClient 0.2.0 は HTTP のステータスだけで分類する）
-        if (node["StatusCode"] is JsonValue statusNode && statusNode.TryGetValue<int>(out var bodyStatus) && bodyStatus != 200)
-        {
-            throw new PleasanterException(
-                Classify((HttpStatusCode)bodyStatus),
-                $"Pleasanter が StatusCode {bodyStatus} を返しました。",
-                bodyStatus);
-        }
-
         return node;
     }
-
-    private static PleasanterErrorKind Classify(HttpStatusCode statusCode) => statusCode switch
-    {
-        HttpStatusCode.Unauthorized => PleasanterErrorKind.Unauthorized,
-        HttpStatusCode.BadRequest or HttpStatusCode.Forbidden or HttpStatusCode.NotFound
-            => PleasanterErrorKind.Permanent,
-        HttpStatusCode.TooManyRequests => PleasanterErrorKind.RateLimited,
-        HttpStatusCode.RequestTimeout => PleasanterErrorKind.Transient,
-        _ => (int)statusCode >= 500 ? PleasanterErrorKind.Transient : PleasanterErrorKind.Permanent,
-    };
 }
