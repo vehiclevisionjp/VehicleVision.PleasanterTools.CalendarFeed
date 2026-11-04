@@ -35,7 +35,7 @@ public sealed record CalendarSnapshot(string Body, DateTimeOffset? LastModified)
 
 /// <summary>Pleasanter から取って .ics を組み立てる。</summary>
 public sealed class FeedService(
-    PleasanterClient client,
+    PleasanterGateway client,
     IFeedStore feeds,
     RuntimeSettings settings,
     IMemoryCache cache,

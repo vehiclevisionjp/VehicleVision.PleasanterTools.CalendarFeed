@@ -21,7 +21,8 @@
    ビルド・配布物へ含めず、CI では取得しない
    （[`_reference/README.md`](../_reference/README.md)）
 7. **依存 OSS は寛容ライセンス（MIT / BSD 系 / Apache-2.0）に限定すること。**
-   追加時にライセンスを一次情報で確認し、[`NOTICE`](../NOTICE) へ追記する
+   追加時にライセンスを一次情報で確認し、[`NOTICE`](../NOTICE) へ追記する。
+   ただし、当社の共通部品（Core・DotNetClient）は、VehicleVision.PleasanterTools のツールが組み込む場合に呼び出し元と一体として扱うため例外とする（`LICENSING.md` の `core`・`dotnetclient`）
     - **フォントは SIL OFL 1.1 も可**（2026-09-08 決定。CalendarFeed は 2026-10-15 に管理画面の書体で採用）。日本語の自由フォントは実質すべて
       OFL であり、これを外すと同梱できるものが無くなる。**OFL はフォント以外へ
       copyleft が伸びない**ので、商用ライセンスでの提供と両立する。

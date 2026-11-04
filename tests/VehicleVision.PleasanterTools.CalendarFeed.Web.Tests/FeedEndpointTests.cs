@@ -127,7 +127,7 @@ internal sealed class TestApp : IDisposable
                     services.Remove(worker);
                 }
 
-                services.AddHttpClient<Pleasanter.PleasanterClient>()
+                services.AddHttpClient<Pleasanter.PleasanterGateway>()
                     .ConfigurePrimaryHttpMessageHandler(() => Pleasanter);
                 services.AddHttpClient(VehicleVision.PleasanterTools.Core.Web.PleasanterSessionVerifier.HttpClientName)
                     .ConfigurePrimaryHttpMessageHandler(() => PleasanterSso);
