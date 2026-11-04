@@ -128,7 +128,7 @@ dotnet run --project src/VehicleVision.PleasanterTools.CalendarFeed.Web -- --gen
 | --- | --- | --- | --- |
 | `Service.json` | `TimeZoneDefault` | `CALENDARFEED_TIMEZONE_DEFAULT` | 既定のタイムゾーン（既定 `Asia/Tokyo`） |
 | `Service.json` | `PublicBaseUrl` | `CALENDARFEED_PUBLIC_BASEURL` | 本アプリの公開 URL（購読 URL の基点） |
-| `Pleasanter.json` | `BaseUrl` | `CALENDARFEED_PLEASANTER_BASEURL` | 接続先 Pleasanter の URL |
+| `Pleasanter.json` | `BaseUrl` | `CALENDARFEED_PLEASANTER_BASEURL` | 接続先 Pleasanter の URL。**https のみ（ループバックだけ http 可）。資格情報・クエリ・フラグメントは不可**（API キーを本文で送るため。守らないと取得が失敗する） |
 | `Pleasanter.json` | `ApiKey` | `CALENDARFEED_PLEASANTER_APIKEY` | API キー。**実値は書かない** |
 | `Pleasanter.json` | `ApiVersion` | `CALENDARFEED_PLEASANTER_APIVERSION` | API バージョン（既定 1.1。読めない値は既定へ） |
 | `Pleasanter.json` | `TimeoutSeconds` | `CALENDARFEED_PLEASANTER_TIMEOUTSECONDS` | 呼び出しのタイムアウト（既定 30） |

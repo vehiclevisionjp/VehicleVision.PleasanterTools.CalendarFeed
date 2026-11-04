@@ -66,7 +66,7 @@ public sealed record CalDavWriteResult(
 /// </para>
 /// </remarks>
 public sealed class CalDavWriteService(
-    PleasanterClient client,
+    PleasanterGateway client,
     ICalDavStore store,
     FeedService feeds,
     RuntimeSettings settings,
