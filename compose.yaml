@@ -42,7 +42,7 @@ services:
       CALENDARFEED_DB_PROVIDER: ${DEV_DB_PROVIDER:-Sqlite}
       CALENDARFEED_DB_CONNECTIONSTRING: ${DEV_DB_CONNECTIONSTRING:-Data Source=/data/calendarfeed.db}
       # **注意（Issue #225）。** DotNetClient は、ループバック以外の http を使わない（API キーを本文で送るため）。
-      # この値（別コンテナへの http）では、フィードの取得が「Pleasanter の URL が使えません」で失敗する。解消の方法は未決（PR #225 の本文を参照）
+      # この値（別コンテナへの http）では、フィードの取得が「Pleasanter の URL が使えません」で失敗する。解消の方法は未決（PR #230 の本文を参照）
       CALENDARFEED_PLEASANTER_BASEURL: http://pleasanter:8080
       CALENDARFEED_PLEASANTER_APIKEY: ${TESTENV_API_KEY:?TESTENV_API_KEY を設定すること（先頭のコメント参照）}
       # **これを失うと、登録済みの API キーが全て使えなくなる。** 本番では App Service の設定か Key Vault に置き、控えを取る
