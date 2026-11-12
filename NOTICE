@@ -34,11 +34,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   MySqlConnector 2.6.2 / MIT / https://www.nuget.org/packages/MySqlConnector
   System.Security.Cryptography.Pkcs 10.0.13 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Pkcs
     （推移的依存の脆弱性 GHSA-846f-f764-76mx を避けるための直接参照。参照日 2026-10-14）
-  VehicleVision.PleasanterTools.Core.Data 0.1.1 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+  VehicleVision.PleasanterTools.Core.Data 0.2.0 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （DB の基盤。接続・DbTime・マイグレーションと排他・SqlDialect の汎用部分。Dapper・FluentMigrator.Runner.Core・4 方言のランナー（SQL Server・PostgreSQL・MySQL・SQLite）・Microsoft.Data.SqlClient・Microsoft.Data.Sqlite・MySqlConnector・Npgsql は、これが推移的に伴う。IBM Db2・Firebird のドライバは伴わない）
-  VehicleVision.PleasanterTools.Core.Mail 0.1.1 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+  VehicleVision.PleasanterTools.Core.Mail 0.2.0 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （メール送信の部品。MailKit・MimeKit・AWSSDK.SimpleEmailV2・Azure.Communication.Email・Azure.Identity などは、これが推移的に伴う）
-  VehicleVision.PleasanterTools.Core.Web 0.1.1 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
+  VehicleVision.PleasanterTools.Core.Web 0.2.0 / AGPL-3.0-or-later または商用（自社。Core リポジトリ） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Core
     （Web 層の部品。Pleasanter のログインの本人確認（PleasanterSessionVerifier）。ASP.NET Core の共有フレームワークだけを使い、NuGet の依存を伴わない）
   VehicleVision.PleasanterTools.DotNetClient 0.3.0 / LGPL-3.0-or-later OR AGPL-3.0-or-later OR 商用（LicenseRef-PMC-Commercial）の 3 層（自社） / https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.DotNetClient
     （Pleasanter の標準 Web API クライアント。レコードの取得・CalDAV の書き込み（`CalendarFeed.Pleasanter` の `PleasanterGateway`）が使う。NuGet では PackageLicenseFile で LICENSING.md を表示し、SPDX の式は持たない。
