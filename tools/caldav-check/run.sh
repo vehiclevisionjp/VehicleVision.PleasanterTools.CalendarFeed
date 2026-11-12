@@ -72,7 +72,7 @@ docker volume create caldav-check-state >/dev/null
 
 run_client() {
     docker run --rm --network "$NETWORK" -v caldav-check-state:/state \
-        -e PLEASANTER_API_KEY="$TESTENV_API_KEY" -e PLEASANTER_URL=http://pleasanter:8080 -e APP_URL=http://app:8080 \
+        -e VVPT_PLEASANTER_API_KEY="$TESTENV_API_KEY" -e VVPT_PLEASANTER_BASE_URL=http://pleasanter:8080 -e APP_URL=http://app:8080 \
         caldav-check python "$@"
 }
 

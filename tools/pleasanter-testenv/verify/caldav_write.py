@@ -3,7 +3,7 @@
 **判定を推測で埋めない。** 応答は /results/ へ生のまま残し、解釈は人が読んで書く（_documents/実機検証結果.md）。
 
     docker compose run --rm verify python caldav_write.py
-    # ホストから: PLEASANTER_BASE_URL=http://localhost:18090 PLEASANTER_API_KEY=... python caldav_write.py
+    # ホストから: VVPT_PLEASANTER_BASE_URL=http://localhost:18090 VVPT_PLEASANTER_API_KEY=... python caldav_write.py
 
 確かめること:
   1. 更新 API の本文へ ``Timestamp``（取得で得た値）を載せると、更新が通るか

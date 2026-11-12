@@ -26,7 +26,7 @@ def find(cal, needle):
     return next((e for e in cal.events() if needle in e.data), None)
 
 
-client = caldav.DAVClient(url=state["url"], username="alice", password=__import__("os").environ["PLEASANTER_API_KEY"])
+client = caldav.DAVClient(url=state["url"], username="alice", password=__import__("os").environ["VVPT_PLEASANTER_API_KEY"])
 cal = client.principal().calendars()[0]
 check.ok(cal.get_display_name() == "検証カレンダー", "探索: principal → calendars で、フィードがカレンダーとして見える")
 check.ok(find(cal, "Pleasanter で作った会議") is not None, "一覧: Pleasanter で作った予定が見える")

@@ -17,7 +17,7 @@ public sealed class PleasanterOptions
     public string BaseUrl { get; init; } = string.Empty;
 
     /// <summary>環境変数の名前。DotNetClient の <c>PleasanterOptions.FromEnvironment()</c> と同じ名前にそろえている。</summary>
-    public const string AllowInsecureHttpEnvironmentVariable = "PLEASANTER_ALLOW_INSECURE_HTTP";
+    public const string AllowInsecureHttpEnvironmentVariable = "VVPT_PLEASANTER_ALLOW_INSECURE_HTTP";
 
     /// <summary>
     /// ループバック以外の <c>http</c> も許す。<b>検証用の環境（コンテナ間の通信など）だけで有効にすること。</b>
@@ -26,7 +26,7 @@ public sealed class PleasanterOptions
     /// </summary>
     /// <remarks>
     /// <b>管理画面・Pleasanter.json からは設定できない</b>（本番で誤って有効にされないよう、設定の項目にしない）。
-    /// 既定値は、環境変数 <c>PLEASANTER_ALLOW_INSECURE_HTTP</c> が <c>true</c> のときだけ有効。
+    /// 既定値は、環境変数 <c>VVPT_PLEASANTER_ALLOW_INSECURE_HTTP</c> が <c>true</c> のときだけ有効。
     /// 本アプリは接続設定を自前で組み立てて DotNetClient へ渡すので、DotNetClient 側の環境変数の読み取り
     /// （<c>FromEnvironment()</c>）は届かない。そのため、ここで読む。
     /// </remarks>
