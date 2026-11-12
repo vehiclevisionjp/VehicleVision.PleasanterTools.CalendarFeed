@@ -21,7 +21,8 @@ Outlook / Google カレンダー / Apple カレンダーの「URL から購読�
 
 - 検証用の環境変数 `PLEASANTER_ALLOW_INSECURE_HTTP` を `VVPT_PLEASANTER_ALLOW_INSECURE_HTTP` へ改名した。
   **旧名は検出も受け付けもしない**（旧名だけの環境では新名が未設定として扱われる）。設定している環境は書き換える
-  （本番では有効にしない設定）。試験用スクリプトの `PLEASANTER_BASE_URL`・`PLEASANTER_API_KEY` も `VVPT_PLEASANTER_BASE_URL`・`VVPT_PLEASANTER_API_KEY` へ改名した
+  （本番では有効にしない設定）。試験用スクリプトの `PLEASANTER_BASE_URL`・`PLEASANTER_API_KEY` も
+  `VVPT_PLEASANTER_BASE_URL`・`VVPT_PLEASANTER_API_KEY` へ改名した
 - `--migrate` / `--migrate-status`: DB の待機期限切れの終了コードが 2 から 1 になり、出力に `[OK]`・`[ERROR]` の接頭辞が付き、
   進行表示は標準エラーへ移った。`--wait-for-db` は `N`・`=N`・`:N` の 3 書式を受ける
 
