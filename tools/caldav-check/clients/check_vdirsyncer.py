@@ -30,7 +30,7 @@ fileext = ".ics"
 type = "caldav"
 url = "{state['url']}"
 username = "alice"
-password = "{os.environ['PLEASANTER_API_KEY']}"
+password = "{os.environ['VVPT_PLEASANTER_API_KEY']}"
 """,
     encoding="utf-8",
 )

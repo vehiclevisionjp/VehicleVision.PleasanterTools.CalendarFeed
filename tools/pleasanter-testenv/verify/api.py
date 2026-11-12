@@ -8,8 +8,8 @@ import os
 import urllib.request
 import urllib.error
 
-BASE = os.environ.get("PLEASANTER_BASE_URL", "http://pleasanter:8080").rstrip("/")
-API_KEY = os.environ["PLEASANTER_API_KEY"]
+BASE = os.environ.get("VVPT_PLEASANTER_BASE_URL", "http://pleasanter:8080").rstrip("/")
+API_KEY = os.environ["VVPT_PLEASANTER_API_KEY"]
 
 
 def post(path: str, body: dict, timeout: int = 60):

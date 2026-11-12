@@ -4,9 +4,9 @@ import os
 import urllib.error
 import urllib.request
 
-PLEASANTER = os.environ.get("PLEASANTER_URL", "http://pleasanter:8080").rstrip("/")
+PLEASANTER = os.environ.get("VVPT_PLEASANTER_BASE_URL", "http://pleasanter:8080").rstrip("/")
 APP = os.environ.get("APP_URL", "http://app:8080").rstrip("/")
-API_KEY = os.environ["PLEASANTER_API_KEY"]
+API_KEY = os.environ["VVPT_PLEASANTER_API_KEY"]
 STATE = "/state/state.json"
 
 

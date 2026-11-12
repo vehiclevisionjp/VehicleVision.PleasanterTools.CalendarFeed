@@ -169,7 +169,7 @@ public sealed class PleasanterGatewayTests
     [InlineData("1", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
-    public void 環境変数_PLEASANTER_ALLOW_INSECURE_HTTP_は_true_のときだけ有効(string? value, bool expected)
+    public void 環境変数_VVPT_PLEASANTER_ALLOW_INSECURE_HTTP_は_true_のときだけ有効(string? value, bool expected)
     {
         Assert.Equal(expected, PleasanterOptions.ParseAllowInsecureHttp(value));
     }

@@ -92,9 +92,9 @@ services:
       pleasanter:
         condition: service_healthy
     environment:
-      PLEASANTER_BASE_URL: http://pleasanter:8080
+      VVPT_PLEASANTER_BASE_URL: http://pleasanter:8080
       # 変数名は必ずプロジェクト接頭辞を付ける（ホストの同名変数が compose の既定値を黙って上書きするため）
-      PLEASANTER_API_KEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
+      VVPT_PLEASANTER_API_KEY: ${TESTENV_API_KEY:-6ce6c0fd2f4aea3c093c3ebdd7d4ea3250a132b4867d68e7d1abe35c2499664abb398d74603c2b2a38e31a21319955b3c43ede30394ead7be37ddd615c34e1f6}
       TZ: Asia/Tokyo
     volumes:
       - ./verify:/verify:ro
