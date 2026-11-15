@@ -58,8 +58,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
     （Azure Communication Services の送信経路。**マネージド ID で通る**）
   Azure.Identity 1.21.0 / MIT / https://github.com/Azure/azure-sdk-for-net
     （マネージド ID から資格情報を取る。Azure.Core などを推移的に伴う。同リポジトリの MIT）
-  ITfoxtec.Identity.Saml2 4.21.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
-  ITfoxtec.Identity.Saml2.MvcCore 4.21.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+  ITfoxtec.Identity.Saml2 4.22.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
+  ITfoxtec.Identity.Saml2.MvcCore 4.22.0 / BSD-3-Clause / https://github.com/ITfoxtec/ITfoxtec.Identity.Saml2
     （SAML 2.0 の SP。Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-14。
       **System.Security.Cryptography.Xml は 10.0.13 以上のランタイムで動かすこと**（10.0.12 以前に高い重大度の勧告がある）。
       テストプロジェクトは 10.0.13 を明示している）
@@ -68,7 +68,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
   Microsoft.Extensions.Configuration 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.Extensions.Configuration/10.0.13
   Microsoft.Extensions.Configuration.Abstractions 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.Extensions.Configuration.Abstractions/10.0.13
   Microsoft.Extensions.Logging.Abstractions 10.0.13 / MIT / https://www.nuget.org/packages/Microsoft.Extensions.Logging.Abstractions/10.0.13
-  System.Security.Cryptography.Xml 10.0.14 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Xml/10.0.13
+  System.Security.Cryptography.Xml 10.0.15 / MIT / https://www.nuget.org/packages/System.Security.Cryptography.Xml/10.0.13
     （ITfoxtec.Identity.Saml2 が使う署名検証。**直接参照して版を固定している**。参照日 2026-10-15）
   Microsoft.Extensions.DependencyInjection 10.0.13 / MIT
     （Dapper 以下は Questionnaire の NOTICE と同じ依存・同じ版。参照日 2026-10-12）
@@ -77,7 +77,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later OR LicenseRef-PMC-Commercial
 
   Microsoft.AspNetCore.Mvc.Testing 10.0.14 / MIT
   xunit 2.9.3 / Apache-2.0
-  Microsoft.NET.Test.Sdk 18.11.0 / MIT
+  Microsoft.NET.Test.Sdk 18.12.0 / MIT
   coverlet.collector 10.1.0 / MIT
   xunit.runner.visualstudio 4.0.1 / Apache-2.0 / https://www.nuget.org/packages/xunit.runner.visualstudio/4.0.1
 

@@ -2,8 +2,8 @@
 
   <ItemGroup>
     <!-- 管理画面の SAML 2.0 ログイン（Questionnaire と同じ依存・同じ版）。BSD-3-Clause -->
-    <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.21.0" />
-    <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.21.0" />
+    <PackageReference Include="ITfoxtec.Identity.Saml2" Version="4.22.0" />
+    <PackageReference Include="ITfoxtec.Identity.Saml2.MvcCore" Version="4.22.0" />
   </ItemGroup>
 
   <ItemGroup>
