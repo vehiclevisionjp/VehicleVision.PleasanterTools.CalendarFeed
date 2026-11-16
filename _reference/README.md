@@ -65,10 +65,5 @@ git -C _reference/Implem.Pleasanter log -1 --format='%H %ad' --date=short
 
 ## 移行の根拠
 
-承認済み Template コミット `3312f003fbe9827090e20bc643800824bdf30e22` の
-[配布手順][distribution]（2026-10-27 参照）と
-vehiclevisionjp/VehicleVision.PleasanterTools.Template#61・
-vehiclevisionjp/VehicleVision.PleasanterTools.Template#63 に基づく。
+共有用の配布手順（2026-10-27 参照）で承認された方式に基づく。
 実際の本体ソースの挙動・API 仕様を今回新たに検証したという意味ではない。
-
-[distribution]: https://github.com/vehiclevisionjp/VehicleVision.PleasanterTools.Template/blob/3312f003fbe9827090e20bc643800824bdf30e22/_documents/参照ソースのオンデマンド取得への配布手順.md
