@@ -23,7 +23,7 @@ public interface IAppSettingsProvider
     /// <summary>いまの設定（短い間キャッシュする）。</summary>
     Task<AppSettingsSnapshot> GetAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>キャッシュを使わずに読み直す（他のインスタンスの保存を取り込む）。</summary>
+    /// <summary>キャッシュを使わずに読み直す（他のインスタンスの保存を反映する）。</summary>
     Task<AppSettingsSnapshot> ReloadAsync(CancellationToken cancellationToken = default);
 
     /// <summary>

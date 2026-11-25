@@ -52,7 +52,7 @@ public sealed class ParameterFilesTests : IDisposable
     [Fact]
     public void SAMLとPleasanterのログインの設定は_環境変数と同じ正式名のキーをファイルへそのまま書ける()
     {
-        // 別名の写しが無い設定（SAML・Pleasanter のログイン）は、正式名を書けばよい（README に書いてある）
+        // 別名のコピーが無い設定（SAML・Pleasanter のログイン）は、正式名を書けばよい（README に書いてある）
         Write("Service.json", """{ "CALENDARFEED_SAML_ENABLED": "true", "CALENDARFEED_PLEASANTERSSO_LOGINURL": "/users/login" }""");
 
         var config = Build();

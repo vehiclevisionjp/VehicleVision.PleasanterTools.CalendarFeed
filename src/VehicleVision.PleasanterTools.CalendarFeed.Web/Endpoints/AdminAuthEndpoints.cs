@@ -45,7 +45,7 @@ public static class AdminAuthEndpoints
                 ? await next(context)
                 : ApiError.Of(StatusCodes.Status403Forbidden, ServerMessageKeys.CrossSiteRejected));
 
-        // ログイン画面が出し分けに使う（認証前に見える値だけ。SAML の釦の有無と文字）
+        // ログイン画面が出し分けに使う（認証前に見える値だけ。SAML のボタンの有無と文字）
         group.MapGet("/status", async (IAdminUserStore users, AdminAuthOptions options, RuntimeSettings settings, CancellationToken ct) =>
         {
             var saml = settings.Current.Saml;
@@ -55,7 +55,7 @@ public static class AdminAuthEndpoints
                 setupRequired = await users.CountAsync(ct) == 0,
                 twoFactor = options.TwoFactor.ToString(),
                 saml = new { enabled = saml.Enabled, buttonLabel = saml.Enabled && saml.ButtonLabel.Length > 0 ? saml.ButtonLabel : null },
-                // Pleasanter のログイン。ログイン画面が、別窓で開くログイン画面（loginUrl）と釦の文字を使う
+                // Pleasanter のログイン。ログイン画面が、別窓で開くログイン画面（loginUrl）とボタンの文字を使う
                 pleasanterSso = new
                 {
                     enabled = sso.Enabled,

@@ -105,7 +105,7 @@ public sealed class FixedParametersTests
 
 /// <summary>
 /// <b>環境変数で指定できる設定は、ファイル（<c>App_Data/Parameters/*.json</c>）でも指定できる</b>（Pleasanter の Parameters の持ち方）。
-/// 新しい設定を足したときに、ファイル側の写しを忘れないための突き合わせ。
+/// 新しい設定を足したときに、ファイル側のコピーを忘れないための突き合わせ。
 /// </summary>
 public sealed class FileBackedSettingsTests : IDisposable
 {
@@ -156,7 +156,7 @@ public sealed class FileBackedSettingsTests : IDisposable
 
         var missing = EnvironmentSettingNames().Except(notFiles).Where(n => !fileBacked.Contains(n)).Order().ToList();
 
-        Assert.True(missing.Count == 0, "ファイルのキーへの写しが無い環境変数: " + string.Join(", ", missing));
+        Assert.True(missing.Count == 0, "ファイルのキーへのコピーが無い環境変数: " + string.Join(", ", missing));
     }
 
     [Fact]

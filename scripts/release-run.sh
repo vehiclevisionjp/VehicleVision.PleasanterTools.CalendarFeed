@@ -221,11 +221,11 @@ fi
 git fetch --no-tags origin develop:refs/remotes/origin/develop master:refs/remotes/origin/master
 
 # **SHA の一致ではなく「master に入っていない commit が無いか」で判定する。**
-# master へは merge コミットで取り込むため、中身が同じでも SHA は一致しない。
-# 取り込みの PR が別経路で先にマージされた後の再実行で、PR を作りに行って
+# master へは merge コミットで反映するため、中身が同じでも SHA は一致しない。
+# 反映の PR が別経路で先にマージされた後の再実行で、PR を作りに行って
 # 「No commits between master and develop」で断られる（Issue #460）
 if git merge-base --is-ancestor refs/remotes/origin/develop refs/remotes/origin/master; then
-    echo "== develop は既に master へ入っている。取り込みの PR は省く"
+    echo "== develop は既に master へ入っている。反映の PR は省く"
     release_pr=""
 else
     release_pr="$(find_or_create_pr master develop \

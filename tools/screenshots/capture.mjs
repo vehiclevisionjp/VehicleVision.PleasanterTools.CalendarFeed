@@ -1,4 +1,4 @@
-// 管理画面の写しを撮る（開発専用）。
+// 管理画面のスクリーンショットを撮る（開発専用）。
 //
 // 使い方（リポジトリのルートで。README.md 参照）:
 //   1. 管理画面を組み立てる:   cd src/VehicleVision.PleasanterTools.CalendarFeed.Frontend && npm ci && npm run build
@@ -19,7 +19,7 @@ import { chromium } from 'playwright-core';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..');
-// 出力先は、環境変数 SHOTS_OUT_DIR で変えられる（確認用に撮るとき、文書の写しを上書きしない）
+// 出力先は、環境変数 SHOTS_OUT_DIR で変えられる（確認用に撮るとき、文書のスクリーンショットを上書きしない）
 const outDir = process.env.SHOTS_OUT_DIR ?? path.join(root, '_documents', '画面の写し');
 const webProject = path.join(root, 'src', 'VehicleVision.PleasanterTools.CalendarFeed.Web');
 const APP = 'http://localhost:5099';
@@ -234,7 +234,7 @@ try {
   await page.waitForSelector('text=登録済みです');
   await shot(page, 'アカウント');
 
-  // SAML を有効にする（ログイン画面に釦が出る。IdP の値は検証用の Keycloak の realm のもの。実際には繋がない）
+  // SAML を有効にする（ログイン画面にボタンが出る。IdP の値は検証用の Keycloak の realm のもの。実際には繋がない）
   const realm = JSON.parse(readFileSync(path.join(here, '..', 'saml-idp', 'realm', 'realm-calendarfeed.json'), 'utf8'));
   const idpCertificate = realm.components['org.keycloak.keys.KeyProvider'].find((c) => c.config.certificate).config.certificate[0];
   const saml = await page.request.put(`${APP}/admin/api/settings/`, {
@@ -256,7 +256,7 @@ try {
   });
   if (!saml.ok()) throw new Error(`SAML の設定に失敗: ${saml.status()} ${await saml.text()}`);
 
-  // 9. ログイン（2 要素）。SAML の釦も出る
+  // 9. ログイン（2 要素）。SAML のボタンも出る
   await page.click('button:has-text("ログアウト")');
   await page.reload(); // SAML の有効・無効は、画面を開いたときに読む
   await page.waitForSelector('#login-id');

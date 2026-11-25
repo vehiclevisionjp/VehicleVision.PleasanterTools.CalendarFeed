@@ -244,7 +244,7 @@ public static class AppSettingDefinitions
         new(SamlRegisterRole, AppSettingGroups.Saml, AppSettingValueType.String, AdminRoles.Editor, "自動で作る利用者の役割", AllowedValues: AdminRoles.All),
         new(SamlLoginIdSource, AppSettingGroups.Saml, AppSettingValueType.String, "NameId", "ログイン ID の取り方", AllowedValues: ["NameId", "Claim"]),
         new(SamlLoginIdClaim, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "ログイン ID にする属性の名前", MaximumLength: 500),
-        new(SamlButtonLabel, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "ログイン画面の釦の文字", MaximumLength: 100),
+        new(SamlButtonLabel, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "ログイン画面のボタンの文字", MaximumLength: 100),
         new(SamlSingleLogoutUrl, AppSettingGroups.Saml, AppSettingValueType.String, string.Empty, "IdP の単一ログアウト URL", MaximumLength: 2000, StringNormalizer: v => Url(v, requireHttps: false)),
         new(PleasanterSsoEnabled, AppSettingGroups.PleasanterSso, AppSettingValueType.Boolean, "false", "Pleasanter のログインを有効にする"),
         new(PleasanterSsoInternalBaseUrl, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "本アプリから Pleasanter へ問い合わせる URL（サーバ間）", MaximumLength: 2000),
@@ -257,7 +257,7 @@ public static class AppSettingDefinitions
         new(PleasanterSsoRegisterRole, AppSettingGroups.PleasanterSso, AppSettingValueType.String, AdminRoles.Editor, "自動で作る利用者の役割", AllowedValues: AdminRoles.All),
         new(PleasanterSsoRevalidateMinutes, AppSettingGroups.PleasanterSso, AppSettingValueType.Integer, "5", "Pleasanter へ確かめ直す間隔（分）", Minimum: 1, Maximum: 60),
         new(PleasanterSsoTimeoutSeconds, AppSettingGroups.PleasanterSso, AppSettingValueType.Integer, "5", "Pleasanter への問い合わせの待ち時間（秒）", Minimum: 1, Maximum: 30),
-        new(PleasanterSsoButtonLabel, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "ログイン画面の釦の文字", MaximumLength: 100),
+        new(PleasanterSsoButtonLabel, AppSettingGroups.PleasanterSso, AppSettingValueType.String, string.Empty, "ログイン画面のボタンの文字", MaximumLength: 100),
     ];
 
     /// <summary>キーで引く。</summary>

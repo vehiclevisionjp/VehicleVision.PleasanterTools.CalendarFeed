@@ -27,14 +27,14 @@ trap 'rm -rf "$work"' EXIT
 
 fail=0
 
-# NuGet の直接依存を「名称<TAB>版」で書き出す。
+# NuGet の直接依存を「名称<TAB>版」で出力する。
 # **obj/ 配下は見ない。** 復元で生成される .props にも似た記述が現れる
 find src tests -name '*.csproj' -not -path '*/obj/*' -print0 \
     | xargs -0 grep -hoE '<PackageReference[^>]*Include="[^"]+"[^>]*Version="[^"]+"' \
     | sed -E 's/.*Include="([^"]+)".*Version="([^"]+)".*/\1\t\2/' \
     | sort -u > "$work/nuget.tsv"
 
-# npm の直接依存を「名称<TAB>版」で書き出す。
+# npm の直接依存を「名称<TAB>版」で出力する。
 # dependencies / devDependencies の節だけを見て、値が版らしいものに限る
 sed -n '/"\(dev\)\{0,1\}[Dd]ependencies"[[:space:]]*:[[:space:]]*{/,/^[[:space:]]*}/p' \
     "$FRONTEND_PACKAGE_JSON" \

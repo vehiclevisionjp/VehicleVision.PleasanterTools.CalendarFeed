@@ -19,7 +19,7 @@ namespace VehicleVision.PleasanterTools.CalendarFeed.Web.Services;
 /// <para>
 /// ⚠️ **ファイルのキーと環境変数の名前が違うものがある。** ファイルは Pleasanter 本体に合わせた短い名前
 /// （<c>BaseUrl</c> など）、環境変数は衝突を避けて <c>CALENDARFEED_*</c>。そのままでは片方しか効かないので、
-/// <see cref="Aliases"/> で正式な名前（環境変数と同じ）へ写している。
+/// <see cref="Aliases"/> で正式な名前（環境変数と同じ）へコピーしている。
 /// </para>
 /// <para>
 /// **値が <c>null</c> や空のキーは写さない。** <c>ApiKey</c> は既定で <c>null</c>（＝ここへ書かせない）なので、
@@ -170,7 +170,7 @@ public static class ParameterFiles
     ];
 
     /// <summary>
-    /// <b>ファイルで指定できる設定名の一覧</b>（平らなキーの写し先と、階層のキーの写し先）。
+    /// <b>ファイルで指定できる設定名の一覧</b>（平らなキーのコピー先と、階層のキーのコピー先）。
     /// <b>環境変数で指定できる設定は、ここに無ければならない</b>（テストが突き合わせる）。
     /// </summary>
     public static IEnumerable<string> FileBackedSettings =>
@@ -313,8 +313,8 @@ public static class ParameterFiles
             ? physical.Root
             : Directory.GetCurrentDirectory();
 
-    /// <summary>ファイルのキーを正式な名前へ写したものを作る。</summary>
-    /// <remarks>**写す前に一度だけ読む。** 積んだ後の設定から読むと、環境変数の値まで巻き込んで写してしまう。</remarks>
+    /// <summary>ファイルのキーを正式な名前へコピーしたものを作る。</summary>
+    /// <remarks>**コピーする前に一度だけ読む。** 積んだ後の設定から読むと、環境変数の値まで巻き込んでコピーしてしまう。</remarks>
     [SuppressMessage(
         "Reliability", "CA2000:Dispose objects before losing scope",
         Justification = "IConfigurationRoot は読み終えた時点で用済み")]
@@ -353,7 +353,7 @@ public static class ParameterFiles
     }
 
     /// <summary>
-    /// 階層のあるファイル（<see cref="SectionedNames"/>）を、ファイル名を節の名前にして写したもの。
+    /// 階層のあるファイル（<see cref="SectionedNames"/>）を、ファイル名を節の名前にしてコピーしたもの。
     /// <b>値を持つキーだけ</b>写す（<c>null</c> は写さない。環境変数を塗り潰さないため）。
     /// </summary>
     [SuppressMessage(

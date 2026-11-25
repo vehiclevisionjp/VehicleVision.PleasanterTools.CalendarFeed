@@ -19,7 +19,7 @@ check_references() {
     fi
     return "$result"
 }
-# ソースの根拠を示すコメントは許可し、取り込み指定と区別する。
+# ソースの根拠を示すコメントは許可し、組み込み指定と区別する。
 if { [[ "${#source_dirs[@]}" -gt 0 ]] &&
     { check_references -REin \
         '(using[[:space:]]+Implem\.|Include="[^"]*Implem\.[^"]*\.csproj"|PackageReference[^>]*Implem\.)' \

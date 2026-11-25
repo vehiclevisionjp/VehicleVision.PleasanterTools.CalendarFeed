@@ -160,7 +160,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         env:
           ACKNOWLEDGE: ${{ inputs.acknowledge }}
-          # **`secrets` / `vars` は `if` から参照できない。** env へ写して判定する
+          # **`secrets` / `vars` は `if` から参照できない。** env へコピーして判定する
           # （Dealer の ci.yml と同じ理由）
           HAS_CLIENT_ID: ${{ vars.MY_REPO_AUTOMATION_BOT_CLIENT_ID != '' }}
           HAS_PRIVATE_KEY: ${{ secrets.MY_REPO_AUTOMATION_BOT_PRIVATE_KEY != '' }}
