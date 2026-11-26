@@ -24,7 +24,7 @@ public sealed record RateLimitPolicy(int Limit, TimeSpan Window);
 /// <para>
 /// 階層のあるファイル（<c>RateLimit.json</c>・<c>CalDav.json</c>）は、ファイル名を節の名前にして読む
 /// （<c>RateLimit:Policies:CalDav:Limit</c>。環境変数なら <c>RateLimit__Policies__CalDav__Limit</c>）。
-/// 平らなファイルは、これまでどおり正式な名前（<c>CALENDARFEED_*</c>）へ写して読む。
+/// 平らなファイルは、これまでどおり正式な名前（<c>CALENDARFEED_*</c>）へコピーして読む。
 /// </para>
 /// </remarks>
 public sealed class FixedParameters

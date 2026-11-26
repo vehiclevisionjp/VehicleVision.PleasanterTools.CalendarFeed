@@ -107,7 +107,7 @@ cd src/VehicleVision.PleasanterTools.CalendarFeed.Frontend
 npm ci && npm test && npm run build
 ```
 
-管理画面の画面の写しは
+管理画面のスクリーンショットは
 [`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md)（[`tools/screenshots`](tools/screenshots/README.md) で撮り直せる）。
 
 **実機（Pleasanter・Keycloak）での通し**は CI の「端から端まで通す試験」（`.github/workflows/e2e.yml`）で回す。手元でも
@@ -127,11 +127,11 @@ Pleasanter 本体は開発・CI の依存ではなく、AI の事実確認時だ
 | [`_documents/導入-更新運用手順書.md`](_documents/導入-更新運用手順書.md) | 導入・日常運用・更新・困ったとき（鍵を失ったとき、プロキシのログ） |
 | [`_documents/機能一覧.md`](_documents/機能一覧.md) | 機能・方式・設定・関連 Issue |
 | [`_documents/実機検証結果.md`](_documents/実機検証結果.md) | 実機（Pleasanter・Keycloak）で確かめた挙動 |
-| [`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md) | 管理画面の画面の写し |
+| [`_documents/管理画面-画面の写し一覧.md`](_documents/管理画面-画面の写し一覧.md) | 管理画面のスクリーンショット |
 | `_reference/Implem.Pleasanter` | Pleasanter 本体（**AGPL v3 / 参照専用・非追跡・必要時取得**）。[README](_reference/README.md) |
 | [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | 開発規約（単一の参照元）。Claude Code は [`CLAUDE.md`](CLAUDE.md) から辿る |
 
-**Pleasanter 本体（AGPL v3）のコードは取り込まない。** 依存 OSS は寛容ライセンスに限定する（[`NOTICE`](NOTICE)）。
+**Pleasanter 本体（AGPL v3）のコードは組み込まない。** 依存 OSS は寛容ライセンスに限定する（[`NOTICE`](NOTICE)）。
 
 ## ライセンス
 

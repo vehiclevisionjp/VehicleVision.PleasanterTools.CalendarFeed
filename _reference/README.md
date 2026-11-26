@@ -7,7 +7,7 @@ Pleasanter 本体（GNU AGPL v3）は **AI の事実確認専用**。Git では�
 - 取得元: <https://github.com/Implem/Implem.Pleasanter>
 - 取得 branch: `main`（リリース前の変更を含む）
 - 本アプリのデュアルライセンス（AGPL-3.0-or-later OR 商用）は変更しない。
-  本体のコードを取り込まないことが商用提供の前提（[`LICENSING.md`](../LICENSING.md)）
+  本体のコードを組み込まないことが商用提供の前提（[`LICENSING.md`](../LICENSING.md)）
 
 ## 厳守事項
 

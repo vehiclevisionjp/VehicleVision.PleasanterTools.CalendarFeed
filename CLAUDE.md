@@ -18,7 +18,7 @@ Claude Code は `applyTo` を自動で解釈しないため、自分で開く必
 - **`_reference/Implem.Pleasanter` は Pleasanter 本体（AGPL v3）の非追跡の参照ソースです。**
   読む前に `bash scripts/sync-reference.sh` で上流 `main` の先頭へ更新します。
   `PLEASANTER_REFERENCE_DIR` を指定した場合は共有取得先を直接読み、リンクは作りません。
-  AI の事実確認専用で、コードの取り込み・ビルド・配布物への混入は禁止です。
+  AI の事実確認専用で、コードの組み込み・ビルド・配布物への混入は禁止です。
   確認した完全な SHA・固定リンク・参照日を残し、実機未検証なら明記します。
   詳細は [`_reference/README.md`](_reference/README.md) を参照してください。
 - **Pleasanter の API キーは、リクエストボディに載せる方式です**
@@ -41,7 +41,7 @@ Claude Code は `applyTo` を自動で解釈しないため、自分で開く必
 ```
 
 - **別途 clone を作らないこと。** 2 つあると必ず片方が古くなる
-- セッション開始時に `git -C <memory> pull --rebase` で他の人の追記を取り込むこと
+- セッション開始時に `git -C <memory> pull --rebase` で他の人の追記を反映すること
 - メモリを追加・更新したら `MEMORY.md` の索引も更新し、コミットして push すること
   （本体リポジトリと違い、push まで指示を待たなくてよい）
 - 書いてよいのは「コードや git 履歴を読んでも分からないこと」だけ。認証情報

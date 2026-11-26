@@ -1,5 +1,5 @@
 // 見た目の基準は VehicleVision.DesignReference（Web UI（アプリ・管理画面）の章。第 2.4 版）。
-// - 色・書体・余白・角丸・影・フォーカスリング・動きの設定は design-reference/ の 2 ファイルにある（DesignReference の写し。ここでは直さない）。
+// - 色・書体・余白・角丸・影・フォーカスリング・動きの設定は design-reference/ の 2 ファイルにある（DesignReference のコピー。ここでは直さない）。
 //   色は **明示型**: 既定はライト。OS の prefers-color-scheme には従わない（ダークの切り替えは持たない）。
 // - このファイルは、トークン（var(--color-*) など）だけで書く。**色コードは書かない**。
 // - CSP は style-src 'self'。インラインの style 属性・<style> は使えないので、見た目はすべてここへ書く。
@@ -7,7 +7,7 @@
 @use 'design-reference/app-base.css';
 
 // アイコンの下地（同梱した Material Icons）。中身はアイコンの名前（リガチャで字形へ置き換わる）。
-// **意味は文字でも書くこと**（アイコンだけの釦は読み上げで何も伝わらない）。**aria-hidden="true" を必ず付ける**
+// **意味は文字でも書くこと**（アイコンだけのボタンは読み上げで何も伝わらない）。**aria-hidden="true" を必ず付ける**
 .material-icons {
   font-family: 'Material Icons';
   font-weight: normal;

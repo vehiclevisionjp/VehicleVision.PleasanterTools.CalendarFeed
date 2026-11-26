@@ -156,7 +156,7 @@ public sealed class AdminAuthEndpointTests : IDisposable
         var session = login.Headers.GetValues("Set-Cookie")
             .Single(c => c.StartsWith("calendarfeed_admin=", StringComparison.Ordinal)).Split(';')[0];
 
-        // cookie を別の入れ物（別のブラウザ）へ写して使う
+        // cookie を別の入れ物（別のブラウザ）へコピーして使う
         var stolen = _app.Client();
         using (var before = new HttpRequestMessage(HttpMethod.Get, "/admin/api/me/"))
         {
