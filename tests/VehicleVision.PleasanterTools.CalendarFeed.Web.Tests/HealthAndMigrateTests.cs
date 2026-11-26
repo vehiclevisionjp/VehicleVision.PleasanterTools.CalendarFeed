@@ -97,10 +97,29 @@ public sealed class HealthAndMigrateTests : IDisposable
             [
                 "Core_AdminUsers", "Core_AdminSetup", "Core_AdminSessions", "Core_AdminRecoveryCodes", "Core_AuditLogs",
                 "Core_AdminInvitations", "Core_MailOutbox", "Core_AppSettings", "Core_RateLimits",
+                "Core_AdminPasskeys", "Core_AdminPasskeyChallenges",
             ];
             Assert.All(legacy, name => Assert.DoesNotContain(name, tables));
             Assert.All(shared, name => Assert.Contains(name, tables));
             Assert.Contains("Feeds", tables);
+
+            // Core 0.3.0 の共有移行 M10008（パスキーの表 2 つ）と M10009（AdminSessions.Via）が適用される。
+            using var versions = db.CreateCommand();
+            versions.CommandText = "SELECT Version FROM VersionInfo WHERE Version IN (10008, 10009)";
+            var applied = new List<long>();
+            using (var reader = versions.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    applied.Add(reader.GetInt64(0));
+                }
+            }
+
+            Assert.Equal([10008L, 10009L], applied.Order().ToArray());
+
+            using var columns = db.CreateCommand();
+            columns.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Core_AdminSessions') WHERE name = 'Via'";
+            Assert.Equal(1L, Convert.ToInt64(columns.ExecuteScalar()));
         }
         finally
         {
