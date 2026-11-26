@@ -198,6 +198,10 @@ Helm の `pre-install` hook がマイグレーション Job を 1 Pod だけ起�
 成功してから Deployment を作る。DB 接続に失敗するかマイグレーションに失敗した場合、導入は止まる。
 Core.Data 0.2.0 では、DB の待機期限切れの終了コードが 2 から 1 になり、出力に `[OK]`・`[ERROR]` の接頭辞が付く。
 hook は出力文言を解析せず、0 か否かだけで判定する（終了コード 2 を特別扱いしていない）ため、引数とチャートの変更は不要。
+Core.Data 0.3.0 では、共有移行 M10008（空の表 `Core_AdminPasskeys`・`Core_AdminPasskeyChallenges`）と
+M10009（`Core_AdminSessions` に NULL 可の `Via` 列）が増える。
+hook の Job が当てるので、Job の DB アカウントに表の作成と列の追加の権限が要る。
+詳細は [`導入-更新運用手順書.md`](導入-更新運用手順書.md#core-030-で増える共有移行m10008m10009) を参照する。
 検証用の環境変数 `PLEASANTER_ALLOW_INSECURE_HTTP` は `VVPT_PLEASANTER_ALLOW_INSECURE_HTTP` へ改名した。チャートは渡さない（本番では設定しない）ので影響しない。
 旧名と新名の対応・直し方は [`導入-更新運用手順書.md`](導入-更新運用手順書.md#環境変数の改名と---migrate-の変更issue-235破壊的変更) を参照する。
 状態確認の引数・終了コード・出力は
